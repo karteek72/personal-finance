@@ -1,0 +1,100 @@
+{
+  "meta": {
+    "product": "SpendFlow",
+    "version": "1.0.0",
+    "description": "Platform-agnostic design tokens. Consumed by ui/ (CSS/Tailwind) and ios/ (Asset Catalog / SwiftUI)."
+  },
+  "color": {
+    "primary": {
+      "light": "#01696f",
+      "dark": "#4f98a3",
+      "usage": "CTAs, active navigation, savings indicators"
+    },
+    "danger": {
+      "light": "#c0392b",
+      "dark": "#e05c4a",
+      "usage": "Expenses, overspend alerts"
+    },
+    "success": {
+      "light": "#437a22",
+      "dark": "#6daa45",
+      "usage": "Income, positive deltas"
+    },
+    "warning": {
+      "light": "#b07a00",
+      "dark": "#e8af34",
+      "usage": "Warnings, budget nearing limit"
+    },
+    "background": {
+      "light": "#f7f6f2",
+      "dark": "#0f0e0d",
+      "usage": "Page background"
+    },
+    "surface": {
+      "light": "#f9f8f5",
+      "dark": "#161513",
+      "usage": "Cards, panels"
+    },
+    "border": {
+      "light": "#d4d1ca",
+      "dark": "#2e2d2b",
+      "usage": "Dividers, card borders"
+    }
+  },
+  "typography": {
+    "fontFamily": {
+      "body": "Inter",
+      "mono": "JetBrains Mono"
+    },
+    "scale": {
+      "pageTitle": { "sizePx": 24, "weight": 700, "lineHeightPx": 30 },
+      "sectionHeading": { "sizePx": 18, "weight": 600, "lineHeightPx": 24 },
+      "subheading": { "sizePx": 16, "weight": 600, "lineHeightPx": 22 },
+      "body": { "sizePx": 14, "weight": 400, "lineHeightPx": 20 },
+      "bodyMedium": { "sizePx": 14, "weight": 500, "lineHeightPx": 20 },
+      "caption": { "sizePx": 12, "weight": 400, "lineHeightPx": 16 },
+      "moneyLarge": { "sizePx": 22, "weight": 500, "lineHeightPx": 28, "font": "mono" },
+      "moneyDefault": { "sizePx": 14, "weight": 500, "lineHeightPx": 20, "font": "mono" }
+    },
+    "rules": {
+      "tabularNumerals": true,
+      "iosDynamicType": "Map body scale to Dynamic Type where possible; money always uses monospaced digits."
+    }
+  },
+  "spacing": {
+    "baseUnitPx": 4,
+    "cardPaddingPx": 16,
+    "sectionGapPx": 16,
+    "pagePaddingPx": 20
+  },
+  "radius": {
+    "cardPx": 6,
+    "pillPx": 9999
+  },
+  "categories": [
+    { "id": "food-groceries", "label": "Food & Groceries", "chartColor": "#3B82F6" },
+    { "id": "dining", "label": "Dining & Restaurants", "chartColor": "#F97316" },
+    { "id": "transport", "label": "Transport & Gas", "chartColor": "#6B7280" },
+    { "id": "entertainment", "label": "Entertainment", "chartColor": "#A855F7" },
+    { "id": "shopping", "label": "Shopping & Retail", "chartColor": "#22C55E" },
+    { "id": "utilities", "label": "Utilities & Bills", "chartColor": "#6366F1" },
+    { "id": "health", "label": "Health & Medical", "chartColor": "#EC4899" },
+    { "id": "travel", "label": "Travel & Hotels", "chartColor": "#14B8A6" },
+    { "id": "subscriptions", "label": "Subscriptions & Software", "chartColor": "#EF4444" },
+    { "id": "home-rent", "label": "Home & Rent", "chartColor": "#EAB308" },
+    { "id": "education", "label": "Education", "chartColor": "#8B5CF6" },
+    { "id": "personal-care", "label": "Personal Care", "chartColor": "#F43F5E" },
+    { "id": "financial", "label": "Financial", "chartColor": "#64748B" },
+    { "id": "income", "label": "Income", "chartColor": "#437a22" },
+    { "id": "transfers", "label": "Transfers (internal)", "chartColor": "#01696f" }
+  ],
+  "navigation": {
+    "primaryDestinations": [
+      { "id": "dashboard", "label": "Dashboard", "route": "/" },
+      { "id": "flow", "label": "Money Flow", "route": "/flow" },
+      { "id": "categories", "label": "Categories", "route": "/categories" },
+      { "id": "transactions", "label": "Transactions", "route": "/transactions" },
+      { "id": "accounts", "label": "Accounts", "route": "/accounts" }
+    ]
+  }
+}

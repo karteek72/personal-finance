@@ -1,0 +1,33 @@
+---
+description: SpendFlow monorepo conventions — always apply
+alwaysApply: true
+---
+
+# SpendFlow Project Rules
+
+## Structure
+
+- `ui/` = Next.js frontend only. No DB, Plaid secrets, or business rules.
+- `ios/` = SwiftUI iPhone app. Keychain for tokens; native Plaid Link; same API.
+- `backend/` = Fastify API + workers. Owns all persistence and Plaid server calls.
+- `docs/design/` = requirements source of truth. Update docs when changing behavior.
+- `docs/design/design-tokens.json` = shared colors/categories for web and iOS.
+- API shape lives in `docs/design/api-contract.md` — keep all clients aligned.
+
+## TypeScript (all services)
+
+- Enable strict mode. No `any`; use `unknown` + type guards at boundaries.
+- Validate external input with Zod (API bodies, env vars, webhooks).
+- Prefer `interface` for object shapes; use `type` for unions and utilities.
+- Use explicit return types on exported functions and public APIs.
+- Never swallow errors — log with context and rethrow or map to HTTP errors.
+
+## Scope discipline
+
+- Minimal diffs. No speculative helpers or premature abstractions.
+- Match existing naming: kebab-case files, PascalCase React components.
+- Do not commit `.env` files or secrets.
+
+## Phase 0
+
+Structure and rules only until scaffolding is explicitly requested. Read `AGENTS.md` before implementing.

@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS & editors
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+
+# Test & coverage
+coverage/
+.nyc_output/
+
+# Podman / Compose local overrides
+compose.override.yaml
+containers/.env
+
+# Drizzle
+backend/drizzle/meta/_journal.json.bak
+
+# Misc
+*.local
+.cache/
+.turbo/

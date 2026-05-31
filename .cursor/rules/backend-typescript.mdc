@@ -1,0 +1,48 @@
+---
+description: Fastify backend TypeScript conventions
+globs: backend/**/*
+alwaysApply: false
+---
+
+# Backend TypeScript Rules
+
+## Architecture
+
+- **Routes** — Zod validate → call service → return typed JSON. No business logic in routes.
+- **Services** — reconciliation, categorization, Plaid sync live here.
+- **DB** — Drizzle only; no raw SQL strings except where Drizzle cannot express the query.
+
+## Modules
+
+- ESM: `"type": "module"`; use `.js` extensions in relative imports.
+- Config via `config/env.ts` — Zod schema, fail fast on boot if invalid.
+
+## Errors
+
+```typescript
+// ❌ BAD
+catch (e) { return reply.status(500).send("error") }
+
+// ✅ GOOD
+catch (err) {
+  logger.error({ err, userId }, "sync failed")
+  throw new AppError("SYNC_FAILED", "Unable to sync transactions", { cause: err })
+}
+```
+
+## Security
+
+- Encrypt Plaid tokens before DB write; decrypt only in sync service.
+- Verify Plaid webhook HMAC before processing.
+- Scope every query by authenticated `userId`.
+- Never log access tokens, passwords, or full account numbers.
+
+## Money
+
+- Store as `numeric(12,2)` in Postgres; serialize as decimal strings in JSON.
+- Never use JavaScript `number` for currency arithmetic in business logic.
+
+## Jobs
+
+- Webhook handlers enqueue work — do not run full sync inline in the request.
+- Jobs must be idempotent (safe to retry on Plaid cursor sync).

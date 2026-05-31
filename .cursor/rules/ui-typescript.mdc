@@ -1,0 +1,40 @@
+---
+description: Next.js UI TypeScript and React conventions
+globs: ui/**/*
+alwaysApply: false
+---
+
+# UI TypeScript Rules
+
+## Components
+
+- Server Components by default; `"use client"` only when needed (hooks, events, browser APIs).
+- One component per file; export name matches filename (`kpi-card.tsx` → `KpiCard`).
+- Props as `interface XxxProps`; no inline prop types on large components.
+
+## Data fetching
+
+- All financial data via `lib/api-client.ts` → backend REST API.
+- Use TanStack Query for server state; Zustand for UI-only state (theme, month filter).
+- No `fetch` to Plaid or direct DB from UI except Plaid Link SDK.
+
+## Styling
+
+- Tailwind v4 + CSS tokens from `docs/design/design-system.md`.
+- Money values: JetBrains Mono + `tabular-nums`.
+- No box shadows; flat surfaces with border/surface contrast.
+
+## Types
+
+- Mirror `docs/design/api-contract.md` in `src/types/api.ts`.
+- Parse API responses with Zod at the client boundary when feasible.
+
+## Example
+
+```tsx
+// ❌ BAD — business logic in UI
+const netSpend = txs.filter(t => !t.name.includes("PAYMENT")).reduce(...)
+
+// ✅ GOOD — consume backend summary
+const { data } = useQuery({ queryKey: ["summary", month], queryFn: () => api.getSummary(month) })
+```
