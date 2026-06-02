@@ -35,30 +35,33 @@ async function resolveScopeFilters(
     query.memberId ? undefined : scope === "all" ? undefined : scope,
     query.memberId,
   );
-  return scopedAccountIds;
+  return { user, scopedAccountIds };
 }
 
 export const transactionRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/transactions/summary", async (request) => {
+  app.get("/transactions/summary", async (request, reply) => {
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const query = request.query as { from?: string; to?: string };
-    return getSummary(query.from, query.to);
+    return getSummary(user.id, query.from, query.to);
   });
 
   app.get("/transactions", async (request, reply) => {
     const query = request.query as Record<string, string | undefined>;
-    const scopedAccountIds = await resolveScopeFilters(
+    const scope = await resolveScopeFilters(
       request,
       reply,
       app.config.env,
       query,
     );
-    if (scopedAccountIds === null) return;
+    if (!scope) return;
 
     return listTransactions({
+      userId: scope.user.id,
       month: query.month,
       category: query.category,
       accountId: query.accountId,
-      scopedAccountIds,
+      scopedAccountIds: scope.scopedAccountIds,
       q: query.q,
       type: query.type,
       sort: query.sort as
@@ -75,9 +78,11 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
-  app.get("/transactions/by-category", async (request) => {
+  app.get("/transactions/by-category", async (request, reply) => {
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const query = request.query as { from?: string; to?: string };
-    return getCategories(query.from, query.to);
+    return getCategories(user.id, query.from, query.to);
   });
 
   app.get("/transactions/chart-data", async (request, reply) => {
@@ -89,41 +94,46 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
       scope?: string;
       memberId?: string;
     };
-    const scopedAccountIds = await resolveScopeFilters(
+    const scope = await resolveScopeFilters(
       request,
       reply,
       app.config.env,
       query,
     );
-    if (scopedAccountIds === null) return;
+    if (!scope) return;
 
     return getChartData({
+      userId: scope.user.id,
       from: query.from,
       to: query.to,
       accountId: query.accountId,
       category: query.category,
-      scopedAccountIds,
+      scopedAccountIds: scope.scopedAccountIds,
     });
   });
 
-  app.get("/transactions/flow", async (request) => {
+  app.get("/transactions/flow", async (request, reply) => {
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const query = request.query as { from?: string; to?: string };
-    return getMoneyFlow(query.from, query.to);
+    return getMoneyFlow(user.id, query.from, query.to);
   });
 };
 
 export const insightRoutes: FastifyPluginAsync = async (app) => {
   app.get("/insights/alerts", async () => getAlerts());
-  app.get("/insights/trends", async (request) => {
+  app.get("/insights/trends", async (request, reply) => {
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const query = request.query as { from?: string; to?: string };
-    return getTrends(query.from, query.to);
+    return getTrends(user.id, query.from, query.to);
   });
 };
 
-export async function getPlaidAccountsResponse() {
-  const count = await transactionCount();
+export async function getPlaidAccountsResponse(userId: string) {
+  const count = await transactionCount(userId);
   if (count > 0) {
-    return getAccountsFromDb();
+    return getAccountsFromDb(userId);
   }
   return getMockAccounts();
 }

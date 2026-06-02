@@ -3,12 +3,12 @@ import { getDb } from "../db/client.js";
 import { accounts, transactions } from "../db/schema.js";
 import { getMemberMapForAccounts } from "./household-store.js";
 
-export async function listAccounts() {
+export async function listAccounts(userId: string) {
   const db = getDb();
   const rows = await db
     .select()
     .from(accounts)
-    .where(eq(accounts.isActive, true))
+    .where(and(eq(accounts.userId, userId), eq(accounts.isActive, true)))
     .orderBy(accounts.name);
 
   const memberMap = await getMemberMapForAccounts(rows.map((row) => row.id));
@@ -68,6 +68,7 @@ function transactionOrderBy(sort: TransactionSort = "date_desc") {
 }
 
 export async function listTransactions(filters: {
+  userId: string;
   month?: string;
   category?: string;
   accountId?: string;
@@ -80,7 +81,7 @@ export async function listTransactions(filters: {
 }) {
   const db = getDb();
   const limit = filters.limit ?? 50;
-  const conditions = [];
+  const conditions = [eq(transactions.userId, filters.userId)];
 
   if (filters.scopedAccountIds !== undefined && filters.scopedAccountIds !== null) {
     if (filters.scopedAccountIds.length === 0) {
@@ -172,17 +173,18 @@ export async function listTransactions(filters: {
   };
 }
 
-export async function getSummary(from?: string, to?: string) {
+export async function getSummary(userId: string, from?: string, to?: string) {
   const db = getDb();
   const dateFilter =
     from && to
-      ? sql`${transactions.date} >= ${from} AND ${transactions.date} <= ${to}`
+      ? sql`date >= ${from} AND date <= ${to}`
       : sql`TRUE`;
 
   const spendRows = await db.execute<{ total: string }>(sql`
     SELECT COALESCE(SUM(amount::numeric), 0)::text AS total
     FROM transactions
-    WHERE transaction_type = 'expense'
+    WHERE user_id = ${userId}
+      AND transaction_type = 'expense'
       AND is_transfer = false
       AND ${dateFilter}
   `);
@@ -190,7 +192,8 @@ export async function getSummary(from?: string, to?: string) {
   const incomeRows = await db.execute<{ total: string }>(sql`
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
-    WHERE transaction_type = 'income'
+    WHERE user_id = ${userId}
+      AND transaction_type = 'income'
       AND is_transfer = false
       AND ${dateFilter}
   `);
@@ -198,7 +201,8 @@ export async function getSummary(from?: string, to?: string) {
   const transferRows = await db.execute<{ total: string }>(sql`
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
-    WHERE is_transfer = true
+    WHERE user_id = ${userId}
+      AND is_transfer = true
       AND ${dateFilter}
   `);
 
@@ -208,7 +212,8 @@ export async function getSummary(from?: string, to?: string) {
   }>(sql`
     SELECT category AS name, SUM(amount::numeric)::text AS amount
     FROM transactions
-    WHERE transaction_type = 'expense'
+    WHERE user_id = ${userId}
+      AND transaction_type = 'expense'
       AND is_transfer = false
       AND ${dateFilter}
     GROUP BY category
@@ -234,11 +239,11 @@ export async function getSummary(from?: string, to?: string) {
   };
 }
 
-export async function getCategories(from?: string, to?: string) {
+export async function getCategories(userId: string, from?: string, to?: string) {
   const db = getDb();
   const dateFilter =
     from && to
-      ? sql`${transactions.date} >= ${from} AND ${transactions.date} <= ${to}`
+      ? sql`date >= ${from} AND date <= ${to}`
       : sql`TRUE`;
 
   const rows = await db.execute<{
@@ -247,7 +252,8 @@ export async function getCategories(from?: string, to?: string) {
   }>(sql`
     SELECT category AS name, SUM(amount::numeric)::text AS amount
     FROM transactions
-    WHERE transaction_type = 'expense'
+    WHERE user_id = ${userId}
+      AND transaction_type = 'expense'
       AND is_transfer = false
       AND ${dateFilter}
     GROUP BY category
@@ -269,7 +275,7 @@ export async function getCategories(from?: string, to?: string) {
   };
 }
 
-export async function getMoneyFlow(from?: string, to?: string) {
+export async function getMoneyFlow(userId: string, from?: string, to?: string) {
   void from;
   void to;
   const db = getDb();
@@ -277,7 +283,8 @@ export async function getMoneyFlow(from?: string, to?: string) {
   const incomeSources = await db.execute<{ label: string; amount: string }>(sql`
     SELECT name AS label, SUM(ABS(amount::numeric))::text AS amount
     FROM transactions
-    WHERE transaction_type = 'income' AND is_transfer = false
+    WHERE user_id = ${userId}
+      AND transaction_type = 'income' AND is_transfer = false
     GROUP BY name
     ORDER BY SUM(ABS(amount::numeric)) DESC
     LIMIT 10
@@ -287,7 +294,8 @@ export async function getMoneyFlow(from?: string, to?: string) {
     SELECT a.name AS label, SUM(ABS(t.amount::numeric))::text AS amount
     FROM transactions t
     JOIN accounts a ON a.id = t.account_id
-    WHERE a.type = 'depository' AND t.transaction_type = 'expense' AND t.is_transfer = false
+    WHERE t.user_id = ${userId}
+      AND a.type = 'depository' AND t.transaction_type = 'expense' AND t.is_transfer = false
     GROUP BY a.name
   `);
 
@@ -295,7 +303,8 @@ export async function getMoneyFlow(from?: string, to?: string) {
     SELECT a.name AS label, SUM(t.amount::numeric)::text AS amount
     FROM transactions t
     JOIN accounts a ON a.id = t.account_id
-    WHERE a.type = 'credit' AND t.transaction_type = 'expense' AND t.is_transfer = false
+    WHERE t.user_id = ${userId}
+      AND a.type = 'credit' AND t.transaction_type = 'expense' AND t.is_transfer = false
     GROUP BY a.name
   `);
 
@@ -311,6 +320,7 @@ export async function getMoneyFlow(from?: string, to?: string) {
       COALESCE(SUM(CASE WHEN transaction_type = 'expense' AND NOT is_transfer THEN amount::numeric ELSE 0 END), 0)::text AS expenses,
       COALESCE(SUM(CASE WHEN transaction_type = 'income' AND NOT is_transfer THEN ABS(amount::numeric) WHEN transaction_type = 'expense' AND NOT is_transfer THEN -amount::numeric ELSE 0 END), 0)::text AS net
     FROM transactions
+    WHERE user_id = ${userId}
     GROUP BY date_trunc('month', date)
     ORDER BY month
   `);
@@ -321,7 +331,7 @@ export async function getMoneyFlow(from?: string, to?: string) {
   );
   const transferTotal = await db.execute<{ total: string }>(sql`
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
-    FROM transactions WHERE is_transfer = true
+    FROM transactions WHERE user_id = ${userId} AND is_transfer = true
   `);
   const ccTotal = creditCards.reduce(
     (s, r) => s + Number.parseFloat(r.amount),
@@ -345,7 +355,7 @@ export async function getMoneyFlow(from?: string, to?: string) {
   };
 }
 
-export async function getTrends(from?: string, to?: string) {
+export async function getTrends(userId: string, from?: string, to?: string) {
   void from;
   void to;
   const db = getDb();
@@ -360,7 +370,8 @@ export async function getTrends(from?: string, to?: string) {
       to_char(date_trunc('month', date), 'YYYY-MM') AS month,
       SUM(amount::numeric)::text AS amount
     FROM transactions
-    WHERE transaction_type = 'expense' AND NOT is_transfer
+    WHERE user_id = ${userId}
+      AND transaction_type = 'expense' AND NOT is_transfer
     GROUP BY category, date_trunc('month', date)
     ORDER BY category, month
   `);
@@ -380,6 +391,7 @@ export async function getTrends(from?: string, to?: string) {
 }
 
 export interface ChartDataParams {
+  userId: string;
   from?: string;
   to?: string;
   accountId?: string;
@@ -388,7 +400,7 @@ export interface ChartDataParams {
 }
 
 function buildChartFilters(params: ChartDataParams) {
-  const parts = [sql`TRUE`];
+  const parts = [sql`t.user_id = ${params.userId}`];
   if (params.from && params.to) {
     parts.push(sql`t.date >= ${params.from} AND t.date <= ${params.to}`);
   }
@@ -413,7 +425,7 @@ function buildChartFilters(params: ChartDataParams) {
   return sql.join(parts, sql` AND `);
 }
 
-export async function getChartData(params: ChartDataParams = {}) {
+export async function getChartData(params: ChartDataParams) {
   const db = getDb();
   const whereClause = buildChartFilters(params);
 
@@ -602,8 +614,15 @@ export async function getAlerts() {
   };
 }
 
-export async function transactionCount(): Promise<number> {
+export async function transactionCount(userId?: string): Promise<number> {
   const db = getDb();
+  if (userId) {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(transactions)
+      .where(eq(transactions.userId, userId));
+    return row?.count ?? 0;
+  }
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(transactions);

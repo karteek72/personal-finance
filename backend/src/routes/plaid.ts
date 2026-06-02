@@ -121,7 +121,11 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
-  app.get("/plaid/accounts", async () => getPlaidAccountsResponse());
+  app.get("/plaid/accounts", async (request, reply) => {
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
+    return getPlaidAccountsResponse(user.id);
+  });
 
   app.get("/plaid/items", async (request, reply) => {
     const user = await requireRequestUser(request, reply, app.config.env);

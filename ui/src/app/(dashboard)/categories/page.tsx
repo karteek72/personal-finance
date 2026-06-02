@@ -1,6 +1,7 @@
 import { CategoryAnalyticsPanel } from "@/components/charts/category-analytics-panel";
 import { PageHeader } from "@/components/ui/page-header";
-import { api } from "@/lib/api-client";
+import { fetchJsonServer } from "@/lib/api-server";
+import type { CategoriesResponse } from "@/types/api";
 
 function defaultDateRange(): { from: string; to: string } {
   const year = new Date().getFullYear();
@@ -9,7 +10,9 @@ function defaultDateRange(): { from: string; to: string } {
 
 export default async function CategoriesPage() {
   const { from, to } = defaultDateRange();
-  const categories = await api.getCategories(from, to);
+  const categories = await fetchJsonServer<CategoriesResponse>(
+    `/transactions/by-category?from=${from}&to=${to}`,
+  );
 
   return (
     <div className="flex flex-col gap-5">

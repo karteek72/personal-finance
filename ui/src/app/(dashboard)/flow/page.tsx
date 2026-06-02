@@ -1,7 +1,8 @@
 import { FlowAnalyticsPanel } from "@/components/charts/flow-analytics-panel";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { api } from "@/lib/api-client";
+import { fetchJsonServer } from "@/lib/api-server";
+import type { MoneyFlowResponse } from "@/types/api";
 import { formatMoney } from "@/lib/format-money";
 
 function yearToDateRange(): { from: string; to: string } {
@@ -57,7 +58,9 @@ function FlowColumn({
 
 export default async function MoneyFlowPage() {
   const { from, to } = yearToDateRange();
-  const flow = await api.getMoneyFlow(from, to);
+  const flow = await fetchJsonServer<MoneyFlowResponse>(
+    `/transactions/flow?from=${from}&to=${to}`,
+  );
 
   return (
     <div className="flex flex-col gap-5">

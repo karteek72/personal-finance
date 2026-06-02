@@ -5,8 +5,10 @@ import { requireRequestUser } from "../lib/auth-http.js";
 import { listAccounts } from "../services/transaction-store.js";
 
 export const accountRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/accounts", async () => {
-    return listAccounts();
+  app.get("/accounts", async (request, reply) => {
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
+    return listAccounts(user.id);
   });
 
   app.delete("/accounts/:accountId", async (request, reply) => {

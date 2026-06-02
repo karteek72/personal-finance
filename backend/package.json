@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "import:statements": "tsx scripts/import-statements.ts"
+    "import:statements": "tsx scripts/import-statements.ts",
+    "db:assign-legacy": "tsx scripts/assign-legacy-data.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

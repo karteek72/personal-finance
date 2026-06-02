@@ -2,7 +2,8 @@ import { AlertBanner } from "@/components/ui/alert-banner";
 import { Card } from "@/components/ui/card";
 import { SpendAnalyticsPanel } from "@/components/charts/spend-analytics-panel";
 import { KpiCard } from "@/components/ui/kpi-card";
-import { api } from "@/lib/api-client";
+import { fetchJsonServer } from "@/lib/api-server";
+import type { AlertsResponse, TransactionSummary } from "@/types/api";
 import { formatMoney } from "@/lib/format-money";
 
 function yearToDateRange(): { from: string; to: string } {
@@ -20,13 +21,15 @@ function getGreeting(): string {
 export default async function DashboardPage() {
   const { from, to } = yearToDateRange();
 
-  let summary: Awaited<ReturnType<typeof api.getSummary>>;
-  let alerts: Awaited<ReturnType<typeof api.getAlerts>>;
+  let summary: TransactionSummary;
+  let alerts: AlertsResponse;
 
   try {
     [summary, alerts] = await Promise.all([
-      api.getSummary(from, to),
-      api.getAlerts(),
+      fetchJsonServer<TransactionSummary>(
+        `/transactions/summary?from=${from}&to=${to}`,
+      ),
+      fetchJsonServer<AlertsResponse>("/insights/alerts"),
     ]);
   } catch (err) {
     const message =

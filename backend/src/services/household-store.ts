@@ -357,7 +357,13 @@ export async function resolveScopedAccountIds(
     return rows.map((row) => row.accountId);
   }
 
-  return null;
+  const db = getDb();
+  const rows = await db
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(and(eq(accounts.userId, userId), eq(accounts.isActive, true)));
+
+  return rows.map((row) => row.id);
 }
 
 export async function getHouseholdInsights(userId: string) {
