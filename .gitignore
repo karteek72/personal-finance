@@ -45,3 +45,5 @@ backend/drizzle/meta/_journal.json.bak
 .turbo/
 
 Statements/
+
+.cursor/
