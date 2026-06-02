@@ -53,7 +53,7 @@ Google uses **two** client IDs:
 | `GOOGLE_CLIENT_ID` | iOS | From `GoogleService-Info.plist` — native sign-in + URL scheme |
 | `GOOGLE_SERVER_CLIENT_ID` | Web | Same as backend `GOOGLE_CLIENT_ID` — ID token audience for `/auth/google` |
 
-1. Create an **iOS OAuth client** in Google Cloud (bundle ID: `com.spendflow.app`); save plist as `SpendFlow/Resources/GoogleService-Info.plist`.
+1. Create an **iOS OAuth client** in Google Cloud with your bundle ID (default: `com.karteek72.spendflow` in `Config/Debug.xcconfig`; override in `Config/Local.xcconfig`); save plist as `SpendFlow/Resources/GoogleService-Info.plist`.
 2. Use your existing **Web OAuth client** for `GOOGLE_SERVER_CLIENT_ID` in `Config/Debug.xcconfig` (must match `containers/.env` `GOOGLE_CLIENT_ID`).
 3. Set Info.plist URL scheme to the iOS `REVERSED_CLIENT_ID` from the plist.
 

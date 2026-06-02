@@ -1,6 +1,6 @@
 name: SpendFlow
 options:
-  bundleIdPrefix: com.spendflow
+  bundleIdPrefix: com.karteek72
   deploymentTarget:
     iOS: "17.0"
   groupSortPosition: top
@@ -36,7 +36,6 @@ targets:
           - "**/.DS_Store"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.spendflow.app
         INFOPLIST_FILE: SpendFlow/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: SpendFlow/Resources/SpendFlow.entitlements
         CURRENT_PROJECT_VERSION: 1
@@ -63,7 +62,7 @@ targets:
       - target: SpendFlow
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.spendflow.app.tests
+        PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER).tests
         GENERATE_INFOPLIST_FILE: YES
 
 schemes:
