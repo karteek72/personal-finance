@@ -17,26 +17,29 @@ spendflow_load_env() {
   export SPENDFLOW_REPO_ROOT="${root}"
   export SPENDFLOW_CONTAINERS_DIR="${containers}"
 
-  if [[ -f "${containers}/deploy.env" ]]; then
-    # shellcheck disable=SC1091
-    set -a
-    source "${containers}/deploy.env"
-    set +a
-  elif [[ -f "${containers}/deploy.env.example" ]]; then
-    echo "warn: ${containers}/deploy.env missing — using deploy.env.example" >&2
-    set -a
-    source "${containers}/deploy.env.example"
-    set +a
-  fi
-
   if [[ -f "${root}/.env" ]]; then
     set -a
+    # shellcheck disable=SC1091
     source "${root}/.env"
     set +a
   fi
   if [[ -f "${containers}/.env" ]]; then
     set -a
+    # shellcheck disable=SC1091
     source "${containers}/.env"
+    set +a
+  fi
+  # deploy.env last — CORS_ORIGINS and public URLs must win over dev .env
+  if [[ -f "${containers}/deploy.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "${containers}/deploy.env"
+    set +a
+  elif [[ -f "${containers}/deploy.env.example" ]]; then
+    echo "warn: ${containers}/deploy.env missing — using deploy.env.example" >&2
+    set -a
+    # shellcheck disable=SC1091
+    source "${containers}/deploy.env.example"
     set +a
   fi
 

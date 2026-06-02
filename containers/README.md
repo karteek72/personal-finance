@@ -44,32 +44,34 @@ The UI image is built with `NEXT_PUBLIC_API_URL` pointing at the **public API** 
 | `./scripts/podman/down.sh` | Stop and remove containers |
 | `./scripts/podman/logs.sh` | Follow compose logs |
 
-## Cloudflare Tunnel (host systemd)
+## Cloudflare Tunnel (existing `cloudflared` pod)
 
-**Do not** run `cloudflared` in compose — use the existing **systemd** service on this machine.
+**Do not** add `cloudflared` to SpendFlow compose. Use your running pod (`tunnel --no-autoupdate run --token …`).
 
-Subdomains:
+StockPulse **Kong** stays on **port 8000** (`stockpulse-kong`). Keep that public hostname (e.g. `dev.stockpulse.win` → `http://192.168.68.100:8000`). Add **new** hostnames for SpendFlow only.
 
-- `spendflow.stockpulse.win` → UI
-- `spendflow-api.stockpulse.win` → API
+### Token mode (your setup) — Zero Trust dashboard
 
-After `./scripts/podman/start.sh`, containers listen on `SPENDFLOW_HOST` (default `192.168.68.100`) ports **3000** and **4000**. Point tunnel ingress at those host URLs, not Docker service names:
+With `--token`, ingress is configured in Cloudflare, not in a local file:
 
-```yaml
-# /etc/cloudflared/config.yml (see containers/cloudflared/config.yml.example)
-ingress:
-  - hostname: spendflow.stockpulse.win
-    service: http://192.168.68.100:3000
-  - hostname: spendflow-api.stockpulse.win
-    service: http://192.168.68.100:4000
-  - service: http_status:404
-```
+1. [Zero Trust](https://one.dash.cloudflare.com/) → **Networks** → **Tunnels** → your tunnel → **Public Hostname**.
+2. Add:
 
-```bash
-sudo systemctl restart cloudflared
-```
+| Hostname | Upstream URL |
+|----------|----------------|
+| `spendflow.stockpulse.win` | `http://192.168.68.100:3000` |
+| `spendflow-api.stockpulse.win` | `http://192.168.68.100:4000` |
 
-Set `SPENDFLOW_BUILD_TARGET=public` in `containers/deploy.env` before `./scripts/podman/build.sh` so the UI image uses the HTTPS API URL for iPhone / internet.
+3. Leave the existing Kong route on `http://192.168.68.100:8000` unchanged.
+4. The `cloudflared` pod usually picks up new routes within ~1 minute (no restart required).
+
+Use **host IP + published ports** from `deploy.env`, not Podman names (`ui` / `api`).
+
+### Config-file mode (optional)
+
+If you migrate off `--token`, list Kong and SpendFlow in one `ingress:` — see `containers/cloudflared/config.yml.example`.
+
+Set `SPENDFLOW_BUILD_TARGET=public` in `deploy.env` before `build.sh` so the UI uses `https://spendflow-api.stockpulse.win/api/v1`.
 
 ## Google Sign-In & Plaid
 
