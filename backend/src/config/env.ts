@@ -1,6 +1,7 @@
 import { config as loadDotenv } from "dotenv";
 import { z } from "zod";
 import { resolve } from "node:path";
+import { getRootLogger } from "../lib/logger.js";
 
 loadDotenv({ path: resolve(process.cwd(), "../.env") });
 loadDotenv({ path: resolve(process.cwd(), ".env") });
@@ -40,7 +41,10 @@ export type Env = z.infer<typeof envSchema>;
 export function loadEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
-    console.error("Invalid environment configuration:", parsed.error.flatten().fieldErrors);
+    getRootLogger().fatal(
+      { fieldErrors: parsed.error.flatten().fieldErrors },
+      "invalid environment configuration",
+    );
     throw new Error("Failed to load environment variables");
   }
   return parsed.data;

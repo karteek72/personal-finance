@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import {
   listAccounts as getAccountsFromDb,
   getAlerts,
@@ -8,27 +8,22 @@ import {
   getSummary,
   getTrends,
   listTransactions,
-  transactionCount,
 } from "../services/transaction-store.js";
 import { resolveScopedAccountIds } from "../services/household-store.js";
 import { requireRequestUser } from "../lib/auth-http.js";
 import type { Env } from "../config/env.js";
-import type { FastifyReply, FastifyRequest } from "fastify";
-import { getAccounts as getMockAccounts } from "../services/mock-data.js";
 
 type ViewScope = "all" | "household" | "personal";
 
 async function resolveScopeFilters(
   request: FastifyRequest,
-  reply: FastifyReply,
   env: Env,
   query: {
     scope?: string;
     memberId?: string;
   },
 ) {
-  const user = await requireRequestUser(request, reply, env);
-  if (!user) return null;
+  const user = await requireRequestUser(request, env);
   const scope = (query.scope as ViewScope | undefined) ?? "all";
   const scopedAccountIds = await resolveScopedAccountIds(
     user.id,
@@ -39,22 +34,15 @@ async function resolveScopeFilters(
 }
 
 export const transactionRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/transactions/summary", async (request, reply) => {
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
+  app.get("/transactions/summary", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
     const query = request.query as { from?: string; to?: string };
     return getSummary(user.id, query.from, query.to);
   });
 
-  app.get("/transactions", async (request, reply) => {
+  app.get("/transactions", async (request) => {
     const query = request.query as Record<string, string | undefined>;
-    const scope = await resolveScopeFilters(
-      request,
-      reply,
-      app.config.env,
-      query,
-    );
-    if (!scope) return;
+    const scope = await resolveScopeFilters(request, app.config.env, query);
 
     return listTransactions({
       userId: scope.user.id,
@@ -78,14 +66,13 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
-  app.get("/transactions/by-category", async (request, reply) => {
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
+  app.get("/transactions/by-category", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
     const query = request.query as { from?: string; to?: string };
     return getCategories(user.id, query.from, query.to);
   });
 
-  app.get("/transactions/chart-data", async (request, reply) => {
+  app.get("/transactions/chart-data", async (request) => {
     const query = request.query as {
       from?: string;
       to?: string;
@@ -94,13 +81,7 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
       scope?: string;
       memberId?: string;
     };
-    const scope = await resolveScopeFilters(
-      request,
-      reply,
-      app.config.env,
-      query,
-    );
-    if (!scope) return;
+    const scope = await resolveScopeFilters(request, app.config.env, query);
 
     return getChartData({
       userId: scope.user.id,
@@ -112,28 +93,26 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
-  app.get("/transactions/flow", async (request, reply) => {
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
+  app.get("/transactions/flow", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
     const query = request.query as { from?: string; to?: string };
     return getMoneyFlow(user.id, query.from, query.to);
   });
 };
 
 export const insightRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/insights/alerts", async () => getAlerts());
-  app.get("/insights/trends", async (request, reply) => {
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
+  app.get("/insights/alerts", async (request) => {
+    await requireRequestUser(request, app.config.env);
+    return getAlerts();
+  });
+
+  app.get("/insights/trends", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
     const query = request.query as { from?: string; to?: string };
     return getTrends(user.id, query.from, query.to);
   });
 };
 
 export async function getPlaidAccountsResponse(userId: string) {
-  const count = await transactionCount(userId);
-  if (count > 0) {
-    return getAccountsFromDb(userId);
-  }
-  return getMockAccounts();
+  return getAccountsFromDb(userId);
 }

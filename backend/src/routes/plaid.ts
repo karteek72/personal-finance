@@ -1,5 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { AppError } from "../lib/errors.js";
+import { requireRequestUser } from "../lib/auth-http.js";
+import { parseBody } from "../lib/validate.js";
 import {
   getPlaidClient,
   parseCountryCodes,
@@ -12,7 +15,6 @@ import {
   syncAllPlaidItems,
 } from "../services/plaid/item-store.js";
 import { syncPlaidItem } from "../services/plaid/sync.js";
-import { requireRequestUser } from "../lib/auth-http.js";
 import { getPlaidAccountsResponse } from "./transactions.js";
 
 const linkTokenBodySchema = z.object({
@@ -36,64 +38,49 @@ function resolvePlaidRedirectUri(env: {
 }
 
 export const plaidRoutes: FastifyPluginAsync = async (app) => {
-  app.post("/plaid/link-token", async (request, reply) => {
-    const body = linkTokenBodySchema.safeParse(request.body ?? {});
-    if (!body.success) {
-      return reply.status(400).send({
-        error: { code: "VALIDATION_ERROR", message: "Invalid request body" },
-      });
+  app.post("/plaid/link-token", async (request) => {
+    parseBody(linkTokenBodySchema, request.body);
+
+    const user = await requireRequestUser(request, app.config.env);
+    const client = getPlaidClient(app.config.env);
+    const linkTokenRequest: Parameters<typeof client.linkTokenCreate>[0] = {
+      user: { client_user_id: user.id },
+      client_name: "SpendFlow",
+      products: parsePlaidProducts(app.config.env.PLAID_PRODUCTS),
+      country_codes: parseCountryCodes(app.config.env.PLAID_COUNTRY_CODES),
+      language: "en",
+      webhook: `${app.config.env.APP_URL}/api/v1/webhooks/plaid`,
+    };
+
+    const redirectUri = resolvePlaidRedirectUri(app.config.env);
+    if (redirectUri) {
+      linkTokenRequest.redirect_uri = redirectUri;
+    } else if (app.config.env.PLAID_REDIRECT_URI) {
+      request.log.warn(
+        "PLAID_REDIRECT_URI ignored — production requires HTTPS. Use ngrok or deploy for OAuth banks.",
+      );
     }
 
     try {
-      const user = await requireRequestUser(request, reply, app.config.env);
-      if (!user) return;
-      const client = getPlaidClient(app.config.env);
-      const linkTokenRequest: Parameters<typeof client.linkTokenCreate>[0] = {
-        user: { client_user_id: user.id },
-        client_name: "SpendFlow",
-        products: parsePlaidProducts(app.config.env.PLAID_PRODUCTS),
-        country_codes: parseCountryCodes(app.config.env.PLAID_COUNTRY_CODES),
-        language: "en",
-        webhook: `${app.config.env.APP_URL}/api/v1/webhooks/plaid`,
-      };
-
-      const redirectUri = resolvePlaidRedirectUri(app.config.env);
-      if (redirectUri) {
-        linkTokenRequest.redirect_uri = redirectUri;
-      } else if (app.config.env.PLAID_REDIRECT_URI) {
-        app.log.warn(
-          "PLAID_REDIRECT_URI ignored — production requires HTTPS. Use ngrok or deploy for OAuth banks.",
-        );
-      }
-
       const response = await client.linkTokenCreate(linkTokenRequest);
-
       return { linkToken: response.data.link_token };
     } catch (error) {
-      app.log.error({ err: error }, "Plaid link token creation failed");
-      return reply.status(502).send({
-        error: {
-          code: "PLAID_ERROR",
-          message: "Unable to create Plaid link token",
-        },
-      });
+      throw AppError.plaidError("Unable to create Plaid link token", error);
     }
   });
 
-  app.post("/plaid/exchange-token", async (request, reply) => {
-    const body = exchangeTokenBodySchema.safeParse(request.body);
-    if (!body.success) {
-      return reply.status(400).send({
-        error: { code: "VALIDATION_ERROR", message: "publicToken is required" },
-      });
-    }
+  app.post("/plaid/exchange-token", async (request) => {
+    const body = parseBody(
+      exchangeTokenBodySchema,
+      request.body,
+      "publicToken is required",
+    );
+    const user = await requireRequestUser(request, app.config.env);
 
     try {
-      const user = await requireRequestUser(request, reply, app.config.env);
-      if (!user) return;
       const client = getPlaidClient(app.config.env);
       const response = await client.itemPublicTokenExchange({
-        public_token: body.data.publicToken,
+        public_token: body.publicToken,
       });
 
       const { item, syncResult } = await exchangeAndSync(
@@ -101,6 +88,15 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
         response.data.item_id,
         response.data.access_token,
         app.config.env,
+      );
+
+      request.log.info(
+        {
+          userId: user.id,
+          itemId: item.plaidItemId,
+          transactionsAdded: syncResult.added,
+        },
+        "plaid account connected",
       );
 
       return {
@@ -111,102 +107,72 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
         message: "Account connected and transactions synced.",
       };
     } catch (error) {
-      app.log.error({ err: error }, "Plaid token exchange failed");
-      return reply.status(502).send({
-        error: {
-          code: "PLAID_ERROR",
-          message: "Unable to exchange Plaid public token",
-        },
-      });
+      if (error instanceof AppError) throw error;
+      throw AppError.plaidError("Unable to exchange Plaid public token", error);
     }
   });
 
-  app.get("/plaid/accounts", async (request, reply) => {
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
+  app.get("/plaid/accounts", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
     return getPlaidAccountsResponse(user.id);
   });
 
-  app.get("/plaid/items", async (request, reply) => {
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
+  app.get("/plaid/items", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
     const items = await listPlaidItems(user.id);
     return { items };
   });
 
-  app.post("/plaid/sync", async (request, reply) => {
+  app.post("/plaid/sync", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
     try {
-      const user = await requireRequestUser(request, reply, app.config.env);
-      if (!user) return;
-      const result = await syncAllPlaidItems(user.id, app.config.env);
-      return result;
+      return await syncAllPlaidItems(user.id, app.config.env);
     } catch (error) {
-      app.log.error({ err: error }, "Plaid sync all failed");
-      return reply.status(502).send({
-        error: {
-          code: "PLAID_SYNC_ERROR",
-          message: "Unable to sync Plaid accounts",
-        },
-      });
+      if (error instanceof AppError) throw error;
+      throw AppError.plaidSyncError("Unable to sync Plaid accounts", error);
     }
   });
 
-  app.post("/plaid/items/:itemId/sync", async (request, reply) => {
-    const params = request.params as { itemId: string };
+  app.post("/plaid/items/:itemId/sync", async (request) => {
+    const { itemId } = request.params as { itemId: string };
+    const user = await requireRequestUser(request, app.config.env);
+    const items = await listPlaidItems(user.id);
+    const item = items.find(
+      (row) => row.id === itemId || row.plaidItemId === itemId,
+    );
+
+    if (!item) {
+      throw AppError.notFound("Plaid item not found");
+    }
 
     try {
-      const user = await requireRequestUser(request, reply, app.config.env);
-      if (!user) return;
-      const items = await listPlaidItems(user.id);
-      const item = items.find(
-        (row) => row.id === params.itemId || row.plaidItemId === params.itemId,
-      );
-
-      if (!item) {
-        return reply.status(404).send({
-          error: { code: "NOT_FOUND", message: "Plaid item not found" },
-        });
-      }
-
       const syncResult = await syncPlaidItem(item.id, app.config.env);
       return { status: "completed", ...syncResult };
     } catch (error) {
-      app.log.error({ err: error }, "Plaid sync failed");
-      return reply.status(502).send({
-        error: {
-          code: "PLAID_SYNC_ERROR",
-          message: "Unable to sync Plaid item",
-        },
-      });
+      if (error instanceof AppError) throw error;
+      throw AppError.plaidSyncError("Unable to sync Plaid item", error);
     }
   });
 
   app.delete("/plaid/items/:itemId", async (request, reply) => {
-    const params = request.params as { itemId: string };
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
+    const { itemId } = request.params as { itemId: string };
+    const user = await requireRequestUser(request, app.config.env);
     const items = await listPlaidItems(user.id);
     const item = items.find(
-      (row) => row.id === params.itemId || row.plaidItemId === params.itemId,
+      (row) => row.id === itemId || row.plaidItemId === itemId,
     );
 
     if (!item) {
-      return reply.status(404).send({
-        error: { code: "NOT_FOUND", message: "Plaid item not found" },
-      });
+      throw AppError.notFound("Plaid item not found");
     }
 
     try {
       await deletePlaidItem(item.id, user.id);
+      request.log.info({ userId: user.id, itemId: item.id }, "plaid item removed");
       return reply.status(204).send();
     } catch (error) {
-      app.log.error({ err: error }, "Plaid item delete failed");
-      return reply.status(502).send({
-        error: {
-          code: "PLAID_ERROR",
-          message: "Unable to disconnect Plaid item",
-        },
-      });
+      if (error instanceof AppError) throw error;
+      throw AppError.plaidError("Unable to disconnect Plaid item", error);
     }
   });
 };

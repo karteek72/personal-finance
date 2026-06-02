@@ -1,5 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { AppError } from "../lib/errors.js";
+import { requireRequestUser } from "../lib/auth-http.js";
+import { parseBody } from "../lib/validate.js";
 import {
   assignAccountToMember,
   createHouseholdMember,
@@ -9,7 +12,6 @@ import {
   updateHouseholdMember,
   updateHouseholdName,
 } from "../services/household-store.js";
-import { requireRequestUser } from "../lib/auth-http.js";
 
 const createMemberSchema = z.object({
   displayName: z.string().min(1).max(80),
@@ -30,23 +32,15 @@ const assignAccountSchema = z.object({
 });
 
 export const householdRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/household", async (request, reply) => {
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
+  app.get("/household", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
     return getHouseholdDetails(user.id);
   });
 
-  app.patch("/household", async (request, reply) => {
-    const body = updateHouseholdSchema.safeParse(request.body ?? {});
-    if (!body.success) {
-      return reply.status(400).send({
-        error: { code: "VALIDATION_ERROR", message: "Invalid household name" },
-      });
-    }
-
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
-    const updated = await updateHouseholdName(user.id, body.data.name);
+  app.patch("/household", async (request) => {
+    const body = parseBody(updateHouseholdSchema, request.body, "Invalid household name");
+    const user = await requireRequestUser(request, app.config.env);
+    const updated = await updateHouseholdName(user.id, body.name);
     return {
       id: updated.id,
       name: updated.name,
@@ -54,79 +48,49 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
-  app.get("/household/insights", async (request, reply) => {
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
+  app.get("/household/insights", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
     return getHouseholdInsights(user.id);
   });
 
-  app.post("/household/members", async (request, reply) => {
-    const body = createMemberSchema.safeParse(request.body ?? {});
-    if (!body.success) {
-      return reply.status(400).send({
-        error: { code: "VALIDATION_ERROR", message: "Invalid member data" },
-      });
-    }
-
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
-    const member = await createHouseholdMember(user.id, body.data);
-    return member;
+  app.post("/household/members", async (request) => {
+    const body = parseBody(createMemberSchema, request.body, "Invalid member data");
+    const user = await requireRequestUser(request, app.config.env);
+    return createHouseholdMember(user.id, body);
   });
 
-  app.patch("/household/members/:memberId", async (request, reply) => {
+  app.patch("/household/members/:memberId", async (request) => {
     const { memberId } = request.params as { memberId: string };
-    const body = updateMemberSchema.safeParse(request.body ?? {});
-    if (!body.success) {
-      return reply.status(400).send({
-        error: { code: "VALIDATION_ERROR", message: "Invalid member update" },
-      });
-    }
-
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
-    const updated = await updateHouseholdMember(user.id, memberId, body.data);
+    const body = parseBody(updateMemberSchema, request.body, "Invalid member update");
+    const user = await requireRequestUser(request, app.config.env);
+    const updated = await updateHouseholdMember(user.id, memberId, body);
     if (!updated) {
-      return reply.status(404).send({
-        error: { code: "NOT_FOUND", message: "Member not found or cannot update" },
-      });
+      throw AppError.notFound("Member not found or cannot update");
     }
     return updated;
   });
 
-  app.delete("/household/members/:memberId", async (request, reply) => {
+  app.delete("/household/members/:memberId", async (request) => {
     const { memberId } = request.params as { memberId: string };
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
+    const user = await requireRequestUser(request, app.config.env);
     const deleted = await deleteHouseholdMember(user.id, memberId);
     if (!deleted) {
-      return reply.status(404).send({
-        error: { code: "NOT_FOUND", message: "Member not found or cannot delete owner" },
-      });
+      throw AppError.notFound("Member not found or cannot delete owner");
     }
     return { status: "deleted", memberId };
   });
 
-  app.put("/household/accounts/:accountId/assign", async (request, reply) => {
+  app.put("/household/accounts/:accountId/assign", async (request) => {
     const { accountId } = request.params as { accountId: string };
-    const body = assignAccountSchema.safeParse(request.body ?? {});
-    if (!body.success) {
-      return reply.status(400).send({
-        error: { code: "VALIDATION_ERROR", message: "memberId is required" },
-      });
-    }
-
-    const user = await requireRequestUser(request, reply, app.config.env);
-    if (!user) return;
+    const body = parseBody(assignAccountSchema, request.body, "memberId is required");
+    const user = await requireRequestUser(request, app.config.env);
     const result = await assignAccountToMember(
       user.id,
       accountId,
-      body.data.memberId,
+      body.memberId,
     );
     if (!result) {
-      return reply.status(404).send({
-        error: { code: "NOT_FOUND", message: "Account or member not found" },
-      });
+      throw AppError.notFound("Account or member not found");
     }
     return result;
   });

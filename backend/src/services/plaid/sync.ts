@@ -3,9 +3,13 @@ import { eq } from "drizzle-orm";
 import type { Env } from "../../config/env.js";
 import { getDb } from "../../db/client.js";
 import { accounts, plaidItems, transactions } from "../../db/schema.js";
+import { AppError } from "../../lib/errors.js";
+import { createLogger } from "../../lib/logger.js";
 import { getPlaidClient } from "./client.js";
 import { decryptPlaidToken } from "./crypto.js";
 import { mapPlaidTransaction } from "./map-transaction.js";
+
+const log = createLogger("plaid.sync");
 
 export interface SyncResult {
   itemId: string;
@@ -44,6 +48,7 @@ export async function syncPlaidItem(
   itemDbId: string,
   env: Env,
 ): Promise<SyncResult> {
+  log.info({ itemDbId }, "plaid sync started");
   const db = getDb();
   const [item] = await db
     .select()
@@ -52,7 +57,8 @@ export async function syncPlaidItem(
     .limit(1);
 
   if (!item) {
-    throw new Error("Plaid item not found");
+    log.warn({ itemDbId }, "plaid item not found");
+    throw AppError.notFound("Plaid item not found");
   }
 
   const accessToken = decryptPlaidToken(item.accessTokenEncrypted, env);
@@ -257,7 +263,7 @@ export async function syncPlaidItem(
     })
     .where(eq(plaidItems.id, itemDbId));
 
-  return {
+  const result: SyncResult = {
     itemId: item.plaidItemId,
     institutionName,
     accountsSynced: accountIdByPlaidId.size,
@@ -265,4 +271,6 @@ export async function syncPlaidItem(
     modified,
     removed,
   };
+  log.info({ itemDbId, ...result }, "plaid sync completed");
+  return result;
 }
