@@ -1,0 +1,56 @@
+{
+  "income": {
+    "sources": [
+      { "label": "Employer Direct Deposit", "amount": "6200.00" },
+      { "label": "Freelance (Stripe)", "amount": "650.00" }
+    ],
+    "total": "6850.00"
+  },
+  "bankAccounts": {
+    "accounts": [
+      { "label": "Chase Checking", "amount": "3247.18" },
+      { "label": "Ally Savings", "amount": "12845.67" }
+    ],
+    "transfersOut": "1623.56"
+  },
+  "creditCards": {
+    "accounts": [
+      { "label": "Chase Sapphire", "amount": "1845.23" },
+      { "label": "Amex Gold", "amount": "2103.45" },
+      { "label": "Citi Double Cash", "amount": "874.88" }
+    ],
+    "totalCharges": "4823.56"
+  },
+  "monthlySeries": [
+    {
+      "month": "2026-01",
+      "income": "6850.00",
+      "expenses": "4521.33",
+      "net": "2328.67"
+    },
+    {
+      "month": "2026-02",
+      "income": "6850.00",
+      "expenses": "4389.72",
+      "net": "2460.28"
+    },
+    {
+      "month": "2026-03",
+      "income": "7100.00",
+      "expenses": "4712.45",
+      "net": "2387.55"
+    },
+    {
+      "month": "2026-04",
+      "income": "6850.00",
+      "expenses": "4598.21",
+      "net": "2251.79"
+    },
+    {
+      "month": "2026-05",
+      "income": "6850.00",
+      "expenses": "4823.56",
+      "net": "2026.44"
+    }
+  ]
+}

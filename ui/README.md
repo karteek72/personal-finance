@@ -59,15 +59,20 @@ Never put secrets (`PLAID_SECRET`, `DATABASE_URL`) in this service.
 
 ---
 
-## Commands (after scaffolding)
+## Commands
 
 ```bash
 npm install
+cp .env.example .env.local   # NEXT_PUBLIC_USE_MOCKS=true by default
 npm run dev          # http://localhost:3000
 npm run build        # production build (standalone)
 npm run lint
 npm run typecheck
 ```
+
+## Mock data mode
+
+With `NEXT_PUBLIC_USE_MOCKS=true` (default in `.env.example`), all API calls use JSON fixtures in `src/mocks/` via `src/lib/mock-api.ts` (~150ms simulated delay). Set `NEXT_PUBLIC_USE_MOCKS=false` to call the real backend at `NEXT_PUBLIC_API_URL`.
 
 ---
 

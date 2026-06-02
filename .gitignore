@@ -40,3 +40,5 @@ backend/drizzle/meta/_journal.json.bak
 *.local
 .cache/
 .turbo/
+
+Statements/

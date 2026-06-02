@@ -1,0 +1,377 @@
+import { and, asc, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
+import { getDb } from "../db/client.js";
+import { accounts, transactions } from "../db/schema.js";
+
+export async function listAccounts() {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.isActive, true))
+    .orderBy(accounts.name);
+
+  return {
+    accounts: rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      officialName: row.officialName,
+      type: row.type as "depository" | "credit" | "investment",
+      subtype: row.subtype,
+      mask: row.mask,
+      balanceCurrent: "0.00",
+      balanceAvailable: null,
+      currencyCode: row.currencyCode,
+      institutionName: row.institutionName,
+      lastSyncedAt: null,
+      status: "active" as const,
+    })),
+  };
+}
+
+export type TransactionSort =
+  | "date_desc"
+  | "date_asc"
+  | "amount_desc"
+  | "amount_asc"
+  | "name_asc"
+  | "name_desc"
+  | "category_asc";
+
+function transactionOrderBy(sort: TransactionSort = "date_desc") {
+  switch (sort) {
+    case "date_asc":
+      return [asc(transactions.date), asc(transactions.createdAt)];
+    case "amount_desc":
+      return [desc(transactions.amount), desc(transactions.date)];
+    case "amount_asc":
+      return [asc(transactions.amount), desc(transactions.date)];
+    case "name_asc":
+      return [asc(transactions.name), desc(transactions.date)];
+    case "name_desc":
+      return [desc(transactions.name), desc(transactions.date)];
+    case "category_asc":
+      return [asc(transactions.category), desc(transactions.date)];
+    default:
+      return [desc(transactions.date), desc(transactions.createdAt)];
+  }
+}
+
+export async function listTransactions(filters: {
+  month?: string;
+  category?: string;
+  accountId?: string;
+  q?: string;
+  type?: string;
+  sort?: TransactionSort;
+  limit?: number;
+  cursor?: string;
+}) {
+  const db = getDb();
+  const limit = filters.limit ?? 50;
+  const conditions = [];
+
+  if (filters.month) {
+    const [year, month] = filters.month.split("-");
+    const start = `${year}-${month}-01`;
+    const endMonth = Number.parseInt(month!, 10);
+    const endYear = Number.parseInt(year!, 10);
+    const lastDay = new Date(endYear, endMonth, 0).getDate();
+    const end = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
+    conditions.push(gte(transactions.date, start));
+    conditions.push(lte(transactions.date, end));
+  }
+
+  if (filters.category) {
+    conditions.push(eq(transactions.category, filters.category));
+  }
+  if (filters.accountId) {
+    conditions.push(eq(transactions.accountId, filters.accountId));
+  }
+  if (filters.type) {
+    conditions.push(eq(transactions.transactionType, filters.type));
+  }
+  if (filters.q) {
+    const q = `%${filters.q}%`;
+    conditions.push(
+      or(ilike(transactions.name, q), ilike(transactions.merchantName, q))!,
+    );
+  }
+
+  let query = db
+    .select({
+      id: transactions.id,
+      accountId: transactions.accountId,
+      accountMask: accounts.mask,
+      date: transactions.date,
+      name: transactions.name,
+      merchantName: transactions.merchantName,
+      amount: transactions.amount,
+      currencyCode: transactions.currencyCode,
+      category: transactions.category,
+      transactionType: transactions.transactionType,
+      isTransfer: transactions.isTransfer,
+      pending: transactions.pending,
+      createdAt: transactions.createdAt,
+    })
+    .from(transactions)
+    .innerJoin(accounts, eq(transactions.accountId, accounts.id))
+    .orderBy(...transactionOrderBy(filters.sort))
+    .limit(limit + 1);
+
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions)) as typeof query;
+  }
+
+  const rows = await query;
+
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+
+  return {
+    items: page.map((row) => ({
+      id: row.id,
+      accountId: row.accountId,
+      accountMask: row.accountMask,
+      date: row.date,
+      name: row.name,
+      merchantName: row.merchantName,
+      amount: row.amount,
+      currencyCode: row.currencyCode,
+      category: row.category,
+      transactionType: row.transactionType as "expense" | "income" | "transfer",
+      isTransfer: row.isTransfer,
+      pending: row.pending,
+    })),
+    nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+  };
+}
+
+export async function getSummary(from?: string, to?: string) {
+  const db = getDb();
+  const dateFilter =
+    from && to
+      ? sql`${transactions.date} >= ${from} AND ${transactions.date} <= ${to}`
+      : sql`TRUE`;
+
+  const spendRows = await db.execute<{ total: string }>(sql`
+    SELECT COALESCE(SUM(amount::numeric), 0)::text AS total
+    FROM transactions
+    WHERE transaction_type = 'expense'
+      AND is_transfer = false
+      AND ${dateFilter}
+  `);
+
+  const incomeRows = await db.execute<{ total: string }>(sql`
+    SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
+    FROM transactions
+    WHERE transaction_type = 'income'
+      AND is_transfer = false
+      AND ${dateFilter}
+  `);
+
+  const transferRows = await db.execute<{ total: string }>(sql`
+    SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
+    FROM transactions
+    WHERE is_transfer = true
+      AND ${dateFilter}
+  `);
+
+  const topCategoryRows = await db.execute<{
+    name: string;
+    amount: string;
+  }>(sql`
+    SELECT category AS name, SUM(amount::numeric)::text AS amount
+    FROM transactions
+    WHERE transaction_type = 'expense'
+      AND is_transfer = false
+      AND ${dateFilter}
+    GROUP BY category
+    ORDER BY SUM(amount::numeric) DESC
+    LIMIT 1
+  `);
+
+  const totalSpent = spendRows[0]?.total ?? "0.00";
+  const income = incomeRows[0]?.total ?? "0.00";
+  const ccPaymentsExcluded = transferRows[0]?.total ?? "0.00";
+  const incomeNum = Number.parseFloat(income);
+  const spentNum = Number.parseFloat(totalSpent);
+  const net = incomeNum - spentNum;
+
+  return {
+    totalSpent,
+    income,
+    netSavings: net.toFixed(2),
+    avgMonthlySpend: totalSpent,
+    topCategory: topCategoryRows[0] ?? { name: "None", amount: "0.00" },
+    ccPaymentsExcluded,
+    savingsRate: incomeNum > 0 ? net / incomeNum : 0,
+  };
+}
+
+export async function getCategories(from?: string, to?: string) {
+  const db = getDb();
+  const dateFilter =
+    from && to
+      ? sql`${transactions.date} >= ${from} AND ${transactions.date} <= ${to}`
+      : sql`TRUE`;
+
+  const rows = await db.execute<{
+    name: string;
+    amount: string;
+  }>(sql`
+    SELECT category AS name, SUM(amount::numeric)::text AS amount
+    FROM transactions
+    WHERE transaction_type = 'expense'
+      AND is_transfer = false
+      AND ${dateFilter}
+    GROUP BY category
+    ORDER BY SUM(amount::numeric) DESC
+  `);
+
+  const total = rows.reduce(
+    (sum, row) => sum + Number.parseFloat(row.amount),
+    0,
+  );
+
+  return {
+    categories: rows.map((row) => ({
+      name: row.name,
+      amount: row.amount,
+      percentage: total > 0 ? (Number.parseFloat(row.amount) / total) * 100 : 0,
+      deltaVsPriorMonth: 0,
+    })),
+  };
+}
+
+export async function getMoneyFlow(from?: string, to?: string) {
+  void from;
+  void to;
+  const db = getDb();
+
+  const incomeSources = await db.execute<{ label: string; amount: string }>(sql`
+    SELECT name AS label, SUM(ABS(amount::numeric))::text AS amount
+    FROM transactions
+    WHERE transaction_type = 'income' AND is_transfer = false
+    GROUP BY name
+    ORDER BY SUM(ABS(amount::numeric)) DESC
+    LIMIT 10
+  `);
+
+  const bankAccounts = await db.execute<{ label: string; amount: string }>(sql`
+    SELECT a.name AS label, SUM(ABS(t.amount::numeric))::text AS amount
+    FROM transactions t
+    JOIN accounts a ON a.id = t.account_id
+    WHERE a.type = 'depository' AND t.transaction_type = 'expense' AND t.is_transfer = false
+    GROUP BY a.name
+  `);
+
+  const creditCards = await db.execute<{ label: string; amount: string }>(sql`
+    SELECT a.name AS label, SUM(t.amount::numeric)::text AS amount
+    FROM transactions t
+    JOIN accounts a ON a.id = t.account_id
+    WHERE a.type = 'credit' AND t.transaction_type = 'expense' AND t.is_transfer = false
+    GROUP BY a.name
+  `);
+
+  const monthlySeries = await db.execute<{
+    month: string;
+    income: string;
+    expenses: string;
+    net: string;
+  }>(sql`
+    SELECT
+      to_char(date_trunc('month', date), 'YYYY-MM') AS month,
+      COALESCE(SUM(CASE WHEN transaction_type = 'income' AND NOT is_transfer THEN ABS(amount::numeric) ELSE 0 END), 0)::text AS income,
+      COALESCE(SUM(CASE WHEN transaction_type = 'expense' AND NOT is_transfer THEN amount::numeric ELSE 0 END), 0)::text AS expenses,
+      COALESCE(SUM(CASE WHEN transaction_type = 'income' AND NOT is_transfer THEN ABS(amount::numeric) WHEN transaction_type = 'expense' AND NOT is_transfer THEN -amount::numeric ELSE 0 END), 0)::text AS net
+    FROM transactions
+    GROUP BY date_trunc('month', date)
+    ORDER BY month
+  `);
+
+  const incomeTotal = incomeSources.reduce(
+    (s, r) => s + Number.parseFloat(r.amount),
+    0,
+  );
+  const transferTotal = await db.execute<{ total: string }>(sql`
+    SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
+    FROM transactions WHERE is_transfer = true
+  `);
+  const ccTotal = creditCards.reduce(
+    (s, r) => s + Number.parseFloat(r.amount),
+    0,
+  );
+
+  return {
+    income: {
+      sources: incomeSources,
+      total: incomeTotal.toFixed(2),
+    },
+    bankAccounts: {
+      accounts: bankAccounts,
+      transfersOut: transferTotal[0]?.total ?? "0.00",
+    },
+    creditCards: {
+      accounts: creditCards,
+      totalCharges: ccTotal.toFixed(2),
+    },
+    monthlySeries,
+  };
+}
+
+export async function getTrends(from?: string, to?: string) {
+  void from;
+  void to;
+  const db = getDb();
+
+  const rows = await db.execute<{
+    name: string;
+    month: string;
+    amount: string;
+  }>(sql`
+    SELECT
+      category AS name,
+      to_char(date_trunc('month', date), 'YYYY-MM') AS month,
+      SUM(amount::numeric)::text AS amount
+    FROM transactions
+    WHERE transaction_type = 'expense' AND NOT is_transfer
+    GROUP BY category, date_trunc('month', date)
+    ORDER BY category, month
+  `);
+
+  const byCategory = new Map<string, { month: string; amount: string }[]>();
+  for (const row of rows) {
+    const list = byCategory.get(row.name) ?? [];
+    list.push({ month: row.month, amount: row.amount });
+    byCategory.set(row.name, list);
+  }
+
+  return {
+    trends: [...byCategory.entries()]
+      .slice(0, 8)
+      .map(([name, months]) => ({ name, months })),
+  };
+}
+
+export async function getAlerts() {
+  return {
+    alerts: [
+      {
+        id: "real-data-imported",
+        severity: "info" as const,
+        title: "Real statement data loaded",
+        message:
+          "Transactions imported from Amex QFX and Bank of America PDF statements.",
+        dismissible: true,
+      },
+    ],
+  };
+}
+
+export async function transactionCount(): Promise<number> {
+  const db = getDb();
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(transactions);
+  return count;
+}

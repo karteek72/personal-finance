@@ -1,0 +1,74 @@
+{
+  "accounts": [
+    {
+      "id": "a1b2c3d4-e5f6-4789-a012-345678901001",
+      "name": "Chase Sapphire",
+      "officialName": "Chase Sapphire Preferred",
+      "type": "credit",
+      "subtype": "credit card",
+      "mask": "4521",
+      "balanceCurrent": "1845.23",
+      "balanceAvailable": "8154.77",
+      "currencyCode": "USD",
+      "institutionName": "Chase",
+      "lastSyncedAt": "2026-05-31T08:15:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "a1b2c3d4-e5f6-4789-a012-345678901002",
+      "name": "Amex Gold",
+      "officialName": "American Express Gold Card",
+      "type": "credit",
+      "subtype": "credit card",
+      "mask": "1003",
+      "balanceCurrent": "2103.45",
+      "balanceAvailable": "7896.55",
+      "currencyCode": "USD",
+      "institutionName": "American Express",
+      "lastSyncedAt": "2026-05-31T08:12:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "a1b2c3d4-e5f6-4789-a012-345678901003",
+      "name": "Citi Double Cash",
+      "officialName": "Citi Double Cash Card",
+      "type": "credit",
+      "subtype": "credit card",
+      "mask": "7890",
+      "balanceCurrent": "874.88",
+      "balanceAvailable": "9125.12",
+      "currencyCode": "USD",
+      "institutionName": "Citibank",
+      "lastSyncedAt": "2026-05-31T08:10:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "a1b2c3d4-e5f6-4789-a012-345678901004",
+      "name": "Chase Checking",
+      "officialName": "Chase Total Checking",
+      "type": "depository",
+      "subtype": "checking",
+      "mask": "6789",
+      "balanceCurrent": "3247.18",
+      "balanceAvailable": "3247.18",
+      "currencyCode": "USD",
+      "institutionName": "Chase",
+      "lastSyncedAt": "2026-05-31T08:15:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "a1b2c3d4-e5f6-4789-a012-345678901005",
+      "name": "Ally Savings",
+      "officialName": "Ally Online Savings",
+      "type": "depository",
+      "subtype": "savings",
+      "mask": "2341",
+      "balanceCurrent": "12845.67",
+      "balanceAvailable": "12845.67",
+      "currencyCode": "USD",
+      "institutionName": "Ally Bank",
+      "lastSyncedAt": "2026-05-31T08:08:00.000Z",
+      "status": "active"
+    }
+  ]
+}

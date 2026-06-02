@@ -1,0 +1,63 @@
+:root {
+  --color-primary: #01696f;
+  --color-danger: #c0392b;
+  --color-success: #437a22;
+  --color-warning: #b07a00;
+  --color-bg: #f7f6f2;
+  --color-surface: #f9f8f5;
+  --color-border: #d4d1ca;
+  --color-text: #1a1918;
+  --color-text-muted: #6b6860;
+  --color-text-inverse: #f7f6f2;
+  --radius-card: 6px;
+  --radius-pill: 9999px;
+}
+
+[data-theme="dark"],
+.dark {
+  --color-primary: #4f98a3;
+  --color-danger: #e05c4a;
+  --color-success: #6daa45;
+  --color-warning: #e8af34;
+  --color-bg: #0f0e0d;
+  --color-surface: #161513;
+  --color-border: #2e2d2b;
+  --color-text: #f0efec;
+  --color-text-muted: #9c9890;
+  --color-text-inverse: #0f0e0d;
+}
+
+@theme inline {
+  --color-primary: var(--color-primary);
+  --color-danger: var(--color-danger);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-border: var(--color-border);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-inverse: var(--color-text-inverse);
+  --radius-card: var(--radius-card);
+  --radius-pill: var(--radius-pill);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-border) 0%,
+    color-mix(in srgb, var(--color-border) 40%, var(--color-surface)) 50%,
+    var(--color-border) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}

@@ -1,0 +1,94 @@
+{
+  "categories": [
+    {
+      "name": "Home & Rent",
+      "amount": "1850.00",
+      "percentage": 38.4,
+      "deltaVsPriorMonth": 0.0
+    },
+    {
+      "name": "Food & Groceries",
+      "amount": "642.34",
+      "percentage": 13.3,
+      "deltaVsPriorMonth": 2.1
+    },
+    {
+      "name": "Dining & Restaurants",
+      "amount": "487.50",
+      "percentage": 10.1,
+      "deltaVsPriorMonth": 18.0
+    },
+    {
+      "name": "Shopping & Retail",
+      "amount": "443.12",
+      "percentage": 9.2,
+      "deltaVsPriorMonth": -4.3
+    },
+    {
+      "name": "Transport & Gas",
+      "amount": "265.67",
+      "percentage": 5.5,
+      "deltaVsPriorMonth": 6.8
+    },
+    {
+      "name": "Utilities & Bills",
+      "amount": "218.45",
+      "percentage": 4.5,
+      "deltaVsPriorMonth": -1.2
+    },
+    {
+      "name": "Subscriptions & Software",
+      "amount": "187.43",
+      "percentage": 3.9,
+      "deltaVsPriorMonth": 12.5
+    },
+    {
+      "name": "Entertainment",
+      "amount": "176.89",
+      "percentage": 3.7,
+      "deltaVsPriorMonth": 22.4
+    },
+    {
+      "name": "Travel & Hotels",
+      "amount": "156.00",
+      "percentage": 3.2,
+      "deltaVsPriorMonth": -35.0
+    },
+    {
+      "name": "Health & Medical",
+      "amount": "109.00",
+      "percentage": 2.3,
+      "deltaVsPriorMonth": 0.0
+    },
+    {
+      "name": "Financial",
+      "amount": "125.00",
+      "percentage": 2.6,
+      "deltaVsPriorMonth": 5.0
+    },
+    {
+      "name": "Personal Care",
+      "amount": "87.25",
+      "percentage": 1.8,
+      "deltaVsPriorMonth": -8.5
+    },
+    {
+      "name": "Education",
+      "amount": "75.00",
+      "percentage": 1.6,
+      "deltaVsPriorMonth": 0.0
+    },
+    {
+      "name": "Income",
+      "amount": "0.00",
+      "percentage": 0.0,
+      "deltaVsPriorMonth": 0.0
+    },
+    {
+      "name": "Transfers (internal)",
+      "amount": "0.00",
+      "percentage": 0.0,
+      "deltaVsPriorMonth": 0.0
+    }
+  ]
+}
