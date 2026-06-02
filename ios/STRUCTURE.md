@@ -43,7 +43,7 @@ ios/
 │   │   ├── APIError.swift
 │   │   ├── AuthService.swift
 │   │   ├── KeychainService.swift
-│   │   └── PlaidLinkCoordinator.swift   # Phase 2: native Plaid SDK
+│   │   └── PlaidLinkCoordinator.swift   # LinkKit SwiftUI flow + token exchange
 │   ├── Models/
 │   │   └── API/
 │   │       ├── Auth.swift
@@ -54,7 +54,7 @@ ios/
 │   └── Resources/
 │       ├── Info.plist
 │       ├── SpendFlow.entitlements
-│       └── Assets.xcassets/      # Primary, Surface, … from design-tokens.json
+│       └── Assets.xcassets/      # BrandPrimary, Surface, … from design-tokens.json
 └── SpendFlowTests/
     └── Services/
         └── MoneyFormatterTests.swift
@@ -62,7 +62,7 @@ ios/
 
 ## Conventions
 
-- **SwiftUI** for all screens; UIKit only if Plaid Link requires it (Phase 2)
+- **SwiftUI** for all screens; LinkKit provides native Plaid Link UI
 - **MVVM-lite** — `@Observable` view models per feature; no massive view controllers
 - **API models** — `Codable` structs matching `docs/design/api-contract.md` and `ui/src/types/api.ts`
 - **Design tokens** — Asset Catalog colors from `docs/design/design-tokens.json`
@@ -71,7 +71,7 @@ ios/
 ## Dependencies
 
 - Google Sign-In iOS (Swift Package Manager, via XcodeGen)
-- Plaid Link iOS SDK (Phase 2)
+- Plaid LinkKit 6.3+ (`plaid-link-ios-spm`)
 - URLSession for networking (no Alamofire)
 
 ## Generate Xcode project

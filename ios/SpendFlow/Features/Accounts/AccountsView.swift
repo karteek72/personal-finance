@@ -35,16 +35,6 @@ final class AccountsViewModel {
             errorMessage = error.localizedDescription
         }
     }
-
-    func beginPlaidLink(api: APIClient) async {
-        statusMessage = nil
-        do {
-            let response = try await api.createPlaidLinkToken(platform: "ios")
-            statusMessage = "Plaid Link coming soon — token ready (\(response.linkToken.prefix(8))…)"
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
 }
 
 struct AccountsView: View {
@@ -60,15 +50,22 @@ struct AccountsView: View {
 
     var body: some View {
         SpendFlowScreen(title: "Wallet", subtitle: "Accounts & balances in one place") {
-            if let status = viewModel.statusMessage {
+            if let status = viewModel.statusMessage ?? appState.plaidLink.statusMessage {
                 statusBanner(status, isSuccess: true)
             }
-            if let error = viewModel.errorMessage, !viewModel.accounts.isEmpty {
+            if let error = viewModel.errorMessage ?? appState.plaidLink.errorMessage {
                 statusBanner(error, isSuccess: false)
             }
 
-            SpendFlowPrimaryButton(title: "Link a bank") {
-                Task { await viewModel.beginPlaidLink(api: appState.apiClient) }
+            SpendFlowPrimaryButton(
+                title: "Link a bank",
+                isLoading: appState.plaidLink.isLoading
+            ) {
+                Task {
+                    await appState.plaidLink.startLink {
+                        await viewModel.load(api: appState.apiClient)
+                    }
+                }
             }
 
             if viewModel.isLoading, viewModel.accounts.isEmpty {
@@ -97,6 +94,7 @@ struct AccountsView: View {
                 }
             }
         }
+        .spendFlowPlaidLink(coordinator: appState.plaidLink)
         .refreshable {
             await viewModel.load(api: appState.apiClient)
         }

@@ -6,9 +6,12 @@ import Observation
 final class AppState {
     let authService = AuthService()
     var apiClient: APIClient
+    private(set) var plaidLink: PlaidLinkCoordinator
 
     init() {
-        apiClient = APIClient(authService: authService)
+        let client = APIClient(authService: authService)
+        apiClient = client
+        plaidLink = PlaidLinkCoordinator(api: client)
     }
 
     func bootstrap() async {
@@ -18,5 +21,6 @@ final class AppState {
 
     func refreshAPIClient() {
         apiClient = APIClient.makeAuthenticated(authService: authService)
+        plaidLink = PlaidLinkCoordinator(api: apiClient)
     }
 }

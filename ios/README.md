@@ -2,8 +2,8 @@
 
 Native iPhone app for SpendFlow. Consumes the same backend REST API as the web client.
 
-**Status:** Phase 1 scaffold — auth, five tabs, read-only financial screens.  
-**Stack:** SwiftUI, Google Sign-In, URLSession, Swift Charts (Phase 2)
+**Status:** Phase 1 + native Plaid Link — auth, five tabs, bank linking via LinkKit.  
+**Stack:** SwiftUI, Google Sign-In, LinkKit, URLSession
 
 ---
 
@@ -61,6 +61,26 @@ The app configures `GIDConfiguration(clientID:serverClientID:)` so tokens sent t
 
 `Info.plist` allows local networking when using a localhost override in `Local.xcconfig`.
 
+### Plaid Link (native)
+
+The **Wallet** tab uses [LinkKit](https://github.com/plaid/plaid-link-ios-spm) (Swift Package Manager, 6.3+):
+
+1. Tap **Link a bank** → app calls `POST /plaid/link-token` with `platform: "ios"`.
+2. LinkKit presents the Plaid UI with the returned `linkToken`.
+3. On success, app calls `POST /plaid/exchange-token` and refreshes accounts.
+
+Backend Plaid env vars (`PLAID_CLIENT_ID`, `PLAID_SECRET`, etc.) live in `containers/.env` — same as web.
+
+**OAuth banks (Chase, etc.):** require **Associated Domains** on your App ID. The default `SpendFlow.entitlements` is empty so Personal Team builds work out of the box. Plaid Link still works for sandbox institutions that use username/password.
+
+When you need OAuth banks on device:
+
+1. [Apple Developer](https://developer.apple.com/account) → **Identifiers** → `com.mx.spendflow` → enable **Associated Domains** → Save.
+2. Copy `SpendFlow-OAuth.entitlements.example` → `SpendFlow.entitlements` (or merge the `com.apple.developer.associated-domains` entry).
+3. In Xcode: **Signing & Capabilities** → verify Associated Domains shows `applinks:spendflow.stockpulse.win`. Delete and re-download the provisioning profile if needed (**Product → Clean Build Folder**, then rebuild).
+4. Register `https://spendflow.stockpulse.win/plaid/oauth` in the [Plaid Dashboard](https://dashboard.plaid.com) (same as web `PLAID_REDIRECT_URI`).
+5. Host `https://spendflow.stockpulse.win/.well-known/apple-app-site-association` with your Team ID and bundle ID.
+
 ---
 
 ## Project layout
@@ -99,8 +119,8 @@ xcodebuild -scheme SpendFlow -destination 'platform=iOS Simulator,name=iPhone 16
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| 1 | Auth, Keychain, tab nav, dashboard + read screens | **Current** |
-| 2 | Plaid Link iOS SDK, re-categorize | Planned |
+| 1 | Auth, Keychain, tab nav, dashboard + read screens | Done |
+| 2 | Plaid Link iOS SDK, re-categorize | **Plaid Link done**; re-categorize planned |
 | 3 | Swift Charts analytics, household/family | Planned |
 | 4 | APNs push, Face ID, App Store | Planned |
 
