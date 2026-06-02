@@ -48,10 +48,6 @@ services:
     restart: unless-stopped
     networks:
       - spendflow-net
-    depends_on:
-      postgres:
-        condition: service_healthy
-        required: false
     env_file:
       - .env
     extra_hosts:

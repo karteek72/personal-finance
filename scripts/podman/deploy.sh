@@ -34,6 +34,8 @@ if [[ "${BUILD}" -eq 1 ]]; then
   "${SCRIPT_DIR}/build.sh"
 fi
 
+spendflow_ensure_podman
+
 echo "==> Starting stack on ${SPENDFLOW_HOST}:${SPENDFLOW_UI_PORT} (UI) and :${SPENDFLOW_API_PORT} (API)"
 
 UP_ARGS=(up -d --remove-orphans)
@@ -44,6 +46,11 @@ if ((${#EXTRA_ARGS[@]})); then
   spendflow_compose "${UP_ARGS[@]}" "${EXTRA_ARGS[@]}"
 else
   spendflow_compose "${UP_ARGS[@]}"
+fi
+
+if [[ -n "${SPENDFLOW_COMPOSE_PROFILE:-}" ]]; then
+  spendflow_wait_container_healthy spendflow-postgres 90 || true
+  spendflow_compose up -d --no-build api ui 2>/dev/null || spendflow_compose up -d api ui
 fi
 
 echo ""
