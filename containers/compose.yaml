@@ -1,0 +1,116 @@
+# SpendFlow — Podman Compose stack
+# Usage: see containers/README.md and scripts/podman/deploy.sh
+
+name: spendflow
+
+networks:
+  spendflow-net:
+    driver: bridge
+
+volumes:
+  spendflow-pgdata:
+
+services:
+  postgres:
+    profiles:
+      - bundled-db
+    image: docker.io/library/postgres:16-alpine
+    container_name: spendflow-postgres
+    restart: unless-stopped
+    networks:
+      - spendflow-net
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-spendflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-spendflow}
+      POSTGRES_DB: ${POSTGRES_DB:-spendflow}
+    volumes:
+      - spendflow-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-spendflow} -d ${POSTGRES_DB:-spendflow}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    ports:
+      # Host tools / drizzle (matches local dev port 5433)
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
+
+  api:
+    image: localhost/spendflow-api:latest
+    container_name: spendflow-api
+    build:
+      context: ../backend
+      dockerfile: ../containers/Containerfile.backend
+    restart: unless-stopped
+    networks:
+      - spendflow-net
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: ${DATABASE_URL}
+      APP_URL: ${SPENDFLOW_API_PUBLIC_URL:-http://localhost:4000}
+      CORS_ORIGIN: ${SPENDFLOW_UI_PUBLIC_URL:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      AUTH_ALLOW_DEV_USER: ${AUTH_ALLOW_DEV_USER:-false}
+      PLAID_CLIENT_ID: ${PLAID_CLIENT_ID}
+      PLAID_SECRET: ${PLAID_SECRET}
+      PLAID_ENV: ${PLAID_ENV:-sandbox}
+      PLAID_PRODUCTS: ${PLAID_PRODUCTS:-transactions}
+      PLAID_COUNTRY_CODES: ${PLAID_COUNTRY_CODES:-US}
+      PLAID_REDIRECT_URI: ${PLAID_REDIRECT_URI:-}
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
+      GOOGLE_SECRET_KEY: ${GOOGLE_SECRET_KEY:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+    ports:
+      - "${SPENDFLOW_HOST:-0.0.0.0}:${SPENDFLOW_API_PORT:-4000}:4000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  ui:
+    image: localhost/spendflow-ui:latest
+    container_name: spendflow-ui
+    build:
+      context: ../ui
+      dockerfile: ../containers/Containerfile.ui
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+        NEXT_PUBLIC_USE_MOCKS: ${NEXT_PUBLIC_USE_MOCKS:-false}
+    restart: unless-stopped
+    networks:
+      - spendflow-net
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "${SPENDFLOW_HOST:-0.0.0.0}:${SPENDFLOW_UI_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+# Cloudflare Tunnel runs on the host via systemd — not in this compose file.
+# Point ingress at the published host ports (see containers/cloudflared/config.yml.example).

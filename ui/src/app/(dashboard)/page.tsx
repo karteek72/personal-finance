@@ -1,9 +1,11 @@
+"use client";
+
 import { AlertBanner } from "@/components/ui/alert-banner";
 import { Card } from "@/components/ui/card";
 import { SpendAnalyticsPanel } from "@/components/charts/spend-analytics-panel";
 import { KpiCard } from "@/components/ui/kpi-card";
-import { fetchJsonServer } from "@/lib/api-server";
-import type { AlertsResponse, TransactionSummary } from "@/types/api";
+import { useAlerts } from "@/hooks/use-alerts";
+import { useSummary } from "@/hooks/use-summary";
 import { formatMoney } from "@/lib/format-money";
 
 function yearToDateRange(): { from: string; to: string } {
@@ -18,23 +20,28 @@ function getGreeting(): string {
   return "Good evening";
 }
 
-export default async function DashboardPage() {
+export default function DashboardPage() {
   const { from, to } = yearToDateRange();
+  const { data: summary, isLoading: summaryLoading, error: summaryError } =
+    useSummary(from, to);
+  const { data: alerts, isLoading: alertsLoading } = useAlerts();
 
-  let summary: TransactionSummary;
-  let alerts: AlertsResponse;
+  if (summaryLoading || alertsLoading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-text-muted">
+        Loading dashboard…
+      </div>
+    );
+  }
 
-  try {
-    [summary, alerts] = await Promise.all([
-      fetchJsonServer<TransactionSummary>(
-        `/transactions/summary?from=${from}&to=${to}`,
-      ),
-      fetchJsonServer<AlertsResponse>("/insights/alerts"),
-    ]);
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to load dashboard data";
-    throw new Error(message);
+  if (summaryError || !summary || !alerts) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-danger">
+        {summaryError instanceof Error
+          ? summaryError.message
+          : "Failed to load dashboard data"}
+      </div>
+    );
   }
 
   const netSavings = Number.parseFloat(summary.netSavings);

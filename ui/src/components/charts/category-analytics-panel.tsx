@@ -12,11 +12,11 @@ import { useChartData } from "@/hooks/use-chart-data";
 import type { CategoryTotal } from "@/types/api";
 
 interface CategoryAnalyticsPanelProps {
-  initialCategories: CategoryTotal[];
+  initialCategories?: CategoryTotal[];
 }
 
 export function CategoryAnalyticsPanel({
-  initialCategories,
+  initialCategories = [],
 }: CategoryAnalyticsPanelProps) {
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);

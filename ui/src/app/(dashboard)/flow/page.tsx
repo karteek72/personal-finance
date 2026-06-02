@@ -1,14 +1,10 @@
+"use client";
+
 import { FlowAnalyticsPanel } from "@/components/charts/flow-analytics-panel";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { fetchJsonServer } from "@/lib/api-server";
-import type { MoneyFlowResponse } from "@/types/api";
+import { useMoneyFlow } from "@/hooks/use-money-flow";
 import { formatMoney } from "@/lib/format-money";
-
-function yearToDateRange(): { from: string; to: string } {
-  const year = new Date().getFullYear();
-  return { from: `${year}-01-01`, to: `${year}-12-31` };
-}
 
 interface FlowColumnProps {
   title: string;
@@ -56,11 +52,24 @@ function FlowColumn({
   );
 }
 
-export default async function MoneyFlowPage() {
-  const { from, to } = yearToDateRange();
-  const flow = await fetchJsonServer<MoneyFlowResponse>(
-    `/transactions/flow?from=${from}&to=${to}`,
-  );
+export default function MoneyFlowPage() {
+  const { data: flow, isLoading, error } = useMoneyFlow();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-text-muted">
+        Loading money flow…
+      </div>
+    );
+  }
+
+  if (error || !flow) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-danger">
+        {error instanceof Error ? error.message : "Failed to load money flow"}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">

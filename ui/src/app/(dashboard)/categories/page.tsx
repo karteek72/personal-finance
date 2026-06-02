@@ -1,18 +1,27 @@
+"use client";
+
 import { CategoryAnalyticsPanel } from "@/components/charts/category-analytics-panel";
 import { PageHeader } from "@/components/ui/page-header";
-import { fetchJsonServer } from "@/lib/api-server";
-import type { CategoriesResponse } from "@/types/api";
+import { useCategories } from "@/hooks/use-categories";
 
-function defaultDateRange(): { from: string; to: string } {
-  const year = new Date().getFullYear();
-  return { from: `${year - 1}-01-01`, to: `${year}-12-31` };
-}
+export default function CategoriesPage() {
+  const { data, isLoading, error } = useCategories();
 
-export default async function CategoriesPage() {
-  const { from, to } = defaultDateRange();
-  const categories = await fetchJsonServer<CategoriesResponse>(
-    `/transactions/by-category?from=${from}&to=${to}`,
-  );
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-text-muted">
+        Loading categories…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-danger">
+        {error instanceof Error ? error.message : "Failed to load categories"}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -21,7 +30,9 @@ export default async function CategoriesPage() {
         subtitle="Filter by account or category — charts update live"
       />
 
-      <CategoryAnalyticsPanel initialCategories={categories.categories} />
+      <CategoryAnalyticsPanel
+        initialCategories={data?.categories ?? []}
+      />
     </div>
   );
 }
