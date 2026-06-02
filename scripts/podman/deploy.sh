@@ -36,8 +36,15 @@ fi
 
 echo "==> Starting stack on ${SPENDFLOW_HOST}:${SPENDFLOW_UI_PORT} (UI) and :${SPENDFLOW_API_PORT} (API)"
 
-COMPOSE_ARGS=(up -d --remove-orphans "${EXTRA_ARGS[@]}")
-spendflow_compose "${COMPOSE_ARGS[@]}"
+UP_ARGS=(up -d --remove-orphans)
+if [[ "${BUILD}" -eq 0 ]]; then
+  UP_ARGS+=(--no-build)
+fi
+if ((${#EXTRA_ARGS[@]})); then
+  spendflow_compose "${UP_ARGS[@]}" "${EXTRA_ARGS[@]}"
+else
+  spendflow_compose "${UP_ARGS[@]}"
+fi
 
 echo ""
 echo "LAN:"

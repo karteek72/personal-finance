@@ -58,7 +58,12 @@ spendflow_compose() {
   local containers
   containers="${SPENDFLOW_CONTAINERS_DIR}"
   cd "${containers}"
-  podman compose -f compose.yaml "$@"
+  # podman-compose ignores COMPOSE_PROFILES; pass --profile explicitly when bundled DB is used.
+  if [[ -n "${SPENDFLOW_COMPOSE_PROFILE:-}" ]]; then
+    podman compose -f compose.yaml --profile "${SPENDFLOW_COMPOSE_PROFILE}" "$@"
+  else
+    podman compose -f compose.yaml "$@"
+  fi
 }
 
 spendflow_require_cmd() {
@@ -99,8 +104,9 @@ spendflow_apply_build_urls() {
 }
 
 spendflow_prepare_postgres() {
+  unset SPENDFLOW_COMPOSE_PROFILE
   if [[ "${SPENDFLOW_BUNDLED_POSTGRES:-false}" == "true" ]]; then
-    export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}bundled-db"
+    export SPENDFLOW_COMPOSE_PROFILE=bundled-db
     export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@postgres:5432/${POSTGRES_DB:-spendflow}"
     return 0
   fi
@@ -110,7 +116,7 @@ spendflow_prepare_postgres() {
     echo "info: using host postgres (spendflow-postgres → 127.0.0.1:${host_port})" >&2
     return 0
   fi
-  export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}bundled-db"
+  export SPENDFLOW_COMPOSE_PROFILE=bundled-db
   export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@postgres:5432/${POSTGRES_DB:-spendflow}"
 }
 

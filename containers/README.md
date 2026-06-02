@@ -37,9 +37,8 @@ The UI image is built with `NEXT_PUBLIC_API_URL` pointing at the **public API** 
 
 | Script | Purpose |
 |--------|---------|
-| `./scripts/podman/start.sh` | **Main entry** — same as `deploy.sh` |
+| `./scripts/podman/deploy.sh` | **Main entry** — build + `podman compose up -d` |
 | `./scripts/podman/build.sh` | Build API (Node) + UI (static `out/` in **nginx:alpine**) |
-| `./scripts/podman/deploy.sh` | Build + `podman compose up -d` |
 | `./scripts/podman/deploy.sh --no-build` | Restart without rebuild |
 | `./scripts/podman/down.sh` | Stop and remove containers |
 | `./scripts/podman/logs.sh` | Follow compose logs |
