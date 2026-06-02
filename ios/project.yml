@@ -1,6 +1,6 @@
 name: SpendFlow
 options:
-  bundleIdPrefix: com.karteek72
+  bundleIdPrefix: com.mx
   deploymentTarget:
     iOS: "17.0"
   groupSortPosition: top

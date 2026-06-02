@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 enum KeychainService {
-    private static let service = "\(Bundle.main.bundleIdentifier ?? "com.karteek72.spendflow").auth"
+    private static let service = "\(Bundle.main.bundleIdentifier ?? "com.mx.spendflow").auth"
 
     enum Key: String {
         case refreshToken

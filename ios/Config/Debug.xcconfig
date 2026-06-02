@@ -2,7 +2,7 @@
 #include? "Local.xcconfig"
 
 // Personal dev bundle ID — change in Local.xcconfig if needed (must match Google iOS OAuth client).
-PRODUCT_BUNDLE_IDENTIFIER = com.karteek72.spendflow
+PRODUCT_BUNDLE_IDENTIFIER = com.mx.spendflow
 
 API_BASE_URL = https:/$()/spendflow-api.stockpulse.win/api/v1
 
