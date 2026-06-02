@@ -1,0 +1,54 @@
+{
+  "trends": [
+    {
+      "name": "Dining & Restaurants",
+      "months": [
+        { "month": "2026-01", "amount": "389.25" },
+        { "month": "2026-02", "amount": "412.00" },
+        { "month": "2026-03", "amount": "445.30" },
+        { "month": "2026-04", "amount": "412.88" },
+        { "month": "2026-05", "amount": "487.50" }
+      ]
+    },
+    {
+      "name": "Food & Groceries",
+      "months": [
+        { "month": "2026-01", "amount": "598.42" },
+        { "month": "2026-02", "amount": "612.18" },
+        { "month": "2026-03", "amount": "625.90" },
+        { "month": "2026-04", "amount": "629.12" },
+        { "month": "2026-05", "amount": "642.34" }
+      ]
+    },
+    {
+      "name": "Subscriptions & Software",
+      "months": [
+        { "month": "2026-01", "amount": "142.97" },
+        { "month": "2026-02", "amount": "142.97" },
+        { "month": "2026-03", "amount": "154.99" },
+        { "month": "2026-04", "amount": "166.58" },
+        { "month": "2026-05", "amount": "187.43" }
+      ]
+    },
+    {
+      "name": "Home & Rent",
+      "months": [
+        { "month": "2026-01", "amount": "1850.00" },
+        { "month": "2026-02", "amount": "1850.00" },
+        { "month": "2026-03", "amount": "1850.00" },
+        { "month": "2026-04", "amount": "1850.00" },
+        { "month": "2026-05", "amount": "1850.00" }
+      ]
+    },
+    {
+      "name": "Shopping & Retail",
+      "months": [
+        { "month": "2026-01", "amount": "512.34" },
+        { "month": "2026-02", "amount": "398.76" },
+        { "month": "2026-03", "amount": "467.89" },
+        { "month": "2026-04", "amount": "462.88" },
+        { "month": "2026-05", "amount": "443.12" }
+      ]
+    }
+  ]
+}

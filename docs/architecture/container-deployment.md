@@ -1,7 +1,7 @@
 # Container Deployment (Podman)
 
-**Last Updated:** May 2026  
-**Status:** Planned — containers not yet implemented
+**Last Updated:** June 2026  
+**Status:** Implemented — see `containers/` and `scripts/podman/`
 
 SpendFlow deploys as **separate Podman containers** for UI and backend, plus infrastructure containers for PostgreSQL and Redis.
 
@@ -37,7 +37,7 @@ SpendFlow deploys as **separate Podman containers** for UI and backend, plus inf
 
 | Image | Source | Base | Output |
 |-------|--------|------|--------|
-| `spendflow-ui` | `ui/` | `node:22-alpine` | Next.js `standalone` server |
+| `spendflow-ui` | `ui/` | `nginx:alpine` | Next.js static `export` → nginx |
 | `spendflow-api` | `backend/` | `node:22-alpine` | Compiled Fastify (`dist/`) |
 | `spendflow-worker` | `backend/` (same build) | same as API | `node dist/worker.js` |
 
@@ -108,8 +108,17 @@ Environment via `containers/.env` (gitignored) or Podman secrets.
 
 ---
 
+## Deploy commands
+
+```bash
+cp containers/deploy.env.example containers/deploy.env
+cp containers/env.example containers/.env
+./scripts/podman/deploy.sh
+```
+
+See [containers/README.md](../../containers/README.md) for Cloudflare Tunnel hostnames (`spendflow.stockpulse.win`, `spendflow-api.stockpulse.win`) and LAN access at `192.168.68.100`.
+
 ## Next steps
 
-1. Scaffold `ui/` and `backend/` with production build outputs (Next standalone, Fastify dist).
-2. Add `containers/compose.yaml` and Containerfiles.
-3. Document build/run commands in `containers/README.md`.
+- Add `spendflow-worker` image when BullMQ worker entry ships.
+- TLS / Caddy on host is optional when using Cloudflare Tunnel.

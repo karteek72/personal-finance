@@ -61,19 +61,22 @@ Keep UI, iOS, and backend changes in separate commits when possible for cleaner 
 
 ---
 
-## Future additions (not yet created)
+## Deployment
 
 ```
 containers/
-├── compose.yaml              # Podman Compose — postgres, redis, ui, api, worker
+├── compose.yaml
 ├── Containerfile.ui
 ├── Containerfile.backend
 └── README.md
 
-.github/workflows/            # CI: lint, typecheck, test per service + xcodebuild
+scripts/podman/
+├── build.sh
+├── deploy.sh
+└── …
 ```
 
-These will be added in Phase 1 scaffolding, not before.
+CI workflows (`.github/workflows/`) are still planned.
 
 ---
 

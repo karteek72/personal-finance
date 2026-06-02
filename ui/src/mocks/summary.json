@@ -1,0 +1,12 @@
+{
+  "totalSpent": "4823.56",
+  "income": "6850.00",
+  "netSavings": "2026.44",
+  "avgMonthlySpend": "4650.00",
+  "topCategory": {
+    "name": "Home & Rent",
+    "amount": "1850.00"
+  },
+  "ccPaymentsExcluded": "2100.00",
+  "savingsRate": 0.296
+}

@@ -32,6 +32,9 @@ coverage/
 # Podman / Compose local overrides
 compose.override.yaml
 containers/.env
+containers/deploy.env
+containers/cloudflared/credentials.json
+containers/cloudflared/config.yml
 
 # Drizzle
 backend/drizzle/meta/_journal.json.bak
@@ -40,3 +43,7 @@ backend/drizzle/meta/_journal.json.bak
 *.local
 .cache/
 .turbo/
+
+Statements/
+
+.cursor/

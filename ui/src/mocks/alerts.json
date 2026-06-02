@@ -1,0 +1,18 @@
+{
+  "alerts": [
+    {
+      "id": "f3a8b2c1-4d5e-4f67-8901-234567890abc",
+      "severity": "warning",
+      "title": "Dining spend up 18%",
+      "message": "You spent $487.50 on Dining & Restaurants in May, up 18% from April ($412.88). Consider cooking at home more often this month.",
+      "dismissible": true
+    },
+    {
+      "id": "f3a8b2c1-4d5e-4f67-8901-234567890abd",
+      "severity": "info",
+      "title": "Subscription creep detected",
+      "message": "Your Subscriptions & Software total rose to $187.43 this month (+12.5% vs April). Review recurring charges for services you no longer use.",
+      "dismissible": true
+    }
+  ]
+}
