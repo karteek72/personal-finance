@@ -6,19 +6,28 @@ import { ChartFilterBar } from "@/components/charts/chart-filter-bar";
 import { InteractiveAreaChart } from "@/components/charts/interactive-area-chart";
 import { InteractiveBarChart } from "@/components/charts/interactive-bar-chart";
 import { InteractiveDonutChart } from "@/components/charts/interactive-donut-chart";
+import { InteractiveMemberChart } from "@/components/charts/interactive-member-chart";
 import { InteractiveMultiLineChart } from "@/components/charts/interactive-multi-line-chart";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useChartData } from "@/hooks/use-chart-data";
+import { useHousehold } from "@/hooks/use-household";
 import { formatMoney } from "@/lib/format-money";
+import { useViewModeStore } from "@/stores/view-mode-store";
 
 export function SpendAnalyticsPanel() {
+  const scope = useViewModeStore((state) => state.scope);
+  const setScope = useViewModeStore((state) => state.setScope);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState("");
 
   const { data: accountsData } = useAccounts();
+  const { data: householdData } = useHousehold();
   const { data, isLoading, error } = useChartData({
     accountId: selectedAccountId || undefined,
     category: selectedCategory || undefined,
+    memberId: selectedMemberId || undefined,
+    scope: selectedMemberId ? undefined : scope,
   });
 
   const categoryNames = useMemo(
@@ -29,6 +38,7 @@ export function SpendAnalyticsPanel() {
   function clearFilters() {
     setSelectedAccountId("");
     setSelectedCategory("");
+    setSelectedMemberId("");
   }
 
   if (isLoading) {
@@ -48,10 +58,15 @@ export function SpendAnalyticsPanel() {
       <ChartFilterBar
         accounts={accountsData?.accounts ?? []}
         categories={categoryNames}
+        members={householdData?.members ?? []}
         selectedAccountId={selectedAccountId}
         selectedCategory={selectedCategory}
+        selectedMemberId={selectedMemberId}
+        scope={scope}
+        onScopeChange={setScope}
         onAccountChange={setSelectedAccountId}
         onCategoryChange={setSelectedCategory}
+        onMemberChange={setSelectedMemberId}
         onClear={clearFilters}
       />
 
@@ -85,17 +100,23 @@ export function SpendAnalyticsPanel() {
       <InteractiveAreaChart monthly={data.monthly} />
 
       <div className="grid gap-5 lg:grid-cols-2">
+        <InteractiveMemberChart
+          slices={data.byMember}
+          selectedMemberId={selectedMemberId}
+          onSelectMember={setSelectedMemberId}
+        />
         <InteractiveDonutChart
           slices={data.byCategory}
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
         />
-        <InteractiveBarChart
-          slices={data.byAccount}
-          selectedAccountId={selectedAccountId}
-          onSelectAccount={setSelectedAccountId}
-        />
       </div>
+
+      <InteractiveBarChart
+        slices={data.byAccount}
+        selectedAccountId={selectedAccountId}
+        onSelectAccount={setSelectedAccountId}
+      />
 
       <InteractiveMultiLineChart
         trends={data.categoryTrends}

@@ -6,6 +6,9 @@ import type {
   ChartDataFilters,
   ChartDataResponse,
   DeleteAccountResponse,
+  HouseholdInsightsResponse,
+  HouseholdMember,
+  HouseholdResponse,
   MoneyFlowResponse,
   PaginatedTransactions,
   PlaidExchangeResponse,
@@ -85,6 +88,8 @@ export const api = {
         sort: filters.sort,
         limit: filters.limit,
         cursor: filters.cursor,
+        memberId: filters.memberId,
+        scope: filters.scope,
       })}`,
     );
   },
@@ -169,8 +174,84 @@ export const api = {
         to: filters.to,
         accountId: filters.accountId,
         category: filters.category,
+        memberId: filters.memberId,
+        scope: filters.scope,
       })}`,
     );
+  },
+
+  getHousehold(): Promise<HouseholdResponse> {
+    if (USE_MOCKS) {
+      return mockApi.getHousehold();
+    }
+    return fetchJson<HouseholdResponse>("/household");
+  },
+
+  updateHouseholdName(name: string): Promise<{ id: string; name: string }> {
+    if (USE_MOCKS) {
+      return mockApi.updateHouseholdName(name);
+    }
+    return fetchJson("/household", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+  },
+
+  getHouseholdInsights(): Promise<HouseholdInsightsResponse> {
+    if (USE_MOCKS) {
+      return mockApi.getHouseholdInsights();
+    }
+    return fetchJson<HouseholdInsightsResponse>("/household/insights");
+  },
+
+  createHouseholdMember(input: {
+    displayName: string;
+    role: "partner" | "child" | "other";
+  }): Promise<HouseholdMember> {
+    if (USE_MOCKS) {
+      return mockApi.createHouseholdMember(input);
+    }
+    return fetchJson<HouseholdMember>("/household/members", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  },
+
+  updateHouseholdMember(
+    memberId: string,
+    input: { displayName?: string; role?: HouseholdMember["role"] },
+  ): Promise<HouseholdMember> {
+    if (USE_MOCKS) {
+      return mockApi.updateHouseholdMember(memberId, input);
+    }
+    return fetchJson<HouseholdMember>(`/household/members/${memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  },
+
+  deleteHouseholdMember(memberId: string): Promise<{ status: string }> {
+    if (USE_MOCKS) {
+      return mockApi.deleteHouseholdMember(memberId);
+    }
+    return fetchJson(`/household/members/${memberId}`, { method: "DELETE" });
+  },
+
+  assignAccountToMember(
+    accountId: string,
+    memberId: string,
+  ): Promise<{ accountId: string; memberId: string }> {
+    if (USE_MOCKS) {
+      return mockApi.assignAccountToMember(accountId, memberId);
+    }
+    return fetchJson(`/household/accounts/${accountId}/assign`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberId }),
+    });
   },
 
   createPlaidLinkToken(platform: "web" | "ios" = "web"): Promise<{ linkToken: string }> {

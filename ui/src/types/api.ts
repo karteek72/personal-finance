@@ -19,6 +19,9 @@ export interface Account {
   status: "active" | "error" | "reauth_required";
   source?: "import" | "plaid";
   plaidItemId?: string | null;
+  memberId?: string | null;
+  memberName?: string | null;
+  memberColor?: string | null;
 }
 
 export interface Transaction {
@@ -34,6 +37,9 @@ export interface Transaction {
   transactionType: "expense" | "income" | "transfer";
   isTransfer: boolean;
   pending: boolean;
+  memberId?: string | null;
+  memberName?: string | null;
+  memberColor?: string | null;
 }
 
 export interface TransactionSummary {
@@ -170,10 +176,19 @@ export interface ChartAccountSlice {
   percentage: number;
 }
 
+export interface ChartMemberSlice {
+  id: string;
+  name: string;
+  color: string;
+  amount: string;
+  percentage: number;
+}
+
 export interface ChartDataResponse {
   monthly: ChartMonthlyPoint[];
   byCategory: ChartCategorySlice[];
   byAccount: ChartAccountSlice[];
+  byMember: ChartMemberSlice[];
   categoryTrends: CategoryTrend[];
   totals: {
     expenses: string;
@@ -187,12 +202,70 @@ export interface ChartDataFilters {
   to?: string;
   accountId?: string;
   category?: string;
+  memberId?: string;
+  scope?: "all" | "household" | "personal";
+}
+
+export type HouseholdMemberRole = "owner" | "partner" | "child" | "other";
+
+export interface HouseholdMember {
+  id: string;
+  displayName: string;
+  role: HouseholdMemberRole;
+  avatarColor: string;
+  userId: string | null;
+  createdAt: string;
+}
+
+export interface HouseholdAccountLink {
+  accountId: string;
+  name: string;
+  mask: string;
+  institutionName: string;
+  balanceCurrent: string;
+  memberId: string | null;
+  memberName: string | null;
+  memberColor: string | null;
+}
+
+export interface HouseholdResponse {
+  household: {
+    id: string;
+    name: string;
+    createdAt: string;
+  };
+  members: HouseholdMember[];
+  accounts: HouseholdAccountLink[];
+}
+
+export interface HouseholdMemberInsight {
+  memberId: string;
+  displayName: string;
+  role: HouseholdMemberRole;
+  avatarColor: string;
+  accountCount: number;
+  totalSpent: string;
+  totalIncome: string;
+  topCategory: { name: string; amount: string };
+}
+
+export interface HouseholdInsightsResponse {
+  members: HouseholdMemberInsight[];
+  unassignedAccounts: HouseholdAccountLink[];
+  householdTotals: {
+    expenses: string;
+    income: string;
+    net: string;
+  };
+  period: { from: string; to: string };
 }
 
 export interface TransactionFilters {
   month?: string;
   category?: string;
   accountId?: string;
+  memberId?: string;
+  scope?: "all" | "household" | "personal";
   q?: string;
   type?: Transaction["transactionType"];
   sort?:

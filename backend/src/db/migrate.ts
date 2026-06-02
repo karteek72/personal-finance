@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import postgres from "postgres";
 
-const MIGRATION_FILES = ["0000_init.sql", "0001_plaid.sql"];
+const MIGRATION_FILES = ["0000_init.sql", "0001_plaid.sql", "0002_households.sql"];
 
 export async function runMigrations(databaseUrl?: string): Promise<void> {
   const url =

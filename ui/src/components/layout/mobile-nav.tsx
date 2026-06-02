@@ -9,6 +9,7 @@ const navItems = [
   { href: "/flow", label: "Flow" },
   { href: "/categories", label: "Spend" },
   { href: "/transactions", label: "Activity" },
+  { href: "/family", label: "Family" },
   { href: "/accounts", label: "Wallet" },
 ] as const;
 
@@ -73,6 +74,19 @@ function MobileNavIcon({ href, active }: { href: string; active: boolean }) {
           <path d="M3 10h18" stroke="currentColor" strokeWidth="2" />
         </svg>
       );
+    case "/family":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+          <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="2" />
+          <circle cx="17" cy="9" r="2.5" stroke="currentColor" strokeWidth="2" />
+          <path
+            d="M4 20c0-3 2.5-5 5-5s5 2 5 5M14 20c0-2.5 1.8-4.5 4-4.5"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      );
     default:
       return null;
   }
@@ -84,7 +98,7 @@ export function MobileNav() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 px-4 pb-4 md:hidden">
       <div
-        className="glass mx-auto flex max-w-md items-center justify-around rounded-[var(--radius-lg)] border border-border/60 px-2 py-2"
+        className="glass mx-auto flex max-w-lg items-center justify-around overflow-x-auto rounded-[var(--radius-lg)] border border-border/60 px-1 py-2"
         style={{ boxShadow: "var(--shadow-float)" }}
       >
         {navItems.map((item) => {

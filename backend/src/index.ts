@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { loadEnv, type Env } from "./config/env.js";
+import { householdRoutes } from "./routes/households.js";
 import { healthRoutes } from "./routes/health.js";
 import { accountRoutes } from "./routes/accounts.js";
 import { plaidRoutes } from "./routes/plaid.js";
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
     credentials: true,
   });
 
+  await app.register(householdRoutes, { prefix: "/api/v1" });
   await app.register(healthRoutes, { prefix: "/api/v1" });
   await app.register(accountRoutes, { prefix: "/api/v1" });
   await app.register(plaidRoutes, { prefix: "/api/v1" });

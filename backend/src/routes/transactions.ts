@@ -10,7 +10,25 @@ import {
   listTransactions,
   transactionCount,
 } from "../services/transaction-store.js";
+import { resolveScopedAccountIds } from "../services/household-store.js";
+import { getOrCreateDevUser } from "../services/user-store.js";
 import { getAccounts as getMockAccounts } from "../services/mock-data.js";
+
+type ViewScope = "all" | "household" | "personal";
+
+async function resolveScopeFilters(query: {
+  scope?: string;
+  memberId?: string;
+}) {
+  const user = await getOrCreateDevUser();
+  const scope = (query.scope as ViewScope | undefined) ?? "all";
+  const scopedAccountIds = await resolveScopedAccountIds(
+    user.id,
+    query.memberId ? undefined : scope === "all" ? undefined : scope,
+    query.memberId,
+  );
+  return scopedAccountIds;
+}
 
 export const transactionRoutes: FastifyPluginAsync = async (app) => {
   app.get("/transactions/summary", async (request) => {
@@ -20,10 +38,13 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/transactions", async (request) => {
     const query = request.query as Record<string, string | undefined>;
+    const scopedAccountIds = await resolveScopeFilters(query);
+
     return listTransactions({
       month: query.month,
       category: query.category,
       accountId: query.accountId,
+      scopedAccountIds,
       q: query.q,
       type: query.type,
       sort: query.sort as
@@ -51,12 +72,17 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
       to?: string;
       accountId?: string;
       category?: string;
+      scope?: string;
+      memberId?: string;
     };
+    const scopedAccountIds = await resolveScopeFilters(query);
+
     return getChartData({
       from: query.from,
       to: query.to,
       accountId: query.accountId,
       category: query.category,
+      scopedAccountIds,
     });
   });
 

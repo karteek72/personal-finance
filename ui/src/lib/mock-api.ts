@@ -10,6 +10,9 @@ import type {
   AlertsResponse,
   CategoriesResponse,
   ChartDataResponse,
+  HouseholdInsightsResponse,
+  HouseholdMember,
+  HouseholdResponse,
   MoneyFlowResponse,
   PaginatedTransactions,
   TransactionFilters,
@@ -344,6 +347,13 @@ export async function getChartData(params: {
     monthly,
     byCategory,
     byAccount,
+    byMember: byCategory.map((slice, index) => ({
+      id: `mock-member-${index}`,
+      name: index === 0 ? "Me" : `Member ${index + 1}`,
+      color: ["#7c3aed", "#ec4899", "#14b8a6"][index % 3] ?? "#7c3aed",
+      amount: slice.amount,
+      percentage: slice.percentage,
+    })),
     categoryTrends,
     totals: {
       expenses: expenseTotal.toFixed(2),
@@ -351,4 +361,140 @@ export async function getChartData(params: {
       net: (incomeTotal - expenseTotal).toFixed(2),
     },
   };
+}
+
+const mockHouseholdState: HouseholdResponse = {
+  household: {
+    id: "mock-household",
+    name: "My Family",
+    createdAt: new Date().toISOString(),
+  },
+  members: [
+    {
+      id: "mock-member-owner",
+      displayName: "Me",
+      role: "owner",
+      avatarColor: "#7c3aed",
+      userId: null,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: "mock-member-partner",
+      displayName: "Partner",
+      role: "partner",
+      avatarColor: "#ec4899",
+      userId: null,
+      createdAt: new Date().toISOString(),
+    },
+  ],
+  accounts: (accountsData as AccountsResponse).accounts.map((account, index) => ({
+    accountId: account.id,
+    name: account.name,
+    mask: account.mask ?? "0000",
+    institutionName: account.institutionName,
+    balanceCurrent: account.balanceCurrent,
+    memberId: index % 2 === 0 ? "mock-member-owner" : "mock-member-partner",
+    memberName: index % 2 === 0 ? "Me" : "Partner",
+    memberColor: index % 2 === 0 ? "#7c3aed" : "#ec4899",
+  })),
+};
+
+export async function getHousehold(): Promise<HouseholdResponse> {
+  await delay();
+  return mockHouseholdState;
+}
+
+export async function updateHouseholdName(name: string) {
+  await delay();
+  mockHouseholdState.household.name = name;
+  return { id: mockHouseholdState.household.id, name };
+}
+
+export async function getHouseholdInsights(): Promise<HouseholdInsightsResponse> {
+  await delay();
+  const year = new Date().getFullYear();
+  return {
+    members: mockHouseholdState.members.map((member) => ({
+      memberId: member.id,
+      displayName: member.displayName,
+      role: member.role,
+      avatarColor: member.avatarColor,
+      accountCount: mockHouseholdState.accounts.filter(
+        (account) => account.memberId === member.id,
+      ).length,
+      totalSpent: "2450.00",
+      totalIncome: "5200.00",
+      topCategory: { name: "Food & Groceries", amount: "680.00" },
+    })),
+    unassignedAccounts: mockHouseholdState.accounts.filter(
+      (account) => !account.memberId,
+    ),
+    householdTotals: {
+      expenses: "4900.00",
+      income: "10400.00",
+      net: "5500.00",
+    },
+    period: { from: `${year}-01-01`, to: `${year}-12-31` },
+  };
+}
+
+export async function createHouseholdMember(input: {
+  displayName: string;
+  role: "partner" | "child" | "other";
+}): Promise<HouseholdMember> {
+  await delay();
+  const member: HouseholdMember = {
+    id: `mock-member-${Date.now()}`,
+    displayName: input.displayName,
+    role: input.role,
+    avatarColor: "#14b8a6",
+    userId: null,
+    createdAt: new Date().toISOString(),
+  };
+  mockHouseholdState.members.push(member);
+  return member;
+}
+
+export async function updateHouseholdMember(
+  memberId: string,
+  input: { displayName?: string; role?: HouseholdMember["role"] },
+): Promise<HouseholdMember> {
+  await delay();
+  const member = mockHouseholdState.members.find((row) => row.id === memberId);
+  if (!member) throw new Error("Member not found");
+  if (input.displayName) member.displayName = input.displayName;
+  if (input.role) member.role = input.role;
+  return member;
+}
+
+export async function deleteHouseholdMember(memberId: string) {
+  await delay();
+  mockHouseholdState.members = mockHouseholdState.members.filter(
+    (member) => member.id !== memberId,
+  );
+  mockHouseholdState.accounts = mockHouseholdState.accounts.map((account) =>
+    account.memberId === memberId
+      ? { ...account, memberId: null, memberName: null, memberColor: null }
+      : account,
+  );
+  return { status: "deleted" };
+}
+
+export async function assignAccountToMember(
+  accountId: string,
+  memberId: string,
+) {
+  await delay();
+  const member = mockHouseholdState.members.find((row) => row.id === memberId);
+  mockHouseholdState.accounts = mockHouseholdState.accounts.map((account) =>
+    account.accountId === accountId
+      ? {
+          ...account,
+          memberId,
+          memberName: member?.displayName ?? null,
+          memberColor: member?.avatarColor ?? null,
+        }
+      : account,
+  );
+  return { accountId, memberId };
 }

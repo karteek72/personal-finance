@@ -15,6 +15,8 @@ interface TransactionRowProps {
   transactionType: "expense" | "income" | "transfer";
   isTransfer: boolean;
   pending: boolean;
+  memberName?: string | null;
+  memberColor?: string | null;
 }
 
 function formatAmount(amount: string, currencyCode: string): string {
@@ -58,6 +60,8 @@ export function TransactionRow({
   transactionType,
   isTransfer,
   pending,
+  memberName,
+  memberColor,
 }: TransactionRowProps) {
   const displayName = merchantName ?? name;
   const isHighlightedTransfer = isTransfer || transactionType === "transfer";
@@ -86,6 +90,14 @@ export function TransactionRow({
           <p className="truncate text-sm font-semibold text-text">
             {displayName}
           </p>
+          {memberName ? (
+            <span
+              className="shrink-0 rounded-[var(--radius-pill)] px-2 py-0.5 text-[10px] font-bold text-text-inverse"
+              style={{ backgroundColor: memberColor ?? "var(--color-primary)" }}
+            >
+              {memberName}
+            </span>
+          ) : null}
           {pending ? (
             <span className="shrink-0 rounded-[var(--radius-pill)] bg-warning/15 px-2 py-0.5 text-[10px] font-bold uppercase text-warning">
               Pending

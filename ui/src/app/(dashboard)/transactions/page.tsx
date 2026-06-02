@@ -11,7 +11,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useCategories } from "@/hooks/use-categories";
 import { useTransactions } from "@/hooks/use-transactions";
+import { useHousehold } from "@/hooks/use-household";
 import type { TransactionFilters } from "@/types/api";
+import { useViewModeStore } from "@/stores/view-mode-store";
 
 type TransactionFilter = "all" | "expense" | "income" | "transfer";
 
@@ -57,9 +59,12 @@ function TransactionsContent() {
   const [sort, setSort] = useState<NonNullable<TransactionFilters["sort"]>>(
     "date_desc",
   );
+  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const scope = useViewModeStore((state) => state.scope);
 
   const { data: accountsData } = useAccounts();
   const { data: categoriesData } = useCategories();
+  const { data: householdData } = useHousehold();
 
   const { data, isLoading, error } = useTransactions({
     type: filter === "all" ? undefined : filter,
@@ -67,6 +72,8 @@ function TransactionsContent() {
     month: monthQueryValue(selectedMonth),
     accountId: accountId || undefined,
     category: category || undefined,
+    memberId: selectedMemberId || undefined,
+    scope: selectedMemberId ? undefined : scope,
     sort,
     limit: 100,
   });
@@ -121,6 +128,44 @@ function TransactionsContent() {
       />
 
       <MonthPills selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
+
+      {householdData && householdData.members.length > 0 ? (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <button
+            type="button"
+            onClick={() => setSelectedMemberId("")}
+            className={`shrink-0 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-semibold ${
+              !selectedMemberId
+                ? "bg-primary text-text-inverse"
+                : "bg-surface text-text-muted card-shadow"
+            }`}
+          >
+            All family
+          </button>
+          {householdData.members.map((member) => (
+            <button
+              key={member.id}
+              type="button"
+              onClick={() =>
+                setSelectedMemberId(
+                  selectedMemberId === member.id ? "" : member.id,
+                )
+              }
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-semibold ${
+                selectedMemberId === member.id
+                  ? "bg-primary text-text-inverse"
+                  : "bg-surface text-text-muted card-shadow"
+              }`}
+            >
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: member.avatarColor }}
+              />
+              {member.displayName}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div
         className="flex gap-2 overflow-x-auto pb-1"

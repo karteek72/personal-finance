@@ -12,6 +12,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/categories": "Spend",
   "/transactions": "Activity",
   "/accounts": "Wallet",
+  "/family": "Family",
 };
 
 export default function DashboardLayout({

@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { accounts, transactions } from "../db/schema.js";
+import { getMemberMapForAccounts } from "./household-store.js";
 
 export async function listAccounts() {
   const db = getDb();
@@ -10,23 +11,31 @@ export async function listAccounts() {
     .where(eq(accounts.isActive, true))
     .orderBy(accounts.name);
 
+  const memberMap = await getMemberMapForAccounts(rows.map((row) => row.id));
+
   return {
-    accounts: rows.map((row) => ({
-      id: row.id,
-      plaidItemId: row.plaidItemId,
-      name: row.name,
-      officialName: row.officialName,
-      type: row.type as "depository" | "credit" | "investment",
-      subtype: row.subtype,
-      mask: row.mask,
-      balanceCurrent: row.balanceCurrent ?? "0.00",
-      balanceAvailable: row.balanceAvailable ?? null,
-      currencyCode: row.currencyCode,
-      institutionName: row.institutionName,
-      lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
-      status: (row.status ?? "active") as "active" | "error" | "reauth_required",
-      source: row.source ?? "import",
-    })),
+    accounts: rows.map((row) => {
+      const member = memberMap.get(row.id);
+      return {
+        id: row.id,
+        plaidItemId: row.plaidItemId,
+        name: row.name,
+        officialName: row.officialName,
+        type: row.type as "depository" | "credit" | "investment",
+        subtype: row.subtype,
+        mask: row.mask,
+        balanceCurrent: row.balanceCurrent ?? "0.00",
+        balanceAvailable: row.balanceAvailable ?? null,
+        currencyCode: row.currencyCode,
+        institutionName: row.institutionName,
+        lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
+        status: (row.status ?? "active") as "active" | "error" | "reauth_required",
+        source: row.source ?? "import",
+        memberId: member?.memberId ?? null,
+        memberName: member?.memberName ?? null,
+        memberColor: member?.memberColor ?? null,
+      };
+    }),
   };
 }
 
@@ -62,6 +71,7 @@ export async function listTransactions(filters: {
   month?: string;
   category?: string;
   accountId?: string;
+  scopedAccountIds?: string[] | null;
   q?: string;
   type?: string;
   sort?: TransactionSort;
@@ -71,6 +81,13 @@ export async function listTransactions(filters: {
   const db = getDb();
   const limit = filters.limit ?? 50;
   const conditions = [];
+
+  if (filters.scopedAccountIds !== undefined && filters.scopedAccountIds !== null) {
+    if (filters.scopedAccountIds.length === 0) {
+      return { items: [], nextCursor: null };
+    }
+    conditions.push(inArray(transactions.accountId, filters.scopedAccountIds));
+  }
 
   if (filters.month) {
     const [year, month] = filters.month.split("-");
@@ -128,22 +145,29 @@ export async function listTransactions(filters: {
 
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
+  const memberMap = await getMemberMapForAccounts(page.map((row) => row.accountId));
 
   return {
-    items: page.map((row) => ({
-      id: row.id,
-      accountId: row.accountId,
-      accountMask: row.accountMask,
-      date: row.date,
-      name: row.name,
-      merchantName: row.merchantName,
-      amount: row.amount,
-      currencyCode: row.currencyCode,
-      category: row.category,
-      transactionType: row.transactionType as "expense" | "income" | "transfer",
-      isTransfer: row.isTransfer,
-      pending: row.pending,
-    })),
+    items: page.map((row) => {
+      const member = memberMap.get(row.accountId);
+      return {
+        id: row.id,
+        accountId: row.accountId,
+        accountMask: row.accountMask,
+        date: row.date,
+        name: row.name,
+        merchantName: row.merchantName,
+        amount: row.amount,
+        currencyCode: row.currencyCode,
+        category: row.category,
+        transactionType: row.transactionType as "expense" | "income" | "transfer",
+        isTransfer: row.isTransfer,
+        pending: row.pending,
+        memberId: member?.memberId ?? null,
+        memberName: member?.memberName ?? null,
+        memberColor: member?.memberColor ?? null,
+      };
+    }),
     nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
   };
 }
@@ -360,6 +384,7 @@ export interface ChartDataParams {
   to?: string;
   accountId?: string;
   category?: string;
+  scopedAccountIds?: string[] | null;
 }
 
 function buildChartFilters(params: ChartDataParams) {
@@ -372,6 +397,18 @@ function buildChartFilters(params: ChartDataParams) {
   }
   if (params.category) {
     parts.push(sql`t.category = ${params.category}`);
+  }
+  if (params.scopedAccountIds !== undefined && params.scopedAccountIds !== null) {
+    if (params.scopedAccountIds.length === 0) {
+      parts.push(sql`FALSE`);
+    } else {
+      parts.push(
+        sql`t.account_id IN (${sql.join(
+          params.scopedAccountIds.map((id) => sql`${id}`),
+          sql`, `,
+        )})`,
+      );
+    }
   }
   return sql.join(parts, sql` AND `);
 }
@@ -434,6 +471,32 @@ export async function getChartData(params: ChartDataParams = {}) {
   `);
 
   const accountTotal = accountRows.reduce(
+    (sum, row) => sum + Number.parseFloat(row.amount),
+    0,
+  );
+
+  const memberRows = await db.execute<{
+    id: string;
+    name: string;
+    color: string;
+    amount: string;
+  }>(sql`
+    SELECT
+      hm.id,
+      hm.display_name AS name,
+      hm.avatar_color AS color,
+      COALESCE(SUM(t.amount::numeric), 0)::text AS amount
+    FROM transactions t
+    JOIN household_account_assignments haa ON haa.account_id = t.account_id
+    JOIN household_members hm ON hm.id = haa.member_id
+    WHERE ${whereClause}
+      AND t.transaction_type = 'expense'
+      AND NOT t.is_transfer
+    GROUP BY hm.id, hm.display_name, hm.avatar_color
+    ORDER BY SUM(t.amount::numeric) DESC
+  `);
+
+  const memberTotal = memberRows.reduce(
     (sum, row) => sum + Number.parseFloat(row.amount),
     0,
   );
@@ -503,6 +566,16 @@ export async function getChartData(params: ChartDataParams = {}) {
       percentage:
         accountTotal > 0
           ? (Number.parseFloat(row.amount) / accountTotal) * 100
+          : 0,
+    })),
+    byMember: memberRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      color: row.color,
+      amount: row.amount,
+      percentage:
+        memberTotal > 0
+          ? (Number.parseFloat(row.amount) / memberTotal) * 100
           : 0,
     })),
     categoryTrends,

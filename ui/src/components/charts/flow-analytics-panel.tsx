@@ -6,17 +6,25 @@ import { ChartFilterBar } from "@/components/charts/chart-filter-bar";
 import { InteractiveAreaChart } from "@/components/charts/interactive-area-chart";
 import { InteractiveBarChart } from "@/components/charts/interactive-bar-chart";
 import { useAccounts } from "@/hooks/use-accounts";
+import { useHousehold } from "@/hooks/use-household";
 import { useChartData } from "@/hooks/use-chart-data";
 import { formatMoney } from "@/lib/format-money";
+import { useViewModeStore } from "@/stores/view-mode-store";
 
 export function FlowAnalyticsPanel() {
+  const scope = useViewModeStore((state) => state.scope);
+  const setScope = useViewModeStore((state) => state.setScope);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState("");
 
   const { data: accountsData } = useAccounts();
+  const { data: householdData } = useHousehold();
   const { data, isLoading, error } = useChartData({
     accountId: selectedAccountId || undefined,
     category: selectedCategory || undefined,
+    memberId: selectedMemberId || undefined,
+    scope: selectedMemberId ? undefined : scope,
   });
 
   const categoryNames = useMemo(
@@ -41,13 +49,19 @@ export function FlowAnalyticsPanel() {
       <ChartFilterBar
         accounts={accountsData?.accounts ?? []}
         categories={categoryNames}
+        members={householdData?.members ?? []}
         selectedAccountId={selectedAccountId}
         selectedCategory={selectedCategory}
+        selectedMemberId={selectedMemberId}
+        scope={scope}
+        onScopeChange={setScope}
         onAccountChange={setSelectedAccountId}
         onCategoryChange={setSelectedCategory}
+        onMemberChange={setSelectedMemberId}
         onClear={() => {
           setSelectedAccountId("");
           setSelectedCategory("");
+          setSelectedMemberId("");
         }}
       />
 
