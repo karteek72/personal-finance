@@ -17,8 +17,14 @@ struct SpendFlowApp: App {
     }
 
     private func configureGoogleSignIn() {
-        guard let clientID = AppConfig.googleClientID else { return }
-        GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
+        guard let clientID = AppConfig.googleClientID,
+              let serverClientID = AppConfig.googleServerClientID else {
+            return
+        }
+        GIDSignIn.sharedInstance.configuration = GIDConfiguration(
+            clientID: clientID,
+            serverClientID: serverClientID
+        )
     }
 }
 

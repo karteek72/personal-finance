@@ -46,18 +46,18 @@ API_BASE_URL = http:/$()/127.0.0.1:4000/api/v1
 
 ### Google Sign-In
 
-1. Create an **iOS OAuth client** in Google Cloud Console (bundle ID: `com.spendflow.app`).
-2. Download the plist Google provides and save it as:
+Google uses **two** client IDs:
 
-   `ios/SpendFlow/Resources/GoogleService-Info.plist`
+| Variable | Type | Value |
+|----------|------|--------|
+| `GOOGLE_CLIENT_ID` | iOS | From `GoogleService-Info.plist` — native sign-in + URL scheme |
+| `GOOGLE_SERVER_CLIENT_ID` | Web | Same as backend `GOOGLE_CLIENT_ID` — ID token audience for `/auth/google` |
 
-   (Already added for this project — replace if you regenerate the iOS client.)
+1. Create an **iOS OAuth client** in Google Cloud (bundle ID: `com.spendflow.app`); save plist as `SpendFlow/Resources/GoogleService-Info.plist`.
+2. Use your existing **Web OAuth client** for `GOOGLE_SERVER_CLIENT_ID` in `Config/Debug.xcconfig` (must match `containers/.env` `GOOGLE_CLIENT_ID`).
+3. Set Info.plist URL scheme to the iOS `REVERSED_CLIENT_ID` from the plist.
 
-3. Ensure `Info.plist` **URL scheme** matches `REVERSED_CLIENT_ID` from that plist:
-
-   `com.googleusercontent.apps.<your-client-prefix>`
-
-4. Add the same **CLIENT_ID** to backend `GOOGLE_CLIENT_ID` or `GOOGLE_CLIENT_IDS` in `containers/.env`.
+The app configures `GIDConfiguration(clientID:serverClientID:)` so tokens sent to the API match what the backend verifies.
 
 `Info.plist` allows local networking when using a localhost override in `Local.xcconfig`.
 

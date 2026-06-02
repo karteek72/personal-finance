@@ -44,7 +44,7 @@ struct LoginView: View {
                         Text("Google Sign-In not configured")
                             .font(.subheadline.weight(.semibold))
                         Text(
-                            "Set GOOGLE_CLIENT_ID in Config/Debug.xcconfig and add the reversed client ID URL scheme to Info.plist."
+                            "Set GOOGLE_CLIENT_ID (iOS) and GOOGLE_SERVER_CLIENT_ID (web, same as backend) in Config/Debug.xcconfig, and add the iOS reversed client ID URL scheme to Info.plist."
                         )
                         .font(.caption)
                         .foregroundStyle(SpendFlowColors.textMuted)
