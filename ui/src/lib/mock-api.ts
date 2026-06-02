@@ -144,6 +144,51 @@ export async function getAccounts(): Promise<AccountsResponse> {
   return accountsData as AccountsResponse;
 }
 
+export async function deleteAccount(
+  accountId: string,
+): Promise<import("@/types/api").DeleteAccountResponse> {
+  await delay();
+  const data = accountsData as AccountsResponse;
+  const account = data.accounts.find((row) => row.id === accountId);
+  if (!account) {
+    throw new Error("Account not found");
+  }
+  return {
+    id: account.id,
+    name: account.name,
+    mask: account.mask ?? "0000",
+    transactionsDeleted: 0,
+  };
+}
+
+export async function syncAccount(
+  accountId: string,
+): Promise<import("@/types/api").PlaidSyncResponse> {
+  await delay();
+  return {
+    status: "completed",
+    itemId: "mock-item",
+    institutionName: "Mock Bank",
+    accountsSynced: 1,
+    added: 3,
+    modified: 0,
+    removed: 0,
+  };
+}
+
+export async function syncAllPlaid(): Promise<
+  import("@/types/api").PlaidSyncAllResponse
+> {
+  await delay();
+  return {
+    status: "completed",
+    itemsSynced: 2,
+    added: 5,
+    modified: 1,
+    removed: 0,
+  };
+}
+
 export async function getAlerts(_month?: string): Promise<AlertsResponse> {
   await delay();
   return alertsData as AlertsResponse;

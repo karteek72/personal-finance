@@ -15,7 +15,9 @@ const envSchema = z.object({
   PLAID_ENV: z.enum(["sandbox", "development", "production"]).default("sandbox"),
   PLAID_PRODUCTS: z.string().default("transactions"),
   PLAID_COUNTRY_CODES: z.string().default("US"),
+  PLAID_REDIRECT_URI: z.string().url().optional(),
   APP_URL: z.string().url().default("http://localhost:4000"),
+  ENCRYPTION_KEY: z.string().optional(),
   DATABASE_URL: z
     .string()
     .default("postgresql://spendflow:spendflow@localhost:5433/spendflow"),

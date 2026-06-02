@@ -13,17 +13,19 @@ export async function listAccounts() {
   return {
     accounts: rows.map((row) => ({
       id: row.id,
+      plaidItemId: row.plaidItemId,
       name: row.name,
       officialName: row.officialName,
       type: row.type as "depository" | "credit" | "investment",
       subtype: row.subtype,
       mask: row.mask,
-      balanceCurrent: "0.00",
-      balanceAvailable: null,
+      balanceCurrent: row.balanceCurrent ?? "0.00",
+      balanceAvailable: row.balanceAvailable ?? null,
       currencyCode: row.currencyCode,
       institutionName: row.institutionName,
-      lastSyncedAt: null,
-      status: "active" as const,
+      lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
+      status: (row.status ?? "active") as "active" | "error" | "reauth_required",
+      source: row.source ?? "import",
     })),
   };
 }
@@ -370,8 +372,8 @@ export async function getAlerts() {
 
 export async function transactionCount(): Promise<number> {
   const db = getDb();
-  const [{ count }] = await db
+  const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(transactions);
-  return count;
+  return row?.count ?? 0;
 }

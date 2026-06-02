@@ -17,6 +17,8 @@ export interface Account {
   institutionName: string;
   lastSyncedAt: string | null;
   status: "active" | "error" | "reauth_required";
+  source?: "import" | "plaid";
+  plaidItemId?: string | null;
 }
 
 export interface Transaction {
@@ -81,6 +83,45 @@ export interface CategoryTrend {
   months: { month: string; amount: string }[];
 }
 
+export interface PlaidExchangeResponse {
+  itemId: string;
+  institutionName: string;
+  accountsSynced: number;
+  transactionsAdded: number;
+  message: string;
+}
+
+export interface PlaidItem {
+  id: string;
+  plaidItemId: string;
+  institutionName: string | null;
+  status: string;
+  lastSyncedAt: string | null;
+  createdAt: string;
+}
+
+export interface PlaidItemsResponse {
+  items: PlaidItem[];
+}
+
+export interface PlaidSyncResponse {
+  status: string;
+  itemId: string;
+  institutionName: string;
+  accountsSynced: number;
+  added: number;
+  modified: number;
+  removed: number;
+}
+
+export interface PlaidSyncAllResponse {
+  status: string;
+  itemsSynced: number;
+  added: number;
+  modified: number;
+  removed: number;
+}
+
 export interface PaginatedTransactions {
   items: Transaction[];
   nextCursor: string | null;
@@ -88,6 +129,13 @@ export interface PaginatedTransactions {
 
 export interface AccountsResponse {
   accounts: Account[];
+}
+
+export interface DeleteAccountResponse {
+  id: string;
+  name: string;
+  mask: string;
+  transactionsDeleted: number;
 }
 
 export interface AlertsResponse {

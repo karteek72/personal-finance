@@ -3,8 +3,13 @@ import type {
   AccountsResponse,
   AlertsResponse,
   CategoriesResponse,
+  DeleteAccountResponse,
   MoneyFlowResponse,
   PaginatedTransactions,
+  PlaidExchangeResponse,
+  PlaidItemsResponse,
+  PlaidSyncAllResponse,
+  PlaidSyncResponse,
   TransactionFilters,
   TransactionSummary,
   TrendsResponse,
@@ -86,7 +91,34 @@ export const api = {
     if (USE_MOCKS) {
       return mockApi.getAccounts();
     }
-    return fetchJson<AccountsResponse>("/plaid/accounts");
+    return fetchJson<AccountsResponse>("/accounts");
+  },
+
+  deleteAccount(accountId: string): Promise<DeleteAccountResponse> {
+    if (USE_MOCKS) {
+      return mockApi.deleteAccount(accountId);
+    }
+    return fetchJson<DeleteAccountResponse>(`/accounts/${accountId}`, {
+      method: "DELETE",
+    });
+  },
+
+  syncAccount(accountId: string): Promise<PlaidSyncResponse> {
+    if (USE_MOCKS) {
+      return mockApi.syncAccount(accountId);
+    }
+    return fetchJson<PlaidSyncResponse>(`/accounts/${accountId}/sync`, {
+      method: "POST",
+    });
+  },
+
+  syncAllPlaid(): Promise<PlaidSyncAllResponse> {
+    if (USE_MOCKS) {
+      return mockApi.syncAllPlaid();
+    }
+    return fetchJson<PlaidSyncAllResponse>("/plaid/sync", {
+      method: "POST",
+    });
   },
 
   getAlerts(month?: string): Promise<AlertsResponse> {
@@ -123,6 +155,51 @@ export const api = {
     return fetchJson<TrendsResponse>(
       `/insights/trends${buildQuery({ from, to })}`,
     );
+  },
+
+  createPlaidLinkToken(platform: "web" | "ios" = "web"): Promise<{ linkToken: string }> {
+    if (USE_MOCKS) {
+      return Promise.resolve({ linkToken: "mock-link-token" });
+    }
+    return fetchJson<{ linkToken: string }>("/plaid/link-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ platform }),
+    });
+  },
+
+  exchangePlaidToken(publicToken: string): Promise<PlaidExchangeResponse> {
+    if (USE_MOCKS) {
+      return Promise.resolve({
+        itemId: "mock-item",
+        institutionName: "Mock Bank",
+        accountsSynced: 1,
+        transactionsAdded: 0,
+        message: "Mock exchange complete",
+      });
+    }
+    return fetchJson<PlaidExchangeResponse>("/plaid/exchange-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ publicToken }),
+    });
+  },
+
+  syncPlaidItem(itemId: string): Promise<PlaidSyncResponse> {
+    if (USE_MOCKS) {
+      return Promise.resolve({
+        status: "completed",
+        itemId,
+        institutionName: "Mock Bank",
+        accountsSynced: 1,
+        added: 0,
+        modified: 0,
+        removed: 0,
+      });
+    }
+    return fetchJson<PlaidSyncResponse>(`/plaid/items/${itemId}/sync`, {
+      method: "POST",
+    });
   },
 };
 

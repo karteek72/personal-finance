@@ -1,10 +1,10 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { execSync } from "node:child_process";
-import postgres from "postgres";
 import { eq, sql } from "drizzle-orm";
 import { loadEnv } from "../src/config/env.js";
 import { closeDb, getDb } from "../src/db/client.js";
+import { runMigrations } from "../src/db/migrate.js";
 import { accounts, transactions, users } from "../src/db/schema.js";
 
 loadEnv();
@@ -262,28 +262,7 @@ function walkFiles(dir: string, ext: string): string[] {
 }
 
 async function migrate(): Promise<void> {
-  const url =
-    process.env.DATABASE_URL ??
-    "postgresql://spendflow:spendflow@localhost:5433/spendflow";
-  const sqlClient = postgres(url);
-
-  const [{ exists }] = await sqlClient<{ exists: boolean }[]>`
-    SELECT EXISTS (
-      SELECT FROM information_schema.tables
-      WHERE table_schema = 'public' AND table_name = 'transactions'
-    ) AS exists
-  `;
-  if (exists) {
-    await sqlClient.end({ timeout: 5 });
-    return;
-  }
-
-  const migration = readFileSync(
-    resolve(process.cwd(), "drizzle/0000_init.sql"),
-    "utf-8",
-  );
-  await sqlClient.unsafe(migration);
-  await sqlClient.end({ timeout: 5 });
+  await runMigrations();
 }
 
 async function main(): Promise<void> {

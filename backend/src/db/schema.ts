@@ -17,23 +17,55 @@ export const users = pgTable("users", {
     .defaultNow(),
 });
 
-export const accounts = pgTable("accounts", {
+export const plaidItems = pgTable("plaid_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  officialName: text("official_name"),
-  type: text("type").notNull(), // depository | credit
-  subtype: text("subtype"),
-  mask: text("mask").notNull(),
-  institutionName: text("institution_name").notNull(),
-  currencyCode: text("currency_code").notNull().default("USD"),
-  isActive: boolean("is_active").notNull().default(true),
+  plaidItemId: text("plaid_item_id").notNull().unique(),
+  accessTokenEncrypted: text("access_token_encrypted").notNull(),
+  institutionId: text("institution_id"),
+  institutionName: text("institution_name"),
+  cursor: text("cursor"),
+  status: text("status").notNull().default("active"),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
+
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    plaidItemId: uuid("plaid_item_id").references(() => plaidItems.id, {
+      onDelete: "set null",
+    }),
+    plaidAccountId: text("plaid_account_id"),
+    name: text("name").notNull(),
+    officialName: text("official_name"),
+    type: text("type").notNull(), // depository | credit
+    subtype: text("subtype"),
+    mask: text("mask").notNull(),
+    institutionName: text("institution_name").notNull(),
+    currencyCode: text("currency_code").notNull().default("USD"),
+    source: text("source").notNull().default("import"), // import | plaid
+    balanceCurrent: numeric("balance_current", { precision: 12, scale: 2 }),
+    balanceAvailable: numeric("balance_available", { precision: 12, scale: 2 }),
+    status: text("status").notNull().default("active"),
+    isActive: boolean("is_active").notNull().default(true),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("accounts_plaid_account_id_idx").on(table.plaidAccountId),
+  ],
+);
 
 export const transactions = pgTable(
   "transactions",
