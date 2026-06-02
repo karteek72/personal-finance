@@ -69,6 +69,17 @@ See [STRUCTURE.md](STRUCTURE.md).
 
 ---
 
+## Design
+
+Visual language matches the **web UI** (`ui/src/styles/tokens.css`): purple–pink gradients, lavender background, glass cards, floating bottom nav.
+
+Regenerate the app icon after brand tweaks:
+
+```bash
+cd ios/scripts && python3 -m venv .venv && .venv/bin/pip install pillow
+.venv/bin/python generate-app-icon.py
+```
+
 ## Commands
 
 ```bash

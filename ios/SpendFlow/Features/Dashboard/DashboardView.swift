@@ -33,28 +33,21 @@ struct DashboardView: View {
     @State private var viewModel = DashboardViewModel()
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    content
-                }
-                .padding(20)
-            }
-            .background(SpendFlowColors.background)
-            .navigationTitle("Dashboard")
-            .refreshable {
-                await viewModel.load(api: appState.apiClient)
-            }
-            .task {
-                await viewModel.load(api: appState.apiClient)
-            }
+        SpendFlowScreen(title: greetingTitle, subtitle: "Your money, minus the stress ✨") {
+            content
+        }
+        .refreshable {
+            await viewModel.load(api: appState.apiClient)
+        }
+        .task {
+            await viewModel.load(api: appState.apiClient)
         }
     }
 
     @ViewBuilder
     private var content: some View {
         if viewModel.isLoading, viewModel.summary == nil {
-            LoadingStateView(message: "Loading dashboard…")
+            LoadingStateView(message: "Loading your vibe check…")
         } else if let error = viewModel.errorMessage, viewModel.summary == nil {
             ErrorStateView(message: error) {
                 Task { await viewModel.load(api: appState.apiClient) }
@@ -67,57 +60,70 @@ struct DashboardView: View {
     }
 
     private func heroCard(summary: TransactionSummary) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(greeting)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.white.opacity(0.9))
-
-            Text("Your net savings this year")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.8))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Net savings · \(Calendar.current.component(.year, from: Date()))")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                Spacer()
+                savingsChip(rate: summary.savingsRate)
+            }
 
             MoneyText(
                 amount: summary.netSavings,
-                font: .system(size: 36, weight: .heavy, design: .rounded).monospacedDigit()
+                font: .system(size: 42, weight: .heavy, design: .rounded).monospacedDigit()
             )
             .foregroundStyle(.white)
 
-            Text(MoneyFormatter.isNonNegative(summary.netSavings)
-                ? "You're in the green — keep it up"
-                : "Spending's ahead of income — worth a look")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.85))
+            Text(vibeCopy(for: summary.netSavings))
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.9))
 
-            HStack(spacing: 8) {
-                miniStat(label: "Spent", amount: summary.totalSpent)
-                miniStat(label: "Income", amount: summary.income)
-                miniStat(label: "Avg / mo", amount: summary.avgMonthlySpend)
+            HStack(spacing: 10) {
+                miniStat(label: "Spent", amount: summary.totalSpent, emoji: "💸")
+                miniStat(label: "Income", amount: summary.income, emoji: "💰")
+                miniStat(label: "Avg/mo", amount: summary.avgMonthlySpend, emoji: "📊")
             }
-            .padding(.top, 8)
         }
-        .padding(20)
-        .background(SpendFlowColors.heroGradient)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .padding(22)
+        .background {
+            RoundedRectangle(cornerRadius: SpendFlowTheme.radiusLG, style: .continuous)
+                .fill(SpendFlowTheme.heroGradient)
+        }
+        .shadow(color: SpendFlowTheme.primary.opacity(0.35), radius: 20, x: 0, y: 10)
     }
 
-    private func miniStat(label: String, amount: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label.uppercased())
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.75))
+    private func savingsChip(rate: Double) -> some View {
+        Text(String(format: "%.0f%% saved", max(0, rate * 100)))
+            .font(.caption2.weight(.bold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(.white.opacity(0.22))
+            .clipShape(Capsule())
+            .foregroundStyle(.white)
+    }
+
+    private func miniStat(label: String, amount: String, emoji: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("\(emoji) \(label)")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white.opacity(0.8))
             MoneyText(amount: amount, font: .caption.weight(.bold))
                 .foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
-        .background(.white.opacity(0.15))
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .padding(10)
+        .background(.white.opacity(0.16))
+        .clipShape(RoundedRectangle(cornerRadius: SpendFlowTheme.radiusSM, style: .continuous))
     }
 
     @ViewBuilder
     private var alertsSection: some View {
         if !viewModel.alerts.isEmpty {
-            VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Heads up")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(SpendFlowTheme.text)
                 ForEach(viewModel.alerts) { alert in
                     AlertBanner(alert: alert)
                 }
@@ -126,25 +132,38 @@ struct DashboardView: View {
     }
 
     private func quickStats(summary: TransactionSummary) -> some View {
-        HStack(spacing: 12) {
-            KpiCard(
-                label: "Top category",
-                value: summary.topCategory.amount,
-                subtext: summary.topCategory.name,
-                tone: .primary
-            )
-            KpiCard(
-                label: "CC payments excluded",
-                value: summary.ccPaymentsExcluded,
-                tone: .neutral
-            )
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Quick hits")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(SpendFlowTheme.text)
+            HStack(spacing: 12) {
+                KpiCard(
+                    label: "Top category",
+                    value: summary.topCategory.amount,
+                    subtext: summary.topCategory.name,
+                    emoji: "🔥",
+                    tone: .primary
+                )
+                KpiCard(
+                    label: "CC excluded",
+                    value: summary.ccPaymentsExcluded,
+                    emoji: "💳",
+                    tone: .neutral
+                )
+            }
         }
     }
 
-    private var greeting: String {
+    private var greetingTitle: String {
         let hour = Calendar.current.component(.hour, from: Date())
-        if hour < 12 { return "Good morning 👋" }
-        if hour < 17 { return "Good afternoon 👋" }
-        return "Good evening 👋"
+        if hour < 12 { return "Good morning" }
+        if hour < 17 { return "Good afternoon" }
+        return "Good evening"
+    }
+
+    private func vibeCopy(for netSavings: String) -> String {
+        MoneyFormatter.isNonNegative(netSavings)
+            ? "You're lowkey winning — keep the streak going 🔥"
+            : "Spending's running hot — worth a quick peek 👀"
     }
 }

@@ -1,5 +1,115 @@
 import SwiftUI
 
+struct TransactionsView: View {
+    @Environment(AppState.self) private var appState
+    @State private var viewModel = TransactionsViewModel()
+
+    var body: some View {
+        SpendFlowScreen(title: "Activity", subtitle: "Every swipe, every subscription 👀") {
+            PillFilterBar(
+                items: TransactionsViewModel.TransactionTypeFilter.allCases,
+                selection: $viewModel.filter,
+                label: \.label,
+                emoji: { filter in
+                    switch filter {
+                    case .all: "✨"
+                    case .expense: "💸"
+                    case .income: "💰"
+                    case .transfer: "↔️"
+                    }
+                }
+            )
+            .onChange(of: viewModel.filter) { _, _ in
+                Task { await viewModel.load(api: appState.apiClient) }
+            }
+
+            if viewModel.isLoading, viewModel.transactions.isEmpty {
+                LoadingStateView(message: "Fetching transactions…")
+            } else if let error = viewModel.errorMessage, viewModel.transactions.isEmpty {
+                ErrorStateView(message: error) {
+                    Task { await viewModel.load(api: appState.apiClient) }
+                }
+            } else {
+                LazyVStack(spacing: 10) {
+                    ForEach(viewModel.transactions) { transaction in
+                        TransactionRow(transaction: transaction)
+                    }
+
+                    if viewModel.canLoadMore {
+                        if viewModel.isLoadingMore {
+                            ProgressView().tint(SpendFlowTheme.primary)
+                        } else {
+                            Button("Load more") {
+                                Task { await viewModel.loadMore(api: appState.apiClient) }
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(SpendFlowTheme.primary)
+                        }
+                    }
+                }
+            }
+        }
+        .refreshable {
+            await viewModel.load(api: appState.apiClient)
+        }
+        .task {
+            await viewModel.load(api: appState.apiClient)
+        }
+    }
+}
+
+struct TransactionRow: View {
+    let transaction: Transaction
+
+    var body: some View {
+        HStack(spacing: 14) {
+            CategoryChip(color: CategoryColor.forCategory(transaction.category))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(transaction.merchantName ?? transaction.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(SpendFlowTheme.text)
+                    .lineLimit(1)
+                Text("\(transaction.category) · \(formattedDate)")
+                    .font(.caption)
+                    .foregroundStyle(SpendFlowTheme.textMuted)
+            }
+
+            Spacer(minLength: 8)
+
+            MoneyText(
+                amount: transaction.amount,
+                currencyCode: transaction.currencyCode,
+                font: .subheadline.weight(.bold)
+            )
+            .foregroundStyle(amountColor)
+        }
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: SpendFlowTheme.radiusCard, style: .continuous)
+                .fill(SpendFlowTheme.surface)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: SpendFlowTheme.radiusCard, style: .continuous)
+                .stroke(SpendFlowTheme.border.opacity(0.7), lineWidth: 1)
+        )
+    }
+
+    private var formattedDate: String {
+        let parts = transaction.date.split(separator: "-")
+        guard parts.count == 3 else { return transaction.date }
+        return "\(parts[1])/\(parts[2])"
+    }
+
+    private var amountColor: Color {
+        switch transaction.transactionType {
+        case .income: SpendFlowTheme.success
+        case .expense: SpendFlowTheme.danger
+        case .transfer: SpendFlowTheme.primary
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class TransactionsViewModel {
@@ -11,10 +121,7 @@ final class TransactionsViewModel {
     private var nextCursor: String?
 
     enum TransactionTypeFilter: String, CaseIterable, Identifiable {
-        case all
-        case expense
-        case income
-        case transfer
+        case all, expense, income, transfer
 
         var id: String { rawValue }
 
@@ -75,113 +182,5 @@ final class TransactionsViewModel {
         await load(api: api, reset: false)
     }
 
-    var canLoadMore: Bool {
-        nextCursor != nil
-    }
-}
-
-struct TransactionsView: View {
-    @Environment(AppState.self) private var appState
-    @State private var viewModel = TransactionsViewModel()
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                Picker("Filter", selection: $viewModel.filter) {
-                    ForEach(TransactionsViewModel.TransactionTypeFilter.allCases) { option in
-                        Text(option.label).tag(option)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .onChange(of: viewModel.filter) { _, _ in
-                    Task { await viewModel.load(api: appState.apiClient) }
-                }
-
-                Group {
-                    if viewModel.isLoading, viewModel.transactions.isEmpty {
-                        LoadingStateView(message: "Loading transactions…")
-                    } else if let error = viewModel.errorMessage, viewModel.transactions.isEmpty {
-                        ErrorStateView(message: error) {
-                            Task { await viewModel.load(api: appState.apiClient) }
-                        }
-                    } else {
-                        List {
-                            ForEach(viewModel.transactions) { transaction in
-                                TransactionRow(transaction: transaction)
-                                    .listRowBackground(SpendFlowColors.surface)
-                            }
-
-                            if viewModel.canLoadMore {
-                                HStack {
-                                    Spacer()
-                                    if viewModel.isLoadingMore {
-                                        ProgressView()
-                                    } else {
-                                        Button("Load more") {
-                                            Task {
-                                                await viewModel.loadMore(api: appState.apiClient)
-                                            }
-                                        }
-                                    }
-                                    Spacer()
-                                }
-                                .listRowBackground(Color.clear)
-                            }
-                        }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
-                    }
-                }
-            }
-            .background(SpendFlowColors.background)
-            .navigationTitle("Transactions")
-            .refreshable {
-                await viewModel.load(api: appState.apiClient)
-            }
-            .task {
-                await viewModel.load(api: appState.apiClient)
-            }
-        }
-    }
-}
-
-struct TransactionRow: View {
-    let transaction: Transaction
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Circle()
-                .fill(CategoryColor.forCategory(transaction.category))
-                .frame(width: 10, height: 10)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(transaction.merchantName ?? transaction.name)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                Text("\(transaction.category) · \(transaction.date)")
-                    .font(.caption)
-                    .foregroundStyle(SpendFlowColors.textMuted)
-            }
-
-            Spacer()
-
-            MoneyText(
-                amount: transaction.amount,
-                currencyCode: transaction.currencyCode,
-                font: .subheadline.weight(.semibold)
-            )
-            .foregroundStyle(amountColor)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private var amountColor: Color {
-        switch transaction.transactionType {
-        case .income: SpendFlowColors.success
-        case .expense: SpendFlowColors.danger
-        case .transfer: SpendFlowColors.primary
-        }
-    }
+    var canLoadMore: Bool { nextCursor != nil }
 }

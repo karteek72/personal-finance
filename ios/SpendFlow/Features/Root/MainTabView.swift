@@ -2,45 +2,48 @@ import SwiftUI
 
 struct MainTabView: View {
     @Environment(AppState.self) private var appState
+    @State private var tab: AppTab = .home
 
     var body: some View {
-        TabView {
-            DashboardView()
-                .tabItem {
-                    Label("Dashboard", systemImage: "chart.bar.fill")
+        ZStack(alignment: .bottom) {
+            Group {
+                switch tab {
+                case .home:
+                    DashboardView()
+                case .flow:
+                    MoneyFlowView()
+                case .spend:
+                    CategoriesView()
+                case .activity:
+                    TransactionsView()
+                case .wallet:
+                    AccountsView()
                 }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            MoneyFlowView()
-                .tabItem {
-                    Label("Flow", systemImage: "arrow.left.arrow.right")
-                }
-
-            CategoriesView()
-                .tabItem {
-                    Label("Categories", systemImage: "square.grid.2x2.fill")
-                }
-
-            TransactionsView()
-                .tabItem {
-                    Label("Activity", systemImage: "list.bullet")
-                }
-
-            AccountsView()
-                .tabItem {
-                    Label("Accounts", systemImage: "building.columns.fill")
-                }
+            FloatingTabBar(selection: $tab)
         }
-        .tint(SpendFlowColors.primary)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Sign out") {
+        .overlay(alignment: .topTrailing) {
+            Menu {
+                if let user = appState.authService.user {
+                    Text(user.displayName ?? user.email)
+                }
+                Button("Sign out", role: .destructive) {
                     Task {
                         await appState.authService.signOut()
                         appState.refreshAPIClient()
                     }
                 }
-                .font(.caption.weight(.semibold))
+            } label: {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 26))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(SpendFlowTheme.primary, SpendFlowTheme.primarySoft)
+                    .padding(.top, 56)
+                    .padding(.trailing, 20)
             }
         }
+        .ignoresSafeArea(.keyboard)
     }
 }

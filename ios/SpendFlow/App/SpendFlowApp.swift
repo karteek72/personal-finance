@@ -41,6 +41,6 @@ struct RootView: View {
                 LoginView()
             }
         }
-        .background(SpendFlowColors.background.ignoresSafeArea())
+        .background(SpendFlowTheme.background.ignoresSafeArea())
     }
 }

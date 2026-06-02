@@ -28,47 +28,81 @@ struct CategoriesView: View {
     @State private var viewModel = CategoriesViewModel()
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if viewModel.isLoading, viewModel.categories.isEmpty {
-                    LoadingStateView(message: "Loading categories…")
-                } else if let error = viewModel.errorMessage, viewModel.categories.isEmpty {
-                    ErrorStateView(message: error) {
-                        Task { await viewModel.load(api: appState.apiClient) }
+        SpendFlowScreen(title: "Spend", subtitle: "Where your money actually goes") {
+            if viewModel.isLoading, viewModel.categories.isEmpty {
+                LoadingStateView(message: "Crunching categories…")
+            } else if let error = viewModel.errorMessage, viewModel.categories.isEmpty {
+                ErrorStateView(message: error) {
+                    Task { await viewModel.load(api: appState.apiClient) }
+                }
+            } else {
+                LazyVStack(spacing: 10) {
+                    ForEach(Array(viewModel.categories.enumerated()), id: \.element.id) { index, category in
+                        CategoryRow(category: category, rank: index + 1)
                     }
-                } else {
-                    List(viewModel.categories) { category in
-                        HStack(spacing: 12) {
-                            Circle()
-                                .fill(CategoryColor.forCategory(category.name))
-                                .frame(width: 10, height: 10)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(category.name)
-                                    .font(.subheadline.weight(.semibold))
-                                Text("\(Int(category.percentage.rounded()))% of spend")
-                                    .font(.caption)
-                                    .foregroundStyle(SpendFlowColors.textMuted)
-                            }
-
-                            Spacer()
-
-                            MoneyText(amount: category.amount, font: .subheadline)
-                        }
-                        .listRowBackground(SpendFlowColors.surface)
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
                 }
             }
-            .background(SpendFlowColors.background)
-            .navigationTitle("Categories")
-            .refreshable {
-                await viewModel.load(api: appState.apiClient)
+        }
+        .refreshable {
+            await viewModel.load(api: appState.apiClient)
+        }
+        .task {
+            await viewModel.load(api: appState.apiClient)
+        }
+    }
+}
+
+private struct CategoryRow: View {
+    let category: CategoryTotal
+    let rank: Int
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Text("#\(rank)")
+                .font(.caption.weight(.black))
+                .foregroundStyle(SpendFlowTheme.primary.opacity(0.7))
+                .frame(width: 28)
+
+            CategoryChip(color: CategoryColor.forCategory(category.name))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(category.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(SpendFlowTheme.text)
+                HStack(spacing: 6) {
+                    Text("\(Int(category.percentage.rounded()))% of spend")
+                        .font(.caption)
+                        .foregroundStyle(SpendFlowTheme.textMuted)
+                    deltaBadge
+                }
             }
-            .task {
-                await viewModel.load(api: appState.apiClient)
-            }
+
+            Spacer(minLength: 8)
+
+            MoneyText(amount: category.amount, font: .subheadline.weight(.bold))
+        }
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: SpendFlowTheme.radiusCard, style: .continuous)
+                .fill(SpendFlowTheme.surface)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: SpendFlowTheme.radiusCard, style: .continuous)
+                .stroke(SpendFlowTheme.border.opacity(0.7), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var deltaBadge: some View {
+        let delta = category.deltaVsPriorMonth
+        if abs(delta) >= 0.1 {
+            Text(String(format: "%+.0f%%", delta))
+                .font(.system(size: 10, weight: .bold))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background((delta > 0 ? SpendFlowTheme.danger : SpendFlowTheme.success).opacity(0.12))
+                .foregroundStyle(delta > 0 ? SpendFlowTheme.danger : SpendFlowTheme.success)
+                .clipShape(Capsule())
         }
     }
 }

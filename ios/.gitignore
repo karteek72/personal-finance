@@ -14,3 +14,6 @@ Config/Local.xcconfig
 
 # macOS
 .DS_Store
+
+# Icon generator venv
+scripts/.venv

@@ -8,59 +8,69 @@ struct LoginView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("SpendFlow")
-                .font(.largeTitle.weight(.heavy))
-                .foregroundStyle(SpendFlowColors.primary)
+        ZStack {
+            SpendFlowTheme.meshBackground.ignoresSafeArea()
 
-            Text("Welcome back")
-                .font(.title2.weight(.bold))
+            // Decorative blobs
+            Circle()
+                .fill(SpendFlowTheme.primary.opacity(0.15))
+                .frame(width: 280, height: 280)
+                .blur(radius: 60)
+                .offset(x: -120, y: -200)
+            Circle()
+                .fill(SpendFlowTheme.accent.opacity(0.2))
+                .frame(width: 220, height: 220)
+                .blur(radius: 50)
+                .offset(x: 140, y: 120)
 
-            Text("Sign in to pick up where you left off")
-                .font(.subheadline)
-                .foregroundStyle(SpendFlowColors.textMuted)
+            VStack(spacing: 28) {
+                Spacer()
 
-            if AppConfig.isGoogleSignInConfigured {
-                Button {
-                    Task { await signInWithGoogle() }
-                } label: {
-                    HStack {
-                        if isSigningIn {
-                            ProgressView()
-                                .tint(.white)
+                VStack(spacing: 12) {
+                    GradientBrandText(text: "SpendFlow", font: .system(size: 40, weight: .heavy, design: .rounded))
+                    Text("Track spend. Stay unbothered.")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(SpendFlowTheme.text)
+                    Text("Your money dashboard — no spreadsheet energy.")
+                        .font(.subheadline)
+                        .foregroundStyle(SpendFlowTheme.textMuted)
+                        .multilineTextAlignment(.center)
+                }
+
+                GlassCard {
+                    VStack(spacing: 16) {
+                        if AppConfig.isGoogleSignInConfigured {
+                            SpendFlowPrimaryButton(
+                                title: isSigningIn ? "Signing in…" : "Continue with Google",
+                                isLoading: isSigningIn
+                            ) {
+                                Task { await signInWithGoogle() }
+                            }
+                        } else {
+                            Text("Google Sign-In not configured")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Set GOOGLE_CLIENT_ID and GOOGLE_SERVER_CLIENT_ID in Config/Debug.xcconfig.")
+                                .font(.caption)
+                                .foregroundStyle(SpendFlowTheme.textMuted)
                         }
-                        Text(isSigningIn ? "Signing in…" : "Continue with Google")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(SpendFlowColors.primary)
-                .disabled(isSigningIn)
-            } else {
-                SpendFlowCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Google Sign-In not configured")
-                            .font(.subheadline.weight(.semibold))
-                        Text(
-                            "Set GOOGLE_CLIENT_ID (iOS) and GOOGLE_SERVER_CLIENT_ID (web, same as backend) in Config/Debug.xcconfig, and add the iOS reversed client ID URL scheme to Info.plist."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(SpendFlowColors.textMuted)
-                    }
-                }
-            }
 
-            if let errorMessage {
-                Text(errorMessage)
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(SpendFlowTheme.danger)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+
+                Spacer()
+                Text("Built for real life, not receipt hoarding 📱")
                     .font(.caption)
-                    .foregroundStyle(SpendFlowColors.danger)
+                    .foregroundStyle(SpendFlowTheme.textMuted)
+                    .padding(.bottom, 32)
             }
-
-            Spacer()
         }
-        .padding(24)
     }
 
     @MainActor
