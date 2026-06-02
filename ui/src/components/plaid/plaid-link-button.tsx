@@ -6,22 +6,32 @@ import {
   type PlaidLinkOnSuccess,
   type PlaidLinkOptions,
 } from "react-plaid-link";
+import clsx from "clsx";
 
+import { PlusIcon } from "@/components/ui/icon-button";
 import { api } from "@/lib/api-client";
 import { storePlaidLinkToken } from "@/lib/plaid-storage";
+
+const defaultClassName =
+  "inline-flex items-center justify-center gap-2 rounded-[var(--radius-pill)] bg-primary px-5 py-2.5 text-sm font-semibold text-text-inverse transition-all hover:opacity-90 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+
+const dashedClassName =
+  "flex min-h-[180px] w-full flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border-2 border-dashed border-border/80 bg-surface/50 text-text-muted transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50";
 
 interface PlaidLinkLauncherProps {
   linkToken: string;
   label?: string;
   className?: string;
+  variant?: "default" | "dashed";
   onSuccess?: () => void;
   onError?: (message: string) => void;
 }
 
 function PlaidLinkLauncher({
   linkToken,
-  label = "Connect Account",
+  label = "Connect account",
   className,
+  variant = "default",
   onSuccess,
   onError,
 }: PlaidLinkLauncherProps) {
@@ -58,17 +68,32 @@ function PlaidLinkLauncher({
 
   const { open, ready } = usePlaidLink(config);
 
+  if (variant === "dashed") {
+    return (
+      <button
+        type="button"
+        disabled={!ready || exchanging}
+        onClick={() => open()}
+        className={clsx(dashedClassName, className)}
+      >
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary">
+          <PlusIcon />
+        </span>
+        <span className="text-sm font-semibold">
+          {exchanging ? "Connecting…" : label}
+        </span>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
       disabled={!ready || exchanging}
       onClick={() => open()}
-      className={
-        className ??
-        "inline-flex items-center justify-center rounded-[var(--radius-card)] border border-primary bg-primary px-4 py-2 text-sm font-medium text-text-inverse transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-      }
+      className={className ?? defaultClassName}
     >
-      {exchanging ? "Syncing transactions…" : label}
+      {exchanging ? "Syncing…" : label}
     </button>
   );
 }
@@ -76,6 +101,7 @@ function PlaidLinkLauncher({
 interface PlaidLinkButtonProps {
   label?: string;
   className?: string;
+  variant?: "default" | "dashed";
   onSuccess?: () => void;
   onError?: (message: string) => void;
 }
@@ -83,6 +109,7 @@ interface PlaidLinkButtonProps {
 export function PlaidLinkButton({
   label,
   className,
+  variant = "default",
   onSuccess,
   onError,
 }: PlaidLinkButtonProps) {
@@ -122,16 +149,20 @@ export function PlaidLinkButton({
   }, [onError]);
 
   if (loading || !linkToken) {
+    if (variant === "dashed") {
+      return (
+        <div className={clsx(dashedClassName, "opacity-50")}>
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary">
+            <PlusIcon />
+          </span>
+          <span className="text-sm font-semibold">Loading…</span>
+        </div>
+      );
+    }
+
     return (
-      <button
-        type="button"
-        disabled
-        className={
-          className ??
-          "inline-flex items-center justify-center rounded-[var(--radius-card)] border border-primary bg-primary px-4 py-2 text-sm font-medium text-text-inverse opacity-60"
-        }
-      >
-        Loading Plaid…
+      <button type="button" disabled className={className ?? defaultClassName}>
+        Loading…
       </button>
     );
   }
@@ -141,6 +172,7 @@ export function PlaidLinkButton({
       linkToken={linkToken}
       label={label}
       className={className}
+      variant={variant}
       onSuccess={onSuccess}
       onError={onError}
     />

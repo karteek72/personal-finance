@@ -1,5 +1,6 @@
 import { CategoriesBreakdown } from "@/components/categories/categories-breakdown";
 import { TrendChart } from "@/components/charts/trend-chart";
+import { PageHeader } from "@/components/ui/page-header";
 import { api } from "@/lib/api-client";
 
 function defaultDateRange(): { from: string; to: string } {
@@ -24,22 +25,18 @@ export default async function CategoriesPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <header>
-        <h2 className="text-lg font-semibold text-text">Breakdown</h2>
-        <p className="text-sm text-text-muted">
-          Click a category to drill down into its transactions
-        </p>
-      </header>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Where your money goes"
+        subtitle="Tap any category to see what's inside"
+      />
 
       <CategoriesBreakdown categories={categories.categories} />
 
-      <section aria-label="Category trends" className="grid gap-4 lg:grid-cols-2">
+      <section aria-label="Category trends" className="grid gap-5 lg:grid-cols-2">
         {trends.trends.slice(0, 4).map((trend) => (
           <div key={trend.name}>
-            <h3 className="mb-2 text-base font-semibold text-text">
-              {trend.name}
-            </h3>
+            <h3 className="mb-3 text-sm font-bold text-text">{trend.name}</h3>
             <TrendChart
               labels={trend.months.map((point) => formatMonthLabel(point.month))}
               data={trend.months.map((point) =>

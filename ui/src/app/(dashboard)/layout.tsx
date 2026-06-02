@@ -7,11 +7,11 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 
 const PAGE_TITLES: Record<string, string> = {
-  "/": "Dashboard",
-  "/flow": "Money Flow",
-  "/categories": "Categories",
-  "/transactions": "Transactions",
-  "/accounts": "Accounts",
+  "/": "Home",
+  "/flow": "Flow",
+  "/categories": "Spend",
+  "/transactions": "Activity",
+  "/accounts": "Wallet",
 };
 
 export default function DashboardLayout({
@@ -25,9 +25,11 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-bg">
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col pb-16 md:pb-0">
+      <div className="flex min-w-0 flex-1 flex-col pb-24 md:pb-6">
         <TopBar title={title} />
-        <main className="flex-1 px-4 py-4 md:px-5 md:py-5">{children}</main>
+        <main className="flex-1 px-4 py-4 md:px-6 md:py-5">
+          <div className="animate-fade-in mx-auto max-w-6xl">{children}</div>
+        </main>
       </div>
       <MobileNav />
     </div>

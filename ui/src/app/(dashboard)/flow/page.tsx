@@ -1,4 +1,6 @@
 import { TrendChart } from "@/components/charts/trend-chart";
+import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { api } from "@/lib/api-client";
 import { formatMoney } from "@/lib/format-money";
 
@@ -17,6 +19,7 @@ function formatMonthLabel(month: string): string {
 
 interface FlowColumnProps {
   title: string;
+  emoji: string;
   lines: { label: string; amount: string }[];
   footerLabel: string;
   footerAmount: string;
@@ -24,33 +27,39 @@ interface FlowColumnProps {
 
 function FlowColumn({
   title,
+  emoji,
   lines,
   footerLabel,
   footerAmount,
 }: FlowColumnProps) {
   return (
-    <article className="rounded-[var(--radius-card)] border border-border bg-surface p-4">
-      <h2 className="text-base font-semibold text-text">{title}</h2>
-      <ul className="mt-3 flex flex-col gap-2">
+    <Card>
+      <div className="flex items-center gap-2">
+        <span className="text-xl" aria-hidden="true">
+          {emoji}
+        </span>
+        <h2 className="text-base font-bold text-text">{title}</h2>
+      </div>
+      <ul className="mt-4 flex flex-col gap-3">
         {lines.map((line) => (
           <li
             key={line.label}
             className="flex items-center justify-between gap-3 text-sm"
           >
             <span className="truncate text-text-muted">{line.label}</span>
-            <span className="font-mono font-medium tabular-nums" data-money>
+            <span className="font-semibold tabular-nums text-text" data-money>
               {formatMoney(line.amount)}
             </span>
           </li>
         ))}
       </ul>
-      <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm font-medium text-text">
-        <span>{footerLabel}</span>
-        <span className="font-mono tabular-nums" data-money>
+      <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-4">
+        <span className="text-sm font-semibold text-text">{footerLabel}</span>
+        <span className="text-sm font-bold tabular-nums text-primary" data-money>
           {formatMoney(footerAmount)}
         </span>
       </div>
-    </article>
+    </Card>
   );
 }
 
@@ -72,60 +81,57 @@ export default async function MoneyFlowPage() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <header>
-        <h2 className="text-lg font-semibold text-text">Reconciliation</h2>
-        <p className="text-sm text-text-muted">
-          Income, bank transfers, and credit card charges
-        </p>
-      </header>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Money flow"
+        subtitle="Income in, spending out — see how it balances"
+      />
 
-      <div
-        role="status"
-        className="rounded-[var(--radius-card)] border border-success/30 bg-success/10 px-4 py-3 text-sm"
-      >
-        <p className="font-medium text-success">Reconciliation balanced</p>
-        <p className="mt-0.5 text-text-muted">
-          Income, bank transfers, and credit card charges reconcile for the
-          selected period.
+      <Card className="border-success/20 bg-success/10">
+        <p className="font-semibold text-success">All balanced ✓</p>
+        <p className="mt-0.5 text-sm text-text-muted">
+          Income, transfers, and card charges reconcile for this period.
         </p>
-      </div>
+      </Card>
 
       <section
         aria-label="Flow breakdown"
         className="grid gap-4 md:grid-cols-3"
       >
         <FlowColumn
-          title="Income Sources"
+          title="Income"
+          emoji="💰"
           lines={flow.income.sources}
-          footerLabel="Total Income"
+          footerLabel="Total in"
           footerAmount={flow.income.total}
         />
         <FlowColumn
-          title="Bank Accounts"
+          title="Bank accounts"
+          emoji="🏦"
           lines={flow.bankAccounts.accounts}
-          footerLabel="Transfers Out"
+          footerLabel="Transfers out"
           footerAmount={flow.bankAccounts.transfersOut}
         />
         <FlowColumn
-          title="Credit Cards"
+          title="Credit cards"
+          emoji="💳"
           lines={flow.creditCards.accounts}
-          footerLabel="Total Charges"
+          footerLabel="Total charges"
           footerAmount={flow.creditCards.totalCharges}
         />
       </section>
 
-      <section aria-label="Income vs expenses" className="grid gap-4 lg:grid-cols-3">
+      <section aria-label="Income vs expenses" className="grid gap-5 lg:grid-cols-3">
         <div>
-          <h3 className="mb-2 text-base font-semibold text-text">Income</h3>
+          <h3 className="mb-3 text-sm font-bold text-text">Income</h3>
           <TrendChart labels={labels} data={incomeData} label="Income" />
         </div>
         <div>
-          <h3 className="mb-2 text-base font-semibold text-text">Expenses</h3>
+          <h3 className="mb-3 text-sm font-bold text-text">Expenses</h3>
           <TrendChart labels={labels} data={expenseData} label="Expenses" />
         </div>
         <div>
-          <h3 className="mb-2 text-base font-semibold text-text">Net</h3>
+          <h3 className="mb-3 text-sm font-bold text-text">Net</h3>
           <TrendChart labels={labels} data={netData} label="Net" />
         </div>
       </section>

@@ -9,6 +9,7 @@ interface KpiCardProps {
   value: string;
   subtext?: string;
   tone?: KpiTone;
+  compact?: boolean;
 }
 
 const toneClasses: Record<KpiTone, string> = {
@@ -24,20 +25,29 @@ export function KpiCard({
   value,
   subtext,
   tone = "default",
+  compact = false,
 }: KpiCardProps) {
   return (
-    <div className="rounded-[var(--radius-card)] border border-border bg-surface p-4">
-      <p className="text-sm text-text-muted">{label}</p>
+    <div
+      className={clsx(
+        "rounded-[var(--radius-card)] border border-border/60 bg-surface card-shadow",
+        compact ? "p-3" : "p-4",
+      )}
+    >
+      <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+        {label}
+      </p>
       <p
         className={clsx(
-          "mt-1 font-mono text-[22px] leading-7 tabular-nums",
+          "mt-1 text-2xl font-bold tabular-nums tracking-tight",
           toneClasses[tone],
         )}
+        data-money
       >
         {value}
       </p>
       {subtext ? (
-        <p className="mt-1 text-xs text-text-muted">{subtext}</p>
+        <p className="mt-0.5 truncate text-xs text-text-muted">{subtext}</p>
       ) : null}
     </div>
   );

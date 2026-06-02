@@ -24,7 +24,7 @@ interface MonthPillsProps {
 
 export function MonthPills({ selectedMonth, onSelect }: MonthPillsProps) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
       {MONTHS.map((label, index) => {
         const month = index + 1;
         const isActive = selectedMonth === month;
@@ -35,10 +35,10 @@ export function MonthPills({ selectedMonth, onSelect }: MonthPillsProps) {
             type="button"
             onClick={() => onSelect(month)}
             className={clsx(
-              "rounded-[var(--radius-pill)] border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+              "shrink-0 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-semibold transition-all",
               isActive
-                ? "border-primary bg-primary text-text-inverse"
-                : "border-border bg-surface text-text-muted hover:border-primary/50 hover:text-text",
+                ? "bg-primary text-text-inverse shadow-sm"
+                : "bg-surface text-text-muted hover:text-text card-shadow",
             )}
           >
             {label}
@@ -49,13 +49,13 @@ export function MonthPills({ selectedMonth, onSelect }: MonthPillsProps) {
         type="button"
         onClick={() => onSelect(null)}
         className={clsx(
-          "rounded-[var(--radius-pill)] border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+          "shrink-0 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-semibold transition-all",
           selectedMonth === null
-            ? "border-primary bg-primary text-text-inverse"
-            : "border-border bg-surface text-text-muted hover:border-primary/50 hover:text-text",
+            ? "bg-primary text-text-inverse shadow-sm"
+            : "bg-surface text-text-muted hover:text-text card-shadow",
         )}
       >
-        All Year
+        All
       </button>
     </div>
   );

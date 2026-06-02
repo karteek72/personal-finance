@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { CategoryRow } from "@/components/categories/category-row";
-import { TransactionListHeader } from "@/components/transactions/transaction-list-header";
 import { TransactionRow } from "@/components/transactions/transaction-row";
+import { Card } from "@/components/ui/card";
 import { useTransactions } from "@/hooks/use-transactions";
 import { getCategoryColor } from "@/lib/category-colors";
 import { formatMoney } from "@/lib/format-money";
@@ -31,16 +31,16 @@ export function CategoriesBreakdown({ categories }: CategoriesBreakdownProps) {
 
   return (
     <section aria-label="Category usage" className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">
+      <Card padding="none" className="overflow-hidden">
         <div
-          className="flex h-3 w-full"
+          className="flex h-2 w-full"
           role="img"
           aria-label="Proportional spend by category"
         >
           {categories.map((category) => (
             <div
               key={category.name}
-              className="h-full"
+              className="h-full transition-all"
               style={{
                 width: `${category.percentage}%`,
                 backgroundColor: getCategoryColor(category.name),
@@ -49,7 +49,7 @@ export function CategoriesBreakdown({ categories }: CategoriesBreakdownProps) {
             />
           ))}
         </div>
-        <ul className="divide-y divide-border p-2">
+        <ul className="space-y-1 p-2">
           {categories.map((category) => (
             <li key={category.name}>
               <CategoryRow
@@ -68,55 +68,53 @@ export function CategoriesBreakdown({ categories }: CategoriesBreakdownProps) {
             </li>
           ))}
         </ul>
-      </div>
+      </Card>
 
       {selectedCategory ? (
-        <div className="overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <Card padding="none" className="overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-4">
             <div>
-              <h3 className="text-base font-semibold text-text">
+              <h3 className="text-base font-bold text-text">
                 {selectedCategory}
               </h3>
               <p className="text-sm text-text-muted">
-                Recent transactions in this category
+                Tap a category to explore · tap again to close
               </p>
             </div>
             <Link
               href={`/transactions?category=${encodeURIComponent(selectedCategory)}`}
-              className="text-sm font-medium text-primary hover:underline"
+              className="rounded-[var(--radius-pill)] bg-primary-soft px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
             >
-              View all in Activity →
+              See all →
             </Link>
           </div>
 
-          <TransactionListHeader />
-
           {isLoading ? (
-            <p className="px-4 py-8 text-center text-sm text-text-muted">
-              Loading transactions…
+            <p className="px-4 py-12 text-center text-sm text-text-muted">
+              Loading…
             </p>
           ) : null}
 
           {error ? (
-            <p className="px-4 py-8 text-center text-sm text-danger">
-              Failed to load transactions.
+            <p className="px-4 py-12 text-center text-sm text-danger">
+              Couldn't load transactions.
             </p>
           ) : null}
 
           {!isLoading && !error && data?.items.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-text-muted">
-              No transactions in this category.
+            <p className="px-4 py-12 text-center text-sm text-text-muted">
+              No transactions in this category yet.
             </p>
           ) : null}
 
           {!isLoading && !error && data && data.items.length > 0 ? (
-            <div>
+            <div className="divide-y divide-border/60">
               {data.items.map((transaction) => (
                 <TransactionRow key={transaction.id} {...transaction} />
               ))}
             </div>
           ) : null}
-        </div>
+        </Card>
       ) : null}
     </section>
   );

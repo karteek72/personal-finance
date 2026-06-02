@@ -30,6 +30,7 @@ export function DonutChart({ segments, className }: DonutChartProps) {
         data: segments.map((segment) => segment.value),
         backgroundColor: segments.map((segment) => segment.color),
         borderWidth: 0,
+        spacing: 2,
       },
     ],
   };
@@ -37,23 +38,23 @@ export function DonutChart({ segments, className }: DonutChartProps) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    cutout: "60%",
+    cutout: "65%",
     plugins: {
       legend: {
-        position: "right" as const,
+        position: "bottom" as const,
         labels: {
-          color: "var(--color-text)",
-          boxWidth: 12,
-          padding: 12,
+          color: "var(--color-text-muted)",
+          boxWidth: 10,
+          padding: 16,
           font: {
-            size: 12,
+            size: 11,
+            weight: "bold" as const,
           },
+          usePointStyle: true,
+          pointStyle: "circle" as const,
         },
       },
       tooltip: {
-        bodyFont: {
-          family: "var(--font-mono, ui-monospace, monospace)",
-        },
         callbacks: {
           label: (context: { label?: string; parsed: number }) =>
             `${context.label ?? ""}: ${context.parsed.toLocaleString()}`,
@@ -65,11 +66,11 @@ export function DonutChart({ segments, className }: DonutChartProps) {
   return (
     <div
       className={clsx(
-        "rounded-[var(--radius-card)] border border-border bg-surface p-4",
+        "rounded-[var(--radius-card)] border border-border/60 bg-surface p-4 card-shadow",
         className,
       )}
     >
-      <div className="h-64">
+      <div className="h-72">
         <Doughnut data={chartData} options={options} />
       </div>
     </div>

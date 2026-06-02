@@ -23,15 +23,15 @@ export function FilterSelect({
   className,
 }: FilterSelectProps) {
   return (
-    <div className={clsx("flex flex-col gap-1", className)}>
-      <label htmlFor={id} className="text-xs font-medium text-text-muted">
+    <div className={clsx("flex flex-col gap-1.5", className)}>
+      <label htmlFor={id} className="text-xs font-semibold text-text-muted">
         {label}
       </label>
       <select
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-[var(--radius-card)] border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary"
+        className="rounded-[var(--radius-sm)] border-0 bg-surface px-3 py-2.5 text-sm font-medium text-text card-shadow outline-none focus:ring-2 focus:ring-primary/30"
       >
         {options.map((option) => (
           <option key={option.value || "all"} value={option.value}>

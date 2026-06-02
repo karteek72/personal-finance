@@ -17,7 +17,7 @@ export const categoryColors = {
   "Transfers (internal)": "#01696f",
 } as const satisfies Record<string, string>;
 
-const DEFAULT_COLOR = "#01696f";
+const DEFAULT_COLOR = "#7c3aed";
 
 export function getCategoryColor(name: string): string {
   return categoryColors[name as keyof typeof categoryColors] ?? DEFAULT_COLOR;

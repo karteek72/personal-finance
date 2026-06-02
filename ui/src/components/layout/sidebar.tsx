@@ -4,47 +4,36 @@ import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-interface ConnectedAccount {
-  id: string;
-  name: string;
-  institutionName: string;
-  mask: string | null;
-}
-
-interface SidebarProps {
-  accounts?: ConnectedAccount[];
-}
-
 const navItems = [
-  { href: "/", label: "Dashboard" },
-  { href: "/flow", label: "Money Flow" },
-  { href: "/categories", label: "Categories" },
-  { href: "/transactions", label: "Transactions" },
-  { href: "/accounts", label: "Accounts" },
+  { href: "/", label: "Home" },
+  { href: "/flow", label: "Flow" },
+  { href: "/categories", label: "Spend" },
+  { href: "/transactions", label: "Activity" },
+  { href: "/accounts", label: "Wallet" },
 ] as const;
 
-function NavIcon({ href }: { href: string }) {
-  const common = "h-4 w-4";
+function NavIcon({ href, active }: { href: string; active: boolean }) {
+  const common = clsx("h-[18px] w-[18px]", active && "stroke-[2.5]");
 
   switch (href) {
     case "/":
       return (
-        <svg viewBox="0 0 16 16" fill="none" className={common} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
           <path
-            d="M2 6.5 8 2l6 4.5V14a1 1 0 0 1-1 1h-3.5v-4H6.5v4H3a1 1 0 0 1-1-1V6.5Z"
+            d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z"
             stroke="currentColor"
-            strokeWidth="1.25"
+            strokeWidth="2"
             strokeLinejoin="round"
           />
         </svg>
       );
     case "/flow":
       return (
-        <svg viewBox="0 0 16 16" fill="none" className={common} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
           <path
-            d="M2 8h4l1.5-3L10 11l1.5-3H14"
+            d="M4 14h4l2-4 4 8 2-4h4"
             stroke="currentColor"
-            strokeWidth="1.25"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -52,38 +41,36 @@ function NavIcon({ href }: { href: string }) {
       );
     case "/categories":
       return (
-        <svg viewBox="0 0 16 16" fill="none" className={common} aria-hidden="true">
-          <path
-            d="M3 4.5A1.5 1.5 0 0 1 4.5 3h2A1.5 1.5 0 0 1 8 4.5V6a1.5 1.5 0 0 1-1.5 1.5h-2A1.5 1.5 0 0 1 3 6V4.5ZM8 11.5A1.5 1.5 0 0 1 9.5 10h2A1.5 1.5 0 0 1 13 11.5V13a1.5 1.5 0 0 1-1.5 1.5h-2A1.5 1.5 0 0 1 8 13v-1.5ZM3 11.5A1.5 1.5 0 0 1 4.5 10h2A1.5 1.5 0 0 1 8 11.5V13a1.5 1.5 0 0 1-1.5 1.5h-2A1.5 1.5 0 0 1 3 13v-1.5Z"
-            stroke="currentColor"
-            strokeWidth="1.25"
-          />
+        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+          <circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="2" />
+          <circle cx="17" cy="7" r="3" stroke="currentColor" strokeWidth="2" />
+          <circle cx="12" cy="17" r="3" stroke="currentColor" strokeWidth="2" />
         </svg>
       );
     case "/transactions":
       return (
-        <svg viewBox="0 0 16 16" fill="none" className={common} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
           <path
-            d="M3 4.5h10M3 8h10M3 11.5h6"
+            d="M4 7h16M4 12h16M4 17h10"
             stroke="currentColor"
-            strokeWidth="1.25"
+            strokeWidth="2"
             strokeLinecap="round"
           />
         </svg>
       );
     case "/accounts":
       return (
-        <svg viewBox="0 0 16 16" fill="none" className={common} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
           <rect
-            x="2"
-            y="4"
-            width="12"
-            height="8"
-            rx="1.5"
+            x="3"
+            y="6"
+            width="18"
+            height="12"
+            rx="3"
             stroke="currentColor"
-            strokeWidth="1.25"
+            strokeWidth="2"
           />
-          <path d="M2 7h12" stroke="currentColor" strokeWidth="1.25" />
+          <path d="M3 10h18" stroke="currentColor" strokeWidth="2" />
         </svg>
       );
     default:
@@ -91,18 +78,18 @@ function NavIcon({ href }: { href: string }) {
   }
 }
 
-export function Sidebar({ accounts = [] }: SidebarProps) {
+export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-surface md:flex">
-      <div className="border-b border-border px-5 py-5">
-        <Link href="/" className="text-lg font-bold text-primary">
+    <aside className="hidden h-full w-[220px] shrink-0 flex-col px-4 py-6 md:flex">
+      <Link href="/" className="mb-8 px-3">
+        <span className="text-xl font-extrabold tracking-tight text-gradient">
           SpendFlow
-        </Link>
-      </div>
+        </span>
+      </Link>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex flex-1 flex-col gap-1">
         {navItems.map((item) => {
           const isActive =
             item.href === "/"
@@ -114,42 +101,22 @@ export function Sidebar({ accounts = [] }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={clsx(
-                "flex items-center gap-3 rounded-[var(--radius-card)] px-3 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+                "flex items-center gap-3 rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-semibold transition-all",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-text-muted hover:bg-bg hover:text-text",
+                  ? "bg-primary-soft text-primary"
+                  : "text-text-muted hover:bg-surface hover:text-text",
               )}
             >
-              <NavIcon href={item.href} />
+              <NavIcon href={item.href} active={isActive} />
               {item.label}
             </Link>
           );
         })}
       </nav>
 
-      {accounts.length > 0 ? (
-        <div className="border-t border-border px-4 py-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
-            Connected Accounts
-          </p>
-          <ul className="space-y-2">
-            {accounts.map((account) => (
-              <li
-                key={account.id}
-                className="rounded-[var(--radius-card)] border border-border bg-bg px-3 py-2"
-              >
-                <p className="truncate text-sm font-medium text-text">
-                  {account.name}
-                </p>
-                <p className="truncate text-xs text-text-muted">
-                  {account.institutionName}
-                  {account.mask ? ` ·••• ${account.mask}` : null}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <p className="px-3 text-xs text-text-muted">
+        Your money, minus the stress
+      </p>
     </aside>
   );
 }

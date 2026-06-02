@@ -4,7 +4,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string;
   children: ReactNode;
-  variant?: "default" | "danger";
+  variant?: "default" | "danger" | "ghost";
 }
 
 export function IconButton({
@@ -20,10 +20,12 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={clsx(
-        "inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-card)] border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40",
         variant === "danger"
-          ? "border-danger/30 text-danger hover:bg-danger/10"
-          : "border-border text-text-muted hover:border-primary/40 hover:text-primary hover:bg-primary/5",
+          ? "text-danger hover:bg-danger/10"
+          : variant === "ghost"
+            ? "text-text-muted hover:bg-primary-soft hover:text-primary"
+            : "bg-surface text-text-muted hover:bg-primary-soft hover:text-primary card-shadow",
         className,
       )}
       {...props}
@@ -70,6 +72,22 @@ export function TrashIcon({ className }: { className?: string }) {
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
       <path d="M10 11v6" />
       <path d="M14 11v6" />
+    </svg>
+  );
+}
+
+export function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      className={clsx("h-4 w-4", className)}
+      aria-hidden="true"
+    >
+      <path d="M12 5v14M5 12h14" />
     </svg>
   );
 }

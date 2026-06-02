@@ -1,5 +1,7 @@
 import clsx from "clsx";
 
+import { getCategoryColor } from "@/lib/category-colors";
+
 interface TransactionRowProps {
   id: string;
   accountId: string;
@@ -24,7 +26,7 @@ function formatAmount(amount: string, currencyCode: string): string {
   return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency: currencyCode,
-  }).format(numeric);
+  }).format(Math.abs(numeric));
 }
 
 function formatDate(date: string): string {
@@ -39,15 +41,8 @@ function formatDate(date: string): string {
   });
 }
 
-function formatAccountMask(mask: string | null): string {
-  if (!mask) {
-    return "—";
-  }
-  return `•${mask}`;
-}
-
 const typeStyles = {
-  expense: "text-danger",
+  expense: "text-text",
   income: "text-success",
   transfer: "text-primary",
 } as const;
@@ -66,70 +61,59 @@ export function TransactionRow({
 }: TransactionRowProps) {
   const displayName = merchantName ?? name;
   const isHighlightedTransfer = isTransfer || transactionType === "transfer";
+  const initial = displayName.charAt(0).toUpperCase();
+  const categoryColor = getCategoryColor(category);
+  const prefix =
+    transactionType === "income" ? "+" : transactionType === "expense" ? "−" : "";
 
   return (
     <div
       className={clsx(
-        "flex flex-col gap-2 border-b border-border px-4 py-3 last:border-b-0 sm:grid sm:grid-cols-[4rem_1fr_8rem_5rem_6rem] sm:items-center sm:gap-4",
-        isHighlightedTransfer && "bg-primary/5",
+        "flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-primary-soft/30",
+        isHighlightedTransfer && "bg-primary-soft/20",
       )}
     >
-      <div className="text-xs text-text-muted tabular-nums sm:w-14">
-        {formatDate(date)}
+      <div
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-text-inverse"
+        style={{ backgroundColor: categoryColor }}
+        aria-hidden="true"
+      >
+        {initial}
       </div>
 
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-text">{displayName}</p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-2 sm:hidden">
-          <span className="truncate text-xs text-text-muted">{category}</span>
-          <span className="text-xs text-text-muted">
-            {formatAccountMask(accountMask)}
-          </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-semibold text-text">
+            {displayName}
+          </p>
           {pending ? (
-            <span className="rounded-[var(--radius-pill)] border border-warning/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning">
+            <span className="shrink-0 rounded-[var(--radius-pill)] bg-warning/15 px-2 py-0.5 text-[10px] font-bold uppercase text-warning">
               Pending
             </span>
           ) : null}
-          {isHighlightedTransfer ? (
-            <span className="rounded-[var(--radius-pill)] border border-primary/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-              Transfer
-            </span>
-          ) : null}
         </div>
-        <div className="mt-0.5 hidden flex-wrap items-center gap-2 sm:flex">
-          {pending ? (
-            <span className="rounded-[var(--radius-pill)] border border-warning/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning">
-              Pending
-            </span>
-          ) : null}
-          {isHighlightedTransfer ? (
-            <span className="rounded-[var(--radius-pill)] border border-primary/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-              Transfer
-            </span>
-          ) : null}
-        </div>
+        <p className="mt-0.5 truncate text-xs text-text-muted">
+          {category}
+          {accountMask ? ` · ••${accountMask}` : ""}
+          {" · "}
+          {formatDate(date)}
+        </p>
       </div>
 
-      <div className="hidden truncate text-sm text-text-muted sm:block">
-        {category}
-      </div>
-
-      <div className="hidden text-sm tabular-nums text-text-muted sm:block">
-        {formatAccountMask(accountMask)}
-      </div>
-
-      <div className="flex items-center justify-between sm:block sm:text-right">
-        <span className="text-xs text-text-muted sm:hidden">
-          {formatAccountMask(accountMask)} · {category}
-        </span>
-        <span
+      <div className="shrink-0 text-right">
+        <p
           className={clsx(
-            "font-mono text-sm tabular-nums",
+            "text-sm font-bold tabular-nums",
             typeStyles[transactionType],
           )}
+          data-money
         >
+          {prefix}
           {formatAmount(amount, currencyCode)}
-        </span>
+        </p>
+        {isHighlightedTransfer ? (
+          <p className="text-[10px] font-semibold text-primary">Transfer</p>
+        ) : null}
       </div>
     </div>
   );

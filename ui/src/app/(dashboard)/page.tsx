@@ -1,4 +1,5 @@
 import { AlertBanner } from "@/components/ui/alert-banner";
+import { Card } from "@/components/ui/card";
 import { DonutChart } from "@/components/charts/donut-chart";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { TrendChart } from "@/components/charts/trend-chart";
@@ -46,6 +47,13 @@ function aggregateMonthlySpend(trends: TrendsResponse): {
   };
 }
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 export default async function DashboardPage() {
   const { from, to } = yearToDateRange();
 
@@ -58,6 +66,8 @@ export default async function DashboardPage() {
   ]);
 
   const monthlySpend = aggregateMonthlySpend(trends);
+  const netSavings = Number.parseFloat(summary.netSavings);
+  const isPositive = netSavings >= 0;
 
   const donutSegments = categories.categories.map((category) => ({
     label: category.name,
@@ -71,47 +81,52 @@ export default async function DashboardPage() {
   }));
 
   return (
-    <div className="flex flex-col gap-4">
-      <header>
-        <h2 className="text-lg font-semibold text-text">Overview</h2>
-        <p className="text-sm text-text-muted">
-          Spending, income, and alerts for the current year
-        </p>
-      </header>
-
-      <section
-        aria-label="Key metrics"
-        className="grid grid-cols-2 gap-3 lg:grid-cols-3"
+    <div className="flex flex-col gap-5">
+      <Card
+        padding="lg"
+        className="overflow-hidden border-0 text-text-inverse"
+        style={{ background: "var(--gradient-hero)" }}
       >
-        <KpiCard
-          label="Total Spent"
-          value={formatMoney(summary.totalSpent)}
-          tone="danger"
-        />
-        <KpiCard
-          label="Income"
-          value={formatMoney(summary.income)}
-          tone="success"
-        />
-        <KpiCard
-          label="Net Savings"
-          value={formatMoney(summary.netSavings)}
-          tone="primary"
-        />
-        <KpiCard
-          label="Avg Monthly"
-          value={formatMoney(summary.avgMonthlySpend)}
-        />
-        <KpiCard
-          label="Top Category"
-          value={formatMoney(summary.topCategory.amount)}
-          subtext={summary.topCategory.name}
-        />
-        <KpiCard
-          label="CC Payments Excluded"
-          value={formatMoney(summary.ccPaymentsExcluded)}
-        />
-      </section>
+        <p className="text-sm font-medium opacity-90">{getGreeting()} 👋</p>
+        <p className="mt-1 text-sm opacity-80">Your net savings this year</p>
+        <p
+          className="mt-2 text-4xl font-extrabold tracking-tight md:text-5xl"
+          data-money
+        >
+          {formatMoney(summary.netSavings)}
+        </p>
+        <p className="mt-2 text-sm opacity-80">
+          {isPositive
+            ? "You're in the green — keep it up"
+            : "Spending's ahead of income — worth a look"}
+        </p>
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          <div className="rounded-[var(--radius-sm)] bg-white/15 px-3 py-2 backdrop-blur-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+              Spent
+            </p>
+            <p className="mt-0.5 text-sm font-bold tabular-nums" data-money>
+              {formatMoney(summary.totalSpent)}
+            </p>
+          </div>
+          <div className="rounded-[var(--radius-sm)] bg-white/15 px-3 py-2 backdrop-blur-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+              Income
+            </p>
+            <p className="mt-0.5 text-sm font-bold tabular-nums" data-money>
+              {formatMoney(summary.income)}
+            </p>
+          </div>
+          <div className="rounded-[var(--radius-sm)] bg-white/15 px-3 py-2 backdrop-blur-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+              Avg / mo
+            </p>
+            <p className="mt-0.5 text-sm font-bold tabular-nums" data-money>
+              {formatMoney(summary.avgMonthlySpend)}
+            </p>
+          </div>
+        </div>
+      </Card>
 
       {alerts.alerts.length > 0 ? (
         <section aria-label="Alerts" className="flex flex-col gap-2">
@@ -127,10 +142,23 @@ export default async function DashboardPage() {
         </section>
       ) : null}
 
+      <section aria-label="Quick stats" className="grid grid-cols-2 gap-3">
+        <KpiCard
+          label="Top category"
+          value={formatMoney(summary.topCategory.amount)}
+          subtext={summary.topCategory.name}
+          tone="primary"
+          compact
+        />
+        <KpiCard
+          label="CC payments excluded"
+          value={formatMoney(summary.ccPaymentsExcluded)}
+          compact
+        />
+      </section>
+
       <section aria-label="Monthly spend trend">
-        <h3 className="mb-2 text-base font-semibold text-text">
-          Monthly Spend
-        </h3>
+        <h3 className="mb-3 text-base font-bold text-text">Monthly spend</h3>
         <TrendChart
           labels={monthlySpend.labels}
           data={monthlySpend.data}
@@ -140,18 +168,14 @@ export default async function DashboardPage() {
 
       <section
         aria-label="Category and account breakdown"
-        className="grid gap-4 lg:grid-cols-2"
+        className="grid gap-5 lg:grid-cols-2"
       >
         <div>
-          <h3 className="mb-2 text-base font-semibold text-text">
-            Spending by Category
-          </h3>
+          <h3 className="mb-3 text-base font-bold text-text">Where it went</h3>
           <DonutChart segments={donutSegments} />
         </div>
         <div>
-          <h3 className="mb-2 text-base font-semibold text-text">
-            Spend by Account
-          </h3>
+          <h3 className="mb-3 text-base font-bold text-text">By account</h3>
           <TrendChart
             labels={accountBar.map((item) => item.label)}
             data={accountBar.map((item) => item.value)}

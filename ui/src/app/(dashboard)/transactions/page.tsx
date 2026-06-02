@@ -3,10 +3,11 @@
 import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { TransactionListHeader } from "@/components/transactions/transaction-list-header";
 import { TransactionRow } from "@/components/transactions/transaction-row";
+import { Card } from "@/components/ui/card";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { MonthPills } from "@/components/ui/month-pills";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useCategories } from "@/hooks/use-categories";
 import { useTransactions } from "@/hooks/use-transactions";
@@ -14,21 +15,22 @@ import type { TransactionFilters } from "@/types/api";
 
 type TransactionFilter = "all" | "expense" | "income" | "transfer";
 
-const FILTER_OPTIONS: { id: TransactionFilter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "expense", label: "Expenses" },
-  { id: "income", label: "Income" },
-  { id: "transfer", label: "Transfers" },
-];
+const FILTER_OPTIONS: { id: TransactionFilter; label: string; emoji: string }[] =
+  [
+    { id: "all", label: "All", emoji: "✨" },
+    { id: "expense", label: "Spent", emoji: "💸" },
+    { id: "income", label: "In", emoji: "💰" },
+    { id: "transfer", label: "Moves", emoji: "↔️" },
+  ];
 
 const SORT_OPTIONS: { value: NonNullable<TransactionFilters["sort"]>; label: string }[] =
   [
-    { value: "date_desc", label: "Newest first" },
-    { value: "date_asc", label: "Oldest first" },
-    { value: "amount_desc", label: "Amount high → low" },
-    { value: "amount_asc", label: "Amount low → high" },
-    { value: "name_asc", label: "Name A → Z" },
-    { value: "category_asc", label: "Category A → Z" },
+    { value: "date_desc", label: "Newest" },
+    { value: "date_asc", label: "Oldest" },
+    { value: "amount_desc", label: "Biggest first" },
+    { value: "amount_asc", label: "Smallest first" },
+    { value: "name_asc", label: "Name A–Z" },
+    { value: "category_asc", label: "Category A–Z" },
   ];
 
 function monthQueryValue(selectedMonth: number | null): string | undefined {
@@ -112,125 +114,111 @@ function TransactionsContent() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex flex-col gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-text">Activity</h2>
-          <p className="text-sm text-text-muted">
-            Search, filter, and sort your transactions
-          </p>
-        </div>
-        <MonthPills selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
-      </header>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Recent activity"
+        subtitle="Everything you've spent, earned, or moved"
+      />
 
-      <div className="flex flex-col gap-3">
-        <div
-          className="flex flex-wrap gap-2"
-          role="tablist"
-          aria-label="Transaction type"
-        >
-          {FILTER_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              role="tab"
-              aria-selected={filter === option.id}
-              onClick={() => setFilter(option.id)}
-              className={`rounded-[var(--radius-pill)] border px-3 py-1 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-                filter === option.id
-                  ? "border-primary bg-primary text-text-inverse"
-                  : "border-border bg-surface text-text-muted hover:border-primary/40"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+      <MonthPills selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <FilterSelect
-            id="transaction-account-filter"
-            label="Account"
-            value={accountId}
-            onChange={(value) => {
-              setAccountId(value);
-              updateUrlFilters(value, category);
-            }}
-            options={accountOptions}
-          />
-          <FilterSelect
-            id="transaction-category-filter"
-            label="Category"
-            value={category}
-            onChange={(value) => {
-              setCategory(value);
-              updateUrlFilters(accountId, value);
-            }}
-            options={categoryOptions}
-          />
-          <FilterSelect
-            id="transaction-sort"
-            label="Sort by"
-            value={sort}
-            onChange={(value) =>
-              setSort(value as NonNullable<TransactionFilters["sort"]>)
-            }
-            options={SORT_OPTIONS.map((option) => ({
-              value: option.value,
-              label: option.label,
-            }))}
-          />
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="transaction-search"
-              className="text-xs font-medium text-text-muted"
-            >
-              Search
-            </label>
-            <input
-              id="transaction-search"
-              type="search"
-              placeholder="Merchant or description…"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="rounded-[var(--radius-card)] border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary"
-            />
-          </div>
-        </div>
+      <div
+        className="flex gap-2 overflow-x-auto pb-1"
+        role="tablist"
+        aria-label="Transaction type"
+      >
+        {FILTER_OPTIONS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={filter === option.id}
+            onClick={() => setFilter(option.id)}
+            className={`flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-semibold transition-all ${
+              filter === option.id
+                ? "bg-primary text-text-inverse shadow-sm"
+                : "bg-surface text-text-muted card-shadow hover:text-text"
+            }`}
+          >
+            <span aria-hidden="true">{option.emoji}</span>
+            {option.label}
+          </button>
+        ))}
       </div>
 
-      <section
-        aria-label="Transaction list"
-        className="overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface"
-      >
-        <TransactionListHeader />
+      <div className="relative">
+        <input
+          id="transaction-search"
+          type="search"
+          placeholder="Search merchants…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          className="w-full rounded-[var(--radius-card)] border-0 bg-surface py-3 pl-4 pr-4 text-sm text-text card-shadow outline-none placeholder:text-text-muted focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        <FilterSelect
+          id="transaction-account-filter"
+          label="Account"
+          value={accountId}
+          onChange={(value) => {
+            setAccountId(value);
+            updateUrlFilters(value, category);
+          }}
+          options={accountOptions}
+        />
+        <FilterSelect
+          id="transaction-category-filter"
+          label="Category"
+          value={category}
+          onChange={(value) => {
+            setCategory(value);
+            updateUrlFilters(accountId, value);
+          }}
+          options={categoryOptions}
+        />
+        <FilterSelect
+          id="transaction-sort"
+          label="Sort"
+          value={sort}
+          onChange={(value) =>
+            setSort(value as NonNullable<TransactionFilters["sort"]>)
+          }
+          options={SORT_OPTIONS.map((option) => ({
+            value: option.value,
+            label: option.label,
+          }))}
+        />
+      </div>
+
+      <Card padding="none" className="overflow-hidden">
         {isLoading ? (
-          <p className="px-4 py-8 text-center text-sm text-text-muted">
-            Loading transactions…
+          <p className="px-4 py-12 text-center text-sm text-text-muted">
+            Loading…
           </p>
         ) : null}
 
         {error ? (
-          <p className="px-4 py-8 text-center text-sm text-danger">
-            Failed to load transactions.
+          <p className="px-4 py-12 text-center text-sm text-danger">
+            Couldn't load transactions.
           </p>
         ) : null}
 
         {!isLoading && !error && data?.items.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-text-muted">
-            No transactions match your filters.
+          <p className="px-4 py-12 text-center text-sm text-text-muted">
+            Nothing here — try changing your filters
           </p>
         ) : null}
 
         {!isLoading && !error && data && data.items.length > 0 ? (
-          <div>
+          <div className="divide-y divide-border/60">
             {data.items.map((transaction) => (
               <TransactionRow key={transaction.id} {...transaction} />
             ))}
           </div>
         ) : null}
-      </section>
+      </Card>
     </div>
   );
 }
@@ -239,7 +227,7 @@ export default function TransactionsPage() {
   return (
     <Suspense
       fallback={
-        <p className="text-sm text-text-muted">Loading transactions…</p>
+        <p className="text-sm text-text-muted">Loading activity…</p>
       }
     >
       <TransactionsContent />

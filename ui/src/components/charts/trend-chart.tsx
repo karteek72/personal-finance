@@ -33,7 +33,7 @@ export function TrendChart({
         label,
         data,
         backgroundColor: "var(--color-primary)",
-        borderRadius: 4,
+        borderRadius: 8,
         borderSkipped: false,
       },
     ],
@@ -47,9 +47,6 @@ export function TrendChart({
         display: false,
       },
       tooltip: {
-        bodyFont: {
-          family: "var(--font-mono, ui-monospace, monospace)",
-        },
         callbacks: {
           label: (context: { parsed: { y: number | null } }) =>
             `${label}: ${context.parsed.y?.toLocaleString() ?? "0"}`,
@@ -63,20 +60,19 @@ export function TrendChart({
         },
         ticks: {
           color: "var(--color-text-muted)",
+          font: { size: 11 },
         },
         border: {
-          color: "var(--color-border)",
+          display: false,
         },
       },
       y: {
         grid: {
-          color: "var(--color-border)",
+          color: "color-mix(in srgb, var(--color-border) 50%, transparent)",
         },
         ticks: {
           color: "var(--color-text-muted)",
-          font: {
-            family: "var(--font-mono, ui-monospace, monospace)",
-          },
+          font: { size: 11 },
         },
         border: {
           display: false,
@@ -88,11 +84,11 @@ export function TrendChart({
   return (
     <div
       className={clsx(
-        "rounded-[var(--radius-card)] border border-border bg-surface p-4",
+        "rounded-[var(--radius-card)] border border-border/60 bg-surface p-4 card-shadow",
         className,
       )}
     >
-      <div className="h-64">
+      <div className="h-56">
         <Bar data={chartData} options={options} />
       </div>
     </div>

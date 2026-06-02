@@ -4,7 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { PlaidLinkButton } from "@/components/plaid/plaid-link-button";
+import { Card } from "@/components/ui/card";
 import { IconButton, SyncIcon, TrashIcon } from "@/components/ui/icon-button";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAccounts } from "@/hooks/use-accounts";
 import { api } from "@/lib/api-client";
 import { formatMoney } from "@/lib/format-money";
@@ -15,6 +17,34 @@ function invalidateFinancialQueries(
   void queryClient.invalidateQueries({ queryKey: ["accounts"] });
   void queryClient.invalidateQueries({ queryKey: ["transactions"] });
   void queryClient.invalidateQueries({ queryKey: ["categories"] });
+}
+
+const CARD_GRADIENTS = [
+  "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
+  "linear-gradient(135deg, #6366f1 0%, #818cf8 100%)",
+  "linear-gradient(135deg, #ec4899 0%, #f472b6 100%)",
+  "linear-gradient(135deg, #14b8a6 0%, #2dd4bf 100%)",
+  "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)",
+];
+
+function StatusToast({
+  message,
+  variant,
+}: {
+  message: string;
+  variant: "success" | "error";
+}) {
+  return (
+    <p
+      className={`rounded-[var(--radius-card)] px-4 py-3 text-sm font-medium card-shadow ${
+        variant === "success"
+          ? "bg-success/10 text-success"
+          : "bg-danger/10 text-danger"
+      }`}
+    >
+      {message}
+    </p>
+  );
 }
 
 export function AccountsView() {
@@ -35,7 +65,7 @@ export function AccountsView() {
       if (event.data?.type !== "spendflow:plaid-oauth-success") return;
 
       setErrorMessage(null);
-      setStatusMessage("Bank account linked successfully.");
+      setStatusMessage("Bank linked — you're all set ✓");
       invalidateFinancialQueries(queryClient);
       void refetch();
     }
@@ -46,10 +76,10 @@ export function AccountsView() {
 
   function handleConnected() {
     setErrorMessage(null);
-    setStatusMessage("Account connected. Syncing latest transactions…");
+    setStatusMessage("Syncing your latest transactions…");
     invalidateFinancialQueries(queryClient);
     void refetch().then(() => {
-      setStatusMessage("Account connected and transactions synced.");
+      setStatusMessage("Account connected and synced ✓");
     });
   }
 
@@ -61,13 +91,13 @@ export function AccountsView() {
     try {
       const result = await api.syncAllPlaid();
       setStatusMessage(
-        `Synced ${result.itemsSynced} institution(s): ${result.added} new, ${result.modified} updated transactions.`,
+        `Updated — ${result.added} new, ${result.modified} changed`,
       );
       invalidateFinancialQueries(queryClient);
       await refetch();
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : "Failed to sync accounts",
+        err instanceof Error ? err.message : "Sync failed — try again",
       );
     } finally {
       setSyncingAll(false);
@@ -82,13 +112,13 @@ export function AccountsView() {
     try {
       const result = await api.syncAccount(accountId);
       setStatusMessage(
-        `${accountName} synced — ${result.added} new, ${result.modified} updated.`,
+        `${accountName} — ${result.added} new transactions`,
       );
       invalidateFinancialQueries(queryClient);
       await refetch();
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : "Failed to sync account",
+        err instanceof Error ? err.message : "Sync failed — try again",
       );
     } finally {
       setSyncingId(null);
@@ -102,7 +132,7 @@ export function AccountsView() {
   ) {
     const label = mask ? `${accountName} (•••• ${mask})` : accountName;
     const confirmed = window.confirm(
-      `Delete ${label} and all of its transactions? This cannot be undone.`,
+      `Remove ${label} and all its transactions? Can't undo this.`,
     );
     if (!confirmed) return;
 
@@ -113,13 +143,13 @@ export function AccountsView() {
     try {
       const result = await api.deleteAccount(accountId);
       setStatusMessage(
-        `Removed ${result.name} and ${result.transactionsDeleted} transactions.`,
+        `Removed ${result.name} (${result.transactionsDeleted} transactions)`,
       );
       invalidateFinancialQueries(queryClient);
       await refetch();
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : "Failed to delete account",
+        err instanceof Error ? err.message : "Couldn't delete account",
       );
     } finally {
       setDeletingId(null);
@@ -127,125 +157,143 @@ export function AccountsView() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-text">Connected</h2>
-          <p className="text-sm text-text-muted">
-            Link banks via Plaid or view imported statement accounts
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {hasPlaidAccounts ? (
-            <button
-              type="button"
-              disabled={syncingAll}
-              onClick={() => void handleSyncAll()}
-              className="inline-flex items-center gap-2 rounded-[var(--radius-card)] border border-border bg-surface px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <SyncIcon className={syncingAll ? "animate-spin" : undefined} />
-              {syncingAll ? "Syncing…" : "Sync all"}
-            </button>
-          ) : null}
-          <PlaidLinkButton
-            onSuccess={handleConnected}
-            onError={(message) => {
-              setStatusMessage(null);
-              setErrorMessage(message);
-            }}
-          />
-        </div>
-      </header>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Your accounts"
+        subtitle="Connect banks or manage imported statements"
+        action={
+          <>
+            {hasPlaidAccounts ? (
+              <button
+                type="button"
+                disabled={syncingAll}
+                onClick={() => void handleSyncAll()}
+                className="inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-surface px-4 py-2.5 text-sm font-semibold text-text transition-opacity hover:opacity-80 disabled:opacity-50 card-shadow"
+              >
+                <SyncIcon className={syncingAll ? "animate-spin" : undefined} />
+                {syncingAll ? "Syncing…" : "Refresh all"}
+              </button>
+            ) : null}
+            <PlaidLinkButton
+              label="Add account"
+              onSuccess={handleConnected}
+              onError={(message) => {
+                setStatusMessage(null);
+                setErrorMessage(message);
+              }}
+            />
+          </>
+        }
+      />
 
       {statusMessage ? (
-        <p className="rounded-[var(--radius-card)] border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
-          {statusMessage}
-        </p>
+        <StatusToast message={statusMessage} variant="success" />
       ) : null}
-
       {errorMessage ? (
-        <p className="rounded-[var(--radius-card)] border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-          {errorMessage}
-        </p>
+        <StatusToast message={errorMessage} variant="error" />
       ) : null}
 
       {isLoading ? (
-        <p className="text-sm text-text-muted">Loading accounts…</p>
+        <p className="text-sm text-text-muted">Loading your accounts…</p>
       ) : null}
 
       {error ? (
-        <p className="text-sm text-danger">Failed to load accounts.</p>
+        <p className="text-sm text-danger">Couldn't load accounts.</p>
       ) : null}
 
       {!isLoading && !error && accounts.length === 0 ? (
-        <div className="rounded-[var(--radius-card)] border border-dashed border-border bg-surface px-6 py-12 text-center">
-          <p className="text-base font-medium text-text">No accounts connected</p>
-          <p className="mt-1 text-sm text-text-muted">
-            Connect your first bank or credit card through Plaid to pull live
-            transactions.
-          </p>
-          <div className="mt-4 flex justify-center">
-            <PlaidLinkButton onSuccess={handleConnected} />
+        <Card padding="lg" className="text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-soft text-2xl">
+            💳
           </div>
-        </div>
+          <p className="mt-4 text-lg font-bold text-text">No accounts yet</p>
+          <p className="mt-1 text-sm text-text-muted">
+            Link your bank or card to see balances and transactions here.
+          </p>
+          <div className="mt-5 flex justify-center">
+            <PlaidLinkButton label="Connect your first account" onSuccess={handleConnected} />
+          </div>
+        </Card>
       ) : null}
 
       {!isLoading && !error && accounts.length > 0 ? (
         <section
           aria-label="Connected accounts"
-          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+          className="grid gap-4 sm:grid-cols-2"
         >
-          {accounts.map((account) => (
+          {accounts.map((account, index) => (
             <article
               key={account.id}
-              className="rounded-[var(--radius-card)] border border-border bg-surface p-4"
+              className="overflow-hidden rounded-[var(--radius-card)] card-shadow"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate font-semibold text-text">
-                    {account.name}
-                  </h3>
-                  <p className="truncate text-sm text-text-muted">
-                    {account.institutionName}
-                    {account.mask ? ` · •••• ${account.mask}` : null}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {account.source === "plaid" ? (
-                    <IconButton
-                      label={`Sync ${account.name}`}
-                      disabled={syncingId === account.id || syncingAll}
-                      onClick={() =>
-                        void handleSyncAccount(account.id, account.name)
-                      }
-                    >
-                      <SyncIcon
-                        className={
-                          syncingId === account.id ? "animate-spin" : undefined
+              <div
+                className="relative p-5 text-text-inverse"
+                style={{
+                  background:
+                    CARD_GRADIENTS[index % CARD_GRADIENTS.length],
+                }}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium uppercase tracking-wide opacity-80">
+                      {account.institutionName}
+                    </p>
+                    <h3 className="mt-1 truncate text-lg font-bold">
+                      {account.name}
+                    </h3>
+                    {account.mask ? (
+                      <p className="mt-0.5 text-sm opacity-80">
+                        •••• {account.mask}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    {account.source === "plaid" ? (
+                      <IconButton
+                        label={`Sync ${account.name}`}
+                        variant="ghost"
+                        disabled={syncingId === account.id || syncingAll}
+                        onClick={() =>
+                          void handleSyncAccount(account.id, account.name)
                         }
-                      />
+                        className="text-white/90 hover:bg-white/20 hover:text-white"
+                      >
+                        <SyncIcon
+                          className={
+                            syncingId === account.id ? "animate-spin" : undefined
+                          }
+                        />
+                      </IconButton>
+                    ) : null}
+                    <IconButton
+                      label={`Delete ${account.name}`}
+                      variant="ghost"
+                      disabled={deletingId === account.id}
+                      onClick={() =>
+                        void handleDeleteAccount(
+                          account.id,
+                          account.name,
+                          account.mask,
+                        )
+                      }
+                      className="text-white/90 hover:bg-white/20 hover:text-white"
+                    >
+                      <TrashIcon />
                     </IconButton>
-                  ) : null}
-                  <IconButton
-                    label={`Delete ${account.name}`}
-                    variant="danger"
-                    disabled={deletingId === account.id}
-                    onClick={() =>
-                      void handleDeleteAccount(
-                        account.id,
-                        account.name,
-                        account.mask,
-                      )
-                    }
-                  >
-                    <TrashIcon />
-                  </IconButton>
+                  </div>
                 </div>
+
+                <p
+                  className="mt-6 text-3xl font-extrabold tracking-tight tabular-nums"
+                  data-money
+                >
+                  {formatMoney(account.balanceCurrent)}
+                </p>
               </div>
 
-              <div className="mt-2">
+              <div className="flex items-center justify-between bg-surface px-5 py-3 text-xs">
                 <span
-                  className={`inline-flex rounded-[var(--radius-pill)] px-2 py-0.5 text-xs font-medium capitalize ${
+                  className={`rounded-[var(--radius-pill)] px-2.5 py-1 font-semibold capitalize ${
                     account.status === "active"
                       ? "bg-success/15 text-success"
                       : account.status === "reauth_required"
@@ -253,37 +301,24 @@ export function AccountsView() {
                         : "bg-danger/15 text-danger"
                   }`}
                 >
-                  {account.source === "plaid" ? "Plaid" : "Import"}
+                  {account.source === "plaid" ? "Live" : "Imported"}
+                </span>
+                <span className="text-text-muted">
+                  {account.lastSyncedAt
+                    ? new Date(account.lastSyncedAt).toLocaleDateString()
+                    : account.source === "import"
+                      ? "From statement"
+                      : "Not synced yet"}
                 </span>
               </div>
-
-              <p
-                className="mt-4 font-mono text-xl font-medium tabular-nums text-text"
-                data-money
-              >
-                {formatMoney(account.balanceCurrent)}
-              </p>
-
-              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-text-muted">
-                <div>
-                  <dt>Type</dt>
-                  <dd className="mt-0.5 capitalize text-text">
-                    {account.subtype ?? account.type}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Last synced</dt>
-                  <dd className="mt-0.5 text-text">
-                    {account.lastSyncedAt
-                      ? new Date(account.lastSyncedAt).toLocaleString()
-                      : account.source === "import"
-                        ? "Statement import"
-                        : "Never"}
-                  </dd>
-                </div>
-              </dl>
             </article>
           ))}
+
+          <PlaidLinkButton
+            label="Add another account"
+            variant="dashed"
+            onSuccess={handleConnected}
+          />
         </section>
       ) : null}
     </div>
