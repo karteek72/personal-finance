@@ -1,0 +1,9 @@
+// Copy to Local.xcconfig (gitignored) to override the default API host.
+//
+// Production (default in Debug/Release xcconfig):
+//   https://spendflow-api.stockpulse.win/api/v1
+//
+// Local backend example:
+// API_BASE_URL = http:/$()/127.0.0.1:4000/api/v1
+//
+GOOGLE_CLIENT_ID = your-ios-client-id.apps.googleusercontent.com

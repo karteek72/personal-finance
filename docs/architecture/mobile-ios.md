@@ -2,7 +2,7 @@
 
 **Product:** SpendFlow  
 **Last Updated:** May 2026  
-**Status:** Planned — `ios/` not scaffolded yet
+**Status:** Phase 1 scaffolded — see `ios/README.md`
 
 ---
 
