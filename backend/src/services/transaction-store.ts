@@ -355,6 +355,165 @@ export async function getTrends(from?: string, to?: string) {
   };
 }
 
+export interface ChartDataParams {
+  from?: string;
+  to?: string;
+  accountId?: string;
+  category?: string;
+}
+
+function buildChartFilters(params: ChartDataParams) {
+  const parts = [sql`TRUE`];
+  if (params.from && params.to) {
+    parts.push(sql`t.date >= ${params.from} AND t.date <= ${params.to}`);
+  }
+  if (params.accountId) {
+    parts.push(sql`t.account_id = ${params.accountId}`);
+  }
+  if (params.category) {
+    parts.push(sql`t.category = ${params.category}`);
+  }
+  return sql.join(parts, sql` AND `);
+}
+
+export async function getChartData(params: ChartDataParams = {}) {
+  const db = getDb();
+  const whereClause = buildChartFilters(params);
+
+  const monthly = await db.execute<{
+    month: string;
+    expenses: string;
+    income: string;
+    net: string;
+  }>(sql`
+    SELECT
+      to_char(date_trunc('month', t.date), 'YYYY-MM') AS month,
+      COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' AND NOT t.is_transfer THEN t.amount::numeric ELSE 0 END), 0)::text AS expenses,
+      COALESCE(SUM(CASE WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS income,
+      COALESCE(SUM(
+        CASE
+          WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric)
+          WHEN t.transaction_type = 'expense' AND NOT t.is_transfer THEN -t.amount::numeric
+          ELSE 0
+        END
+      ), 0)::text AS net
+    FROM transactions t
+    WHERE ${whereClause}
+    GROUP BY date_trunc('month', t.date)
+    ORDER BY month
+  `);
+
+  const categoryRows = await db.execute<{ name: string; amount: string }>(sql`
+    SELECT t.category AS name, SUM(t.amount::numeric)::text AS amount
+    FROM transactions t
+    WHERE ${whereClause}
+      AND t.transaction_type = 'expense'
+      AND NOT t.is_transfer
+    GROUP BY t.category
+    ORDER BY SUM(t.amount::numeric) DESC
+  `);
+
+  const categoryTotal = categoryRows.reduce(
+    (sum, row) => sum + Number.parseFloat(row.amount),
+    0,
+  );
+
+  const accountRows = await db.execute<{
+    id: string;
+    name: string;
+    amount: string;
+  }>(sql`
+    SELECT a.id, a.name, SUM(t.amount::numeric)::text AS amount
+    FROM transactions t
+    JOIN accounts a ON a.id = t.account_id
+    WHERE ${whereClause}
+      AND t.transaction_type = 'expense'
+      AND NOT t.is_transfer
+    GROUP BY a.id, a.name
+    ORDER BY SUM(t.amount::numeric) DESC
+  `);
+
+  const accountTotal = accountRows.reduce(
+    (sum, row) => sum + Number.parseFloat(row.amount),
+    0,
+  );
+
+  const trendRows = await db.execute<{
+    name: string;
+    month: string;
+    amount: string;
+  }>(sql`
+    SELECT
+      t.category AS name,
+      to_char(date_trunc('month', t.date), 'YYYY-MM') AS month,
+      SUM(t.amount::numeric)::text AS amount
+    FROM transactions t
+    WHERE ${whereClause}
+      AND t.transaction_type = 'expense'
+      AND NOT t.is_transfer
+    GROUP BY t.category, date_trunc('month', t.date)
+    ORDER BY t.category, month
+  `);
+
+  const trendsByCategory = new Map<string, { month: string; amount: string }[]>();
+  for (const row of trendRows) {
+    const list = trendsByCategory.get(row.name) ?? [];
+    list.push({ month: row.month, amount: row.amount });
+    trendsByCategory.set(row.name, list);
+  }
+
+  const categoryTrends = [...trendsByCategory.entries()]
+    .sort((a, b) => {
+      const totalA = a[1].reduce(
+        (sum, point) => sum + Number.parseFloat(point.amount),
+        0,
+      );
+      const totalB = b[1].reduce(
+        (sum, point) => sum + Number.parseFloat(point.amount),
+        0,
+      );
+      return totalB - totalA;
+    })
+    .slice(0, params.category ? 1 : 5)
+    .map(([name, months]) => ({ name, months }));
+
+  const expenseTotal = monthly.reduce(
+    (sum, row) => sum + Number.parseFloat(row.expenses),
+    0,
+  );
+  const incomeTotal = monthly.reduce(
+    (sum, row) => sum + Number.parseFloat(row.income),
+    0,
+  );
+
+  return {
+    monthly,
+    byCategory: categoryRows.map((row) => ({
+      name: row.name,
+      amount: row.amount,
+      percentage:
+        categoryTotal > 0
+          ? (Number.parseFloat(row.amount) / categoryTotal) * 100
+          : 0,
+    })),
+    byAccount: accountRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      amount: row.amount,
+      percentage:
+        accountTotal > 0
+          ? (Number.parseFloat(row.amount) / accountTotal) * 100
+          : 0,
+    })),
+    categoryTrends,
+    totals: {
+      expenses: expenseTotal.toFixed(2),
+      income: incomeTotal.toFixed(2),
+      net: (incomeTotal - expenseTotal).toFixed(2),
+    },
+  };
+}
+
 export async function getAlerts() {
   return {
     alerts: [

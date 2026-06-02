@@ -13,6 +13,8 @@ import type { CategoryTotal } from "@/types/api";
 
 interface CategoriesBreakdownProps {
   categories: CategoryTotal[];
+  selectedCategory?: string | null;
+  onSelectCategory?: (category: string | null) => void;
 }
 
 function formatDeltaPercent(delta: number): string {
@@ -20,8 +22,21 @@ function formatDeltaPercent(delta: number): string {
   return `${sign}${delta.toFixed(1)}%`;
 }
 
-export function CategoriesBreakdown({ categories }: CategoriesBreakdownProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+export function CategoriesBreakdown({
+  categories,
+  selectedCategory: controlledCategory,
+  onSelectCategory,
+}: CategoriesBreakdownProps) {
+  const [internalCategory, setInternalCategory] = useState<string | null>(null);
+  const selectedCategory = controlledCategory ?? internalCategory;
+
+  function setSelectedCategory(category: string | null) {
+    if (onSelectCategory) {
+      onSelectCategory(category);
+    } else {
+      setInternalCategory(category);
+    }
+  }
 
   const { data, isLoading, error } = useTransactions({
     category: selectedCategory ?? undefined,
@@ -60,8 +75,8 @@ export function CategoriesBreakdown({ categories }: CategoriesBreakdownProps) {
                 barColor={getCategoryColor(category.name)}
                 selected={selectedCategory === category.name}
                 onClick={() =>
-                  setSelectedCategory((current) =>
-                    current === category.name ? null : category.name,
+                  setSelectedCategory(
+                    selectedCategory === category.name ? null : category.name,
                   )
                 }
               />

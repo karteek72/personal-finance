@@ -3,6 +3,7 @@ import {
   listAccounts as getAccountsFromDb,
   getAlerts,
   getCategories,
+  getChartData,
   getMoneyFlow,
   getSummary,
   getTrends,
@@ -42,6 +43,21 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
   app.get("/transactions/by-category", async (request) => {
     const query = request.query as { from?: string; to?: string };
     return getCategories(query.from, query.to);
+  });
+
+  app.get("/transactions/chart-data", async (request) => {
+    const query = request.query as {
+      from?: string;
+      to?: string;
+      accountId?: string;
+      category?: string;
+    };
+    return getChartData({
+      from: query.from,
+      to: query.to,
+      accountId: query.accountId,
+      category: query.category,
+    });
   });
 
   app.get("/transactions/flow", async (request) => {

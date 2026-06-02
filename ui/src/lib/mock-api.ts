@@ -9,6 +9,7 @@ import type {
   AccountsResponse,
   AlertsResponse,
   CategoriesResponse,
+  ChartDataResponse,
   MoneyFlowResponse,
   PaginatedTransactions,
   TransactionFilters,
@@ -233,4 +234,121 @@ export async function getTrends(
   }));
 
   return { trends };
+}
+
+export async function getChartData(params: {
+  from?: string;
+  to?: string;
+  accountId?: string;
+  category?: string;
+}): Promise<ChartDataResponse> {
+  await delay();
+
+  const accounts = (accountsData as AccountsResponse).accounts;
+  const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
+
+  let items = (transactionsData as PaginatedTransactions).items.filter((tx) => {
+    if (params.from && tx.date < params.from) return false;
+    if (params.to && tx.date > params.to) return false;
+    if (params.accountId && tx.accountId !== params.accountId) return false;
+    if (params.category && tx.category !== params.category) return false;
+    return true;
+  });
+
+  const monthlyMap = new Map<
+    string,
+    { expenses: number; income: number; net: number }
+  >();
+  const categoryMap = new Map<string, number>();
+  const accountMap = new Map<string, number>();
+  const trendMap = new Map<string, Map<string, number>>();
+
+  for (const tx of items) {
+    const month = tx.date.slice(0, 7);
+    const entry = monthlyMap.get(month) ?? { expenses: 0, income: 0, net: 0 };
+    const amount = Number.parseFloat(tx.amount);
+
+    if (tx.transactionType === "expense" && !tx.isTransfer) {
+      entry.expenses += amount;
+      entry.net -= amount;
+      categoryMap.set(tx.category, (categoryMap.get(tx.category) ?? 0) + amount);
+      accountMap.set(tx.accountId, (accountMap.get(tx.accountId) ?? 0) + amount);
+
+      const catTrend = trendMap.get(tx.category) ?? new Map<string, number>();
+      catTrend.set(month, (catTrend.get(month) ?? 0) + amount);
+      trendMap.set(tx.category, catTrend);
+    } else if (tx.transactionType === "income" && !tx.isTransfer) {
+      entry.income += Math.abs(amount);
+      entry.net += Math.abs(amount);
+    }
+
+    monthlyMap.set(month, entry);
+  }
+
+  const monthly = [...monthlyMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, values]) => ({
+      month,
+      expenses: values.expenses.toFixed(2),
+      income: values.income.toFixed(2),
+      net: values.net.toFixed(2),
+    }));
+
+  const categoryTotal = [...categoryMap.values()].reduce((s, v) => s + v, 0);
+  const accountTotal = [...accountMap.values()].reduce((s, v) => s + v, 0);
+
+  const byCategory = [...categoryMap.entries()]
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, amount]) => ({
+      name,
+      amount: amount.toFixed(2),
+      percentage: categoryTotal > 0 ? (amount / categoryTotal) * 100 : 0,
+    }));
+
+  const byAccount = [...accountMap.entries()]
+    .sort(([, a], [, b]) => b - a)
+    .map(([id, amount]) => ({
+      id,
+      name: accountNames.get(id) ?? "Account",
+      amount: amount.toFixed(2),
+      percentage: accountTotal > 0 ? (amount / accountTotal) * 100 : 0,
+    }));
+
+  const categoryTrends = [...trendMap.entries()]
+    .sort(([, a], [, b]) => {
+      const totalA = [...a.values()].reduce((s, v) => s + v, 0);
+      const totalB = [...b.values()].reduce((s, v) => s + v, 0);
+      return totalB - totalA;
+    })
+    .slice(0, params.category ? 1 : 5)
+    .map(([name, monthsMap]) => ({
+      name,
+      months: [...monthsMap.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, amount]) => ({
+          month,
+          amount: amount.toFixed(2),
+        })),
+    }));
+
+  const expenseTotal = monthly.reduce(
+    (s, row) => s + Number.parseFloat(row.expenses),
+    0,
+  );
+  const incomeTotal = monthly.reduce(
+    (s, row) => s + Number.parseFloat(row.income),
+    0,
+  );
+
+  return {
+    monthly,
+    byCategory,
+    byAccount,
+    categoryTrends,
+    totals: {
+      expenses: expenseTotal.toFixed(2),
+      income: incomeTotal.toFixed(2),
+      net: (incomeTotal - expenseTotal).toFixed(2),
+    },
+  };
 }

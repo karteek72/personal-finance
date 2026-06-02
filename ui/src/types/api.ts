@@ -150,6 +150,45 @@ export interface TrendsResponse {
   trends: CategoryTrend[];
 }
 
+export interface ChartMonthlyPoint {
+  month: string;
+  expenses: string;
+  income: string;
+  net: string;
+}
+
+export interface ChartCategorySlice {
+  name: string;
+  amount: string;
+  percentage: number;
+}
+
+export interface ChartAccountSlice {
+  id: string;
+  name: string;
+  amount: string;
+  percentage: number;
+}
+
+export interface ChartDataResponse {
+  monthly: ChartMonthlyPoint[];
+  byCategory: ChartCategorySlice[];
+  byAccount: ChartAccountSlice[];
+  categoryTrends: CategoryTrend[];
+  totals: {
+    expenses: string;
+    income: string;
+    net: string;
+  };
+}
+
+export interface ChartDataFilters {
+  from?: string;
+  to?: string;
+  accountId?: string;
+  category?: string;
+}
+
 export interface TransactionFilters {
   month?: string;
   category?: string;

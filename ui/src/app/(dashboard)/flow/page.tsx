@@ -1,4 +1,4 @@
-import { TrendChart } from "@/components/charts/trend-chart";
+import { FlowAnalyticsPanel } from "@/components/charts/flow-analytics-panel";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { api } from "@/lib/api-client";
@@ -7,14 +7,6 @@ import { formatMoney } from "@/lib/format-money";
 function yearToDateRange(): { from: string; to: string } {
   const year = new Date().getFullYear();
   return { from: `${year}-01-01`, to: `${year}-12-31` };
-}
-
-function formatMonthLabel(month: string): string {
-  const [, monthPart] = month.split("-");
-  const monthIndex = Number.parseInt(monthPart ?? "1", 10) - 1;
-  return new Date(2000, monthIndex, 1).toLocaleString("en-US", {
-    month: "short",
-  });
 }
 
 interface FlowColumnProps {
@@ -67,24 +59,11 @@ export default async function MoneyFlowPage() {
   const { from, to } = yearToDateRange();
   const flow = await api.getMoneyFlow(from, to);
 
-  const labels = flow.monthlySeries.map((point) =>
-    formatMonthLabel(point.month),
-  );
-  const incomeData = flow.monthlySeries.map((point) =>
-    Number.parseFloat(point.income),
-  );
-  const expenseData = flow.monthlySeries.map((point) =>
-    Number.parseFloat(point.expenses),
-  );
-  const netData = flow.monthlySeries.map((point) =>
-    Number.parseFloat(point.net),
-  );
-
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Money flow"
-        subtitle="Income in, spending out — see how it balances"
+        subtitle="Filter charts by account or category"
       />
 
       <Card className="border-success/20 bg-success/10">
@@ -121,20 +100,7 @@ export default async function MoneyFlowPage() {
         />
       </section>
 
-      <section aria-label="Income vs expenses" className="grid gap-5 lg:grid-cols-3">
-        <div>
-          <h3 className="mb-3 text-sm font-bold text-text">Income</h3>
-          <TrendChart labels={labels} data={incomeData} label="Income" />
-        </div>
-        <div>
-          <h3 className="mb-3 text-sm font-bold text-text">Expenses</h3>
-          <TrendChart labels={labels} data={expenseData} label="Expenses" />
-        </div>
-        <div>
-          <h3 className="mb-3 text-sm font-bold text-text">Net</h3>
-          <TrendChart labels={labels} data={netData} label="Net" />
-        </div>
-      </section>
+      <FlowAnalyticsPanel />
     </div>
   );
 }

@@ -3,6 +3,8 @@ import type {
   AccountsResponse,
   AlertsResponse,
   CategoriesResponse,
+  ChartDataFilters,
+  ChartDataResponse,
   DeleteAccountResponse,
   MoneyFlowResponse,
   PaginatedTransactions,
@@ -154,6 +156,20 @@ export const api = {
     }
     return fetchJson<TrendsResponse>(
       `/insights/trends${buildQuery({ from, to })}`,
+    );
+  },
+
+  getChartData(filters: ChartDataFilters = {}): Promise<ChartDataResponse> {
+    if (USE_MOCKS) {
+      return mockApi.getChartData(filters);
+    }
+    return fetchJson<ChartDataResponse>(
+      `/transactions/chart-data${buildQuery({
+        from: filters.from,
+        to: filters.to,
+        accountId: filters.accountId,
+        category: filters.category,
+      })}`,
     );
   },
 
