@@ -57,7 +57,7 @@ services:
       PORT: "4000"
       DATABASE_URL: ${DATABASE_URL}
       APP_URL: ${SPENDFLOW_API_PUBLIC_URL:-http://localhost:4000}
-      CORS_ORIGIN: ${SPENDFLOW_UI_PUBLIC_URL:-http://localhost:3000}
+      CORS_ORIGIN: ${SPENDFLOW_UI_PUBLIC_URL:-http://localhost:3005}
       CORS_ORIGINS: ${CORS_ORIGINS}
       AUTH_ALLOW_DEV_USER: ${AUTH_ALLOW_DEV_USER:-false}
       PLAID_CLIENT_ID: ${PLAID_CLIENT_ID}
@@ -104,9 +104,9 @@ services:
       api:
         condition: service_started
     ports:
-      - "${SPENDFLOW_HOST:-0.0.0.0}:${SPENDFLOW_UI_PORT:-3000}:3000"
+      - "${SPENDFLOW_HOST:-0.0.0.0}:${SPENDFLOW_UI_PORT:-3005}:3005"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3005/"]
       interval: 30s
       timeout: 5s
       retries: 3
