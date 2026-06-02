@@ -1,6 +1,25 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { isGoogleAuthEnabled, requiresSignIn } from "@/lib/auth-session";
+import { useAuthStore } from "@/stores/auth-store";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const status = useAuthStore((s) => s.status);
+  const googleEnabled = isGoogleAuthEnabled();
+
+  useEffect(() => {
+    if (!requiresSignIn()) return;
+    if (status === "authenticated") {
+      router.replace("/");
+    }
+  }, [router, status]);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm rounded-[var(--radius-lg)] bg-surface p-8 card-shadow">
@@ -12,45 +31,58 @@ export default function LoginPage() {
           Sign in to pick up where you left off
         </p>
 
-        <form className="mt-6 flex flex-col gap-4" action="#" method="post">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="email" className="text-xs font-semibold text-text-muted">
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="rounded-[var(--radius-sm)] border-0 bg-bg px-4 py-3 text-sm text-text outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </div>
+        <div className="mt-6">
+          <GoogleSignInButton />
+        </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="password"
-              className="text-xs font-semibold text-text-muted"
+        {googleEnabled ? (
+          <p className="mt-6 text-center text-xs text-text-muted">
+            Email and password sign-in is coming soon.
+          </p>
+        ) : (
+          <form className="mt-6 flex flex-col gap-4" action="#" method="post">
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="email"
+                className="text-xs font-semibold text-text-muted"
+              >
+                Email
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="rounded-[var(--radius-sm)] border-0 bg-bg px-4 py-3 text-sm text-text outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="password"
+                className="text-xs font-semibold text-text-muted"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="rounded-[var(--radius-sm)] border-0 bg-bg px-4 py-3 text-sm text-text outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="mt-2 rounded-[var(--radius-pill)] bg-primary px-4 py-3 text-sm font-semibold text-text-inverse transition-opacity hover:opacity-90"
             >
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="rounded-[var(--radius-sm)] border-0 bg-bg px-4 py-3 text-sm text-text outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="mt-2 rounded-[var(--radius-pill)] bg-primary px-4 py-3 text-sm font-semibold text-text-inverse transition-opacity hover:opacity-90"
-          >
-            Sign in
-          </button>
-        </form>
+              Sign in
+            </button>
+          </form>
+        )}
 
         <p className="mt-5 text-center text-sm text-text-muted">
           New here?{" "}

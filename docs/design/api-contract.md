@@ -28,6 +28,7 @@ HTTP status codes: `200` success, `201` created, `204` no content, `400` validat
 
 | Method | Path | Body | Response |
 |--------|------|------|----------|
+| POST | `/auth/google` | `{ idToken }` | `{ user, accessToken, refreshToken }` |
 | POST | `/auth/register` | `{ email, password }` | `{ user, accessToken, refreshToken }` |
 | POST | `/auth/login` | `{ email, password }` | `{ user, accessToken, refreshToken }` |
 | POST | `/auth/refresh` | `{ refreshToken }` | `{ accessToken, refreshToken }` |

@@ -1,7 +1,19 @@
 export interface User {
   id: string;
   email: string;
+  displayName: string | null;
   createdAt: string;
+}
+
+export interface AuthSessionResponse {
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface AuthRefreshResponse {
+  accessToken: string;
+  refreshToken: string;
 }
 
 export interface Account {

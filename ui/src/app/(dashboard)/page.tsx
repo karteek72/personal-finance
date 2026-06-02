@@ -20,10 +20,19 @@ function getGreeting(): string {
 export default async function DashboardPage() {
   const { from, to } = yearToDateRange();
 
-  const [summary, alerts] = await Promise.all([
-    api.getSummary(from, to),
-    api.getAlerts(),
-  ]);
+  let summary: Awaited<ReturnType<typeof api.getSummary>>;
+  let alerts: Awaited<ReturnType<typeof api.getAlerts>>;
+
+  try {
+    [summary, alerts] = await Promise.all([
+      api.getSummary(from, to),
+      api.getAlerts(),
+    ]);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Failed to load dashboard data";
+    throw new Error(message);
+  }
 
   const netSavings = Number.parseFloat(summary.netSavings);
   const isPositive = netSavings >= 0;

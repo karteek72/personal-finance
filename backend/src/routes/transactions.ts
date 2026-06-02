@@ -11,16 +11,24 @@ import {
   transactionCount,
 } from "../services/transaction-store.js";
 import { resolveScopedAccountIds } from "../services/household-store.js";
-import { getOrCreateDevUser } from "../services/user-store.js";
+import { requireRequestUser } from "../lib/auth-http.js";
+import type { Env } from "../config/env.js";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { getAccounts as getMockAccounts } from "../services/mock-data.js";
 
 type ViewScope = "all" | "household" | "personal";
 
-async function resolveScopeFilters(query: {
-  scope?: string;
-  memberId?: string;
-}) {
-  const user = await getOrCreateDevUser();
+async function resolveScopeFilters(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  env: Env,
+  query: {
+    scope?: string;
+    memberId?: string;
+  },
+) {
+  const user = await requireRequestUser(request, reply, env);
+  if (!user) return null;
   const scope = (query.scope as ViewScope | undefined) ?? "all";
   const scopedAccountIds = await resolveScopedAccountIds(
     user.id,
@@ -36,9 +44,15 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
     return getSummary(query.from, query.to);
   });
 
-  app.get("/transactions", async (request) => {
+  app.get("/transactions", async (request, reply) => {
     const query = request.query as Record<string, string | undefined>;
-    const scopedAccountIds = await resolveScopeFilters(query);
+    const scopedAccountIds = await resolveScopeFilters(
+      request,
+      reply,
+      app.config.env,
+      query,
+    );
+    if (scopedAccountIds === null) return;
 
     return listTransactions({
       month: query.month,
@@ -66,7 +80,7 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
     return getCategories(query.from, query.to);
   });
 
-  app.get("/transactions/chart-data", async (request) => {
+  app.get("/transactions/chart-data", async (request, reply) => {
     const query = request.query as {
       from?: string;
       to?: string;
@@ -75,7 +89,13 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
       scope?: string;
       memberId?: string;
     };
-    const scopedAccountIds = await resolveScopeFilters(query);
+    const scopedAccountIds = await resolveScopeFilters(
+      request,
+      reply,
+      app.config.env,
+      query,
+    );
+    if (scopedAccountIds === null) return;
 
     return getChartData({
       from: query.from,

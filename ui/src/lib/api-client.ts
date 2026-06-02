@@ -1,5 +1,8 @@
 import * as mockApi from "@/lib/mock-api";
+import { getAccessToken } from "@/lib/auth-session";
 import type {
+  AuthRefreshResponse,
+  AuthSessionResponse,
   AccountsResponse,
   AlertsResponse,
   CategoriesResponse,
@@ -37,11 +40,18 @@ function buildQuery(params: Record<string, string | number | undefined>): string
   return query ? `?${query}` : "";
 }
 
+function authHeaders(): Record<string, string> {
+  const token = getAccessToken();
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
+
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
+      ...authHeaders(),
       ...init?.headers,
     },
   });
@@ -63,6 +73,22 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  signInWithGoogle(idToken: string): Promise<AuthSessionResponse> {
+    return fetchJson<AuthSessionResponse>("/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
+  },
+
+  refreshSession(refreshToken: string): Promise<AuthRefreshResponse> {
+    return fetchJson<AuthRefreshResponse>("/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+  },
+
   getSummary(from?: string, to?: string): Promise<TransactionSummary> {
     if (USE_MOCKS) {
       return mockApi.getSummary(from, to);

@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { deleteAccount, getAccount } from "../services/account-store.js";
 import { syncPlaidItem } from "../services/plaid/sync.js";
-import { getOrCreateDevUser } from "../services/user-store.js";
+import { requireRequestUser } from "../lib/auth-http.js";
 import { listAccounts } from "../services/transaction-store.js";
 
 export const accountRoutes: FastifyPluginAsync = async (app) => {
@@ -11,7 +11,8 @@ export const accountRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/accounts/:accountId", async (request, reply) => {
     const { accountId } = request.params as { accountId: string };
-    const user = await getOrCreateDevUser();
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
 
     const result = await deleteAccount(accountId, user.id);
     if (!result) {
@@ -25,7 +26,8 @@ export const accountRoutes: FastifyPluginAsync = async (app) => {
 
   app.post("/accounts/:accountId/sync", async (request, reply) => {
     const { accountId } = request.params as { accountId: string };
-    const user = await getOrCreateDevUser();
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const account = await getAccount(accountId, user.id);
 
     if (!account) {

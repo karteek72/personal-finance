@@ -1,6 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { runMigrations } from "../db/migrate.js";
 import {
   getPlaidClient,
   parseCountryCodes,
@@ -13,7 +12,7 @@ import {
   syncAllPlaidItems,
 } from "../services/plaid/item-store.js";
 import { syncPlaidItem } from "../services/plaid/sync.js";
-import { getOrCreateDevUser } from "../services/user-store.js";
+import { requireRequestUser } from "../lib/auth-http.js";
 import { getPlaidAccountsResponse } from "./transactions.js";
 
 const linkTokenBodySchema = z.object({
@@ -37,8 +36,6 @@ function resolvePlaidRedirectUri(env: {
 }
 
 export const plaidRoutes: FastifyPluginAsync = async (app) => {
-  await runMigrations(app.config.env.DATABASE_URL);
-
   app.post("/plaid/link-token", async (request, reply) => {
     const body = linkTokenBodySchema.safeParse(request.body ?? {});
     if (!body.success) {
@@ -48,7 +45,8 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
     }
 
     try {
-      const user = await getOrCreateDevUser();
+      const user = await requireRequestUser(request, reply, app.config.env);
+      if (!user) return;
       const client = getPlaidClient(app.config.env);
       const linkTokenRequest: Parameters<typeof client.linkTokenCreate>[0] = {
         user: { client_user_id: user.id },
@@ -91,7 +89,8 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
     }
 
     try {
-      const user = await getOrCreateDevUser();
+      const user = await requireRequestUser(request, reply, app.config.env);
+      if (!user) return;
       const client = getPlaidClient(app.config.env);
       const response = await client.itemPublicTokenExchange({
         public_token: body.data.publicToken,
@@ -124,15 +123,17 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/plaid/accounts", async () => getPlaidAccountsResponse());
 
-  app.get("/plaid/items", async () => {
-    const user = await getOrCreateDevUser();
+  app.get("/plaid/items", async (request, reply) => {
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const items = await listPlaidItems(user.id);
     return { items };
   });
 
-  app.post("/plaid/sync", async (_request, reply) => {
+  app.post("/plaid/sync", async (request, reply) => {
     try {
-      const user = await getOrCreateDevUser();
+      const user = await requireRequestUser(request, reply, app.config.env);
+      if (!user) return;
       const result = await syncAllPlaidItems(user.id, app.config.env);
       return result;
     } catch (error) {
@@ -150,7 +151,8 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
     const params = request.params as { itemId: string };
 
     try {
-      const user = await getOrCreateDevUser();
+      const user = await requireRequestUser(request, reply, app.config.env);
+      if (!user) return;
       const items = await listPlaidItems(user.id);
       const item = items.find(
         (row) => row.id === params.itemId || row.plaidItemId === params.itemId,
@@ -177,7 +179,8 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/plaid/items/:itemId", async (request, reply) => {
     const params = request.params as { itemId: string };
-    const user = await getOrCreateDevUser();
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const items = await listPlaidItems(user.id);
     const item = items.find(
       (row) => row.id === params.itemId || row.plaidItemId === params.itemId,

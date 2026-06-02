@@ -21,6 +21,15 @@ const envSchema = z.object({
   DATABASE_URL: z
     .string()
     .default("postgresql://spendflow:spendflow@localhost:5433/spendflow"),
+  JWT_SECRET: z.string().min(16).optional(),
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_IDS: z.string().optional(),
+  /** OAuth client secret (optional; ID-token sign-in does not require it). */
+  GOOGLE_SECRET_KEY: z.string().min(1).optional(),
+  AUTH_ALLOW_DEV_USER: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
 });
 
 export type Env = z.infer<typeof envSchema>;

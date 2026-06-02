@@ -9,13 +9,21 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  email: text("email").notNull().unique(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull().unique(),
+    googleSub: text("google_sub"),
+    displayName: text("display_name"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("users_google_sub_idx").on(table.googleSub),
+  ],
+);
 
 export const plaidItems = pgTable("plaid_items", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -1,6 +1,8 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { loadEnv, type Env } from "./config/env.js";
+import { runMigrations } from "./db/migrate.js";
+import { authRoutes } from "./routes/auth.js";
 import { householdRoutes } from "./routes/households.js";
 import { healthRoutes } from "./routes/health.js";
 import { accountRoutes } from "./routes/accounts.js";
@@ -27,6 +29,8 @@ async function main(): Promise<void> {
 
   app.decorate("config", { env });
 
+  await runMigrations(env.DATABASE_URL);
+
   const allowedOrigins = env.CORS_ORIGINS
     ? env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
     : [env.CORS_ORIGIN];
@@ -49,6 +53,7 @@ async function main(): Promise<void> {
     credentials: true,
   });
 
+  await app.register(authRoutes, { prefix: "/api/v1" });
   await app.register(householdRoutes, { prefix: "/api/v1" });
   await app.register(healthRoutes, { prefix: "/api/v1" });
   await app.register(accountRoutes, { prefix: "/api/v1" });

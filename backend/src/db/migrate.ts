@@ -2,9 +2,16 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import postgres from "postgres";
 
-const MIGRATION_FILES = ["0000_init.sql", "0001_plaid.sql", "0002_households.sql"];
+const MIGRATION_FILES = [
+  "0000_init.sql",
+  "0001_plaid.sql",
+  "0002_households.sql",
+  "0003_google_auth.sql",
+];
 
-export async function runMigrations(databaseUrl?: string): Promise<void> {
+let migrationPromise: Promise<void> | null = null;
+
+async function runMigrationsOnce(databaseUrl?: string): Promise<void> {
   const url =
     databaseUrl ??
     process.env.DATABASE_URL ??
@@ -58,4 +65,10 @@ export async function runMigrations(databaseUrl?: string): Promise<void> {
   }
 
   await sqlClient.end({ timeout: 5 });
+}
+
+/** Runs pending SQL migrations once per process (safe if multiple routes import this). */
+export function runMigrations(databaseUrl?: string): Promise<void> {
+  migrationPromise ??= runMigrationsOnce(databaseUrl);
+  return migrationPromise;
 }

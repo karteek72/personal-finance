@@ -1,6 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { runMigrations } from "../db/migrate.js";
 import {
   assignAccountToMember,
   createHouseholdMember,
@@ -10,7 +9,7 @@ import {
   updateHouseholdMember,
   updateHouseholdName,
 } from "../services/household-store.js";
-import { getOrCreateDevUser } from "../services/user-store.js";
+import { requireRequestUser } from "../lib/auth-http.js";
 
 const createMemberSchema = z.object({
   displayName: z.string().min(1).max(80),
@@ -31,10 +30,9 @@ const assignAccountSchema = z.object({
 });
 
 export const householdRoutes: FastifyPluginAsync = async (app) => {
-  await runMigrations(app.config.env.DATABASE_URL);
-
-  app.get("/household", async () => {
-    const user = await getOrCreateDevUser();
+  app.get("/household", async (request, reply) => {
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     return getHouseholdDetails(user.id);
   });
 
@@ -46,7 +44,8 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const user = await getOrCreateDevUser();
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const updated = await updateHouseholdName(user.id, body.data.name);
     return {
       id: updated.id,
@@ -55,8 +54,9 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
-  app.get("/household/insights", async () => {
-    const user = await getOrCreateDevUser();
+  app.get("/household/insights", async (request, reply) => {
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     return getHouseholdInsights(user.id);
   });
 
@@ -68,7 +68,8 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const user = await getOrCreateDevUser();
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const member = await createHouseholdMember(user.id, body.data);
     return member;
   });
@@ -82,7 +83,8 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const user = await getOrCreateDevUser();
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const updated = await updateHouseholdMember(user.id, memberId, body.data);
     if (!updated) {
       return reply.status(404).send({
@@ -94,7 +96,8 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/household/members/:memberId", async (request, reply) => {
     const { memberId } = request.params as { memberId: string };
-    const user = await getOrCreateDevUser();
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const deleted = await deleteHouseholdMember(user.id, memberId);
     if (!deleted) {
       return reply.status(404).send({
@@ -113,7 +116,8 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const user = await getOrCreateDevUser();
+    const user = await requireRequestUser(request, reply, app.config.env);
+    if (!user) return;
     const result = await assignAccountToMember(
       user.id,
       accountId,
