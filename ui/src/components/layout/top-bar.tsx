@@ -1,6 +1,7 @@
 "use client";
 
 import { useTheme } from "@/hooks/use-theme";
+import { UserMenu } from "@/components/layout/user-menu";
 
 interface TopBarProps {
   title: string;
@@ -60,6 +61,7 @@ export function TopBar({ title }: TopBarProps) {
           <span className="hidden rounded-[var(--radius-pill)] bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary sm:inline">
             {year}
           </span>
+          <UserMenu />
           <button
             type="button"
             onClick={toggleTheme}

@@ -2,7 +2,11 @@
 
 import clsx from "clsx";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { api } from "@/lib/api-client";
+import { useAuthStore } from "@/stores/auth-store";
 
 const navItems = [
   { href: "/", label: "Home" },
@@ -94,9 +98,29 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const user = useAuthStore((s) => s.user);
+  const status = useAuthStore((s) => s.status);
+  const hydrated = useAuthStore((s) => s.hydrated);
+  const clearSession = useAuthStore((s) => s.clearSession);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const showAccount = hydrated && status === "authenticated" && user;
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await api.signOut();
+    } catch {
+      // Clear local session even if the API call fails.
+    } finally {
+      clearSession();
+      router.push("/login");
+    }
+  }
 
   return (
-    <aside className="hidden h-full w-[220px] shrink-0 flex-col px-4 py-6 md:flex">
+    <aside className="hidden h-full w-[220px] shrink-0 flex-col px-4 py-6 md:flex md:flex-col">
       <Link href="/" className="mb-8 px-3">
         <span className="text-xl font-extrabold tracking-tight text-gradient">
           SpendFlow
@@ -128,9 +152,24 @@ export function Sidebar() {
         })}
       </nav>
 
-      <p className="px-3 text-xs text-text-muted">
-        Your money, minus the stress
-      </p>
+      <div className="mt-auto flex flex-col gap-2 px-3">
+        {showAccount ? (
+          <>
+            <p className="truncate text-xs font-semibold text-text">
+              {user.displayName ?? user.email}
+            </p>
+            <button
+              type="button"
+              disabled={signingOut}
+              onClick={() => void handleSignOut()}
+              className="rounded-[var(--radius-sm)] px-2 py-2 text-left text-sm font-semibold text-text-muted transition-colors hover:bg-surface hover:text-danger disabled:opacity-60"
+            >
+              {signingOut ? "Signing out…" : "Sign out"}
+            </button>
+          </>
+        ) : null}
+        <p className="text-xs text-text-muted">Your money, minus the stress</p>
+      </div>
     </aside>
   );
 }

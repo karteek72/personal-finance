@@ -42,6 +42,17 @@ export function writeAuthSession(session: StoredAuthSession): void {
 export function clearAuthSession(): void {
   localStorage.removeItem(STORAGE_KEY);
   document.cookie = `${ACCESS_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+  revokeGoogleAutoSelect();
+}
+
+export function revokeGoogleAutoSelect(): void {
+  if (typeof window === "undefined") return;
+  const idApi = (
+    window as Window & {
+      google?: { accounts?: { id?: { disableAutoSelect?: () => void } } };
+    }
+  ).google?.accounts?.id;
+  idApi?.disableAutoSelect?.();
 }
 
 export function hasStoredSession(): boolean {

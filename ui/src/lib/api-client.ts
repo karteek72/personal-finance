@@ -81,6 +81,19 @@ export const api = {
     });
   },
 
+  async signOut(): Promise<void> {
+    const response = await fetch(`${getBaseUrl()}/auth/logout`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        ...authHeaders(),
+      },
+    });
+    if (!response.ok && response.status !== 204) {
+      throw new Error("Sign out failed");
+    }
+  },
+
   refreshSession(refreshToken: string): Promise<AuthRefreshResponse> {
     return fetchJson<AuthRefreshResponse>("/auth/refresh", {
       method: "POST",
