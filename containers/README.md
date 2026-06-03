@@ -94,7 +94,7 @@ cp containers/env.example containers/.env
 | UI | http://localhost:3002 |
 | API | http://localhost:4000/api/v1/health |
 | Postgres | `127.0.0.1:5433` (user/db from `containers/.env`, volume `spendflow-pgdata`) |
-| Redis | `127.0.0.1:6379` (volume `spendflow-redisdata`) |
+| Redis | `127.0.0.1:6380` (volume `spendflow-redisdata`; host port avoids clashing with other local Redis on 6379) |
 
 Log files: `logs/dev/api.log`, `logs/dev/ui.log`.
 
