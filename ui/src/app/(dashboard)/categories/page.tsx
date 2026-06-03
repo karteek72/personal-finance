@@ -1,11 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import clsx from "clsx";
 import { CategoryAnalyticsPanel } from "@/components/charts/category-analytics-panel";
 import { AsyncPanel } from "@/components/ui/async-panel";
 import { PageHeader } from "@/components/ui/page-header";
 import { useCategories } from "@/hooks/use-categories";
-import { useMoneyFlow } from "@/hooks/use-money-flow";
+import { useChartData } from "@/hooks/use-chart-data";
 import { formatMoney } from "@/lib/format-money";
 
 /* ─── Monthly cash-flow card ─────────────────────────────────────── */
@@ -50,7 +51,7 @@ function MonthCard({ month, income, expenses, net, maxIncome }: MonthCardProps) 
         </div>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-border/40">
           <div
-            className="h-full rounded-full bg-success"
+            className="h-full rounded-full bg-success transition-all duration-500"
             style={{ width: `${incW}%` }}
           />
         </div>
@@ -65,7 +66,7 @@ function MonthCard({ month, income, expenses, net, maxIncome }: MonthCardProps) 
         </div>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-border/40">
           <div
-            className="h-full rounded-full bg-danger"
+            className="h-full rounded-full bg-danger transition-all duration-500"
             style={{ width: `${expW}%` }}
           />
         </div>
@@ -92,12 +93,18 @@ function MonthCard({ month, income, expenses, net, maxIncome }: MonthCardProps) 
 
 /* ─── Monthly flow strip ─────────────────────────────────────────── */
 
-function MonthlyFlowStrip() {
-  const { data: flow } = useMoneyFlow();
+interface MonthlyFlowStripProps {
+  accountId?: string;
+}
 
-  if (!flow?.monthlySeries?.length) return null;
+function MonthlyFlowStrip({ accountId }: MonthlyFlowStripProps) {
+  // Reuse the same useChartData call that CategoryAnalyticsPanel makes —
+  // React Query deduplicates requests with identical keys.
+  const { data } = useChartData({ accountId: accountId || undefined });
 
-  const maxIncome = flow.monthlySeries.reduce(
+  if (!data?.monthly?.length) return null;
+
+  const maxIncome = data.monthly.reduce(
     (max, m) => Math.max(max, Number.parseFloat(m.income)),
     0,
   );
@@ -106,9 +113,14 @@ function MonthlyFlowStrip() {
     <section aria-label="Monthly cash flow overview">
       <h3 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-text-muted">
         Monthly overview
+        {accountId ? (
+          <span className="ml-1.5 font-normal normal-case text-text-muted/70">
+            · filtered by account
+          </span>
+        ) : null}
       </h3>
       <div className="flex gap-3 overflow-x-auto pb-1">
-        {flow.monthlySeries.map((m) => (
+        {data.monthly.map((m) => (
           <MonthCard
             key={m.month}
             month={m.month}
@@ -127,6 +139,8 @@ function MonthlyFlowStrip() {
 
 export default function CategoriesPage() {
   const { data, isLoading, isFetching, error } = useCategories();
+  // Lifted up so MonthlyFlowStrip and CategoryAnalyticsPanel share the same filter
+  const [selectedAccountId, setSelectedAccountId] = useState("");
 
   return (
     <AsyncPanel
@@ -142,11 +156,13 @@ export default function CategoriesPage() {
           subtitle="Month-by-month overview, then drill into categories"
         />
 
-        {/* Monthly cash-flow strip — loads independently */}
-        <MonthlyFlowStrip />
+        {/* Monthly strip — filters with account selection */}
+        <MonthlyFlowStrip accountId={selectedAccountId} />
 
         <CategoryAnalyticsPanel
           initialCategories={data?.categories ?? []}
+          selectedAccountId={selectedAccountId}
+          onAccountChange={setSelectedAccountId}
         />
       </div>
     </AsyncPanel>
