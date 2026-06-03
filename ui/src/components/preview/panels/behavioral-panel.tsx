@@ -4,15 +4,6 @@ import { useMemo, useState } from "react";
 
 import { useBehavioral } from "@/hooks/use-features";
 
-const PREVIEW_BANNER = (
-  <div className="mb-5 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
-      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-    </svg>
-    <span><strong>Preview</strong> — Transaction tagging &amp; true-cost calculators are illustrative.</span>
-  </div>
-);
-
 const FALLBACK_CHALLENGES = [
   { title: "Dining budget cut", goal: "Reduce dining by 20% this month", progress: 62, days: 18, color: "#f97316", complete: false },
   { title: "No impulse over $50", goal: "Wait 24h before any purchase >$50", progress: 85, days: 6, color: "#22c55e", complete: false },
@@ -129,8 +120,6 @@ export function BehavioralPanel() {
 
   return (
     <div className="space-y-5">
-      {PREVIEW_BANNER}
-
       {/* Spending personality */}
       <div className="rounded-[var(--radius-lg)] p-5" style={{ background: "var(--gradient-hero)" }}>
         <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Your spending archetype</p>

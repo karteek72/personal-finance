@@ -43,20 +43,20 @@ export function TopBar({ title }: TopBarProps) {
   const isFetching = useIsFetching() > 0;
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between gap-4 px-4 py-3 md:px-5 md:py-4">
+    <header className="sticky top-0 z-20 flex min-w-0 items-center justify-between gap-2 px-4 py-3 md:gap-4 md:px-5 md:py-4">
       {/* Left: title (mobile only) + fetch spinner */}
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         {isFetching ? (
           <LoadingSpinner size="sm" label="Updating data" className="shrink-0" />
         ) : null}
         {/* Page title: visible on mobile only — desktop sidebar provides navigation context */}
-        <h1 className="text-xl font-bold tracking-tight text-text md:hidden">
+        <h1 className="truncate text-lg font-bold tracking-tight text-text sm:text-xl md:hidden">
           {title}
         </h1>
       </div>
 
       {/* Right: actions */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1">
         <NotificationBell />
         <UserMenu />
         <button

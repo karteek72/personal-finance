@@ -274,8 +274,10 @@ spendflow_load_dev_env() {
   export SPENDFLOW_DEV_API_PORT="${SPENDFLOW_DEV_API_PORT:-4000}"
   export SPENDFLOW_DEV_UI_PORT="${SPENDFLOW_DEV_UI_PORT:-3002}"
   export POSTGRES_HOST_PORT="${POSTGRES_HOST_PORT:-5433}"
+  export REDIS_HOST_PORT="${REDIS_HOST_PORT:-6379}"
 
   export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@127.0.0.1:${POSTGRES_HOST_PORT}/${POSTGRES_DB:-spendflow}"
+  export REDIS_URL="redis://127.0.0.1:${REDIS_HOST_PORT}"
   export PORT="${SPENDFLOW_DEV_API_PORT}"
   export NODE_ENV=development
   export AUTH_ALLOW_DEV_USER="${AUTH_ALLOW_DEV_USER:-true}"
@@ -292,16 +294,30 @@ spendflow_load_dev_env() {
   spendflow_ensure_jwt_secret
 }
 
-spendflow_dev_start_postgres() {
+spendflow_dev_start_infra() {
   export SPENDFLOW_COMPOSE_PROFILE=bundled-db
-  echo "==> Starting Postgres (container) on 127.0.0.1:${POSTGRES_HOST_PORT:-5433}"
-  spendflow_compose up -d postgres
+  spendflow_prepare_postgres
+  echo "==> Starting Postgres + Redis (containers on spendflow-net)"
+  echo "    Postgres: 127.0.0.1:${POSTGRES_HOST_PORT} (volume spendflow-pgdata)"
+  echo "    Redis:    127.0.0.1:${REDIS_HOST_PORT} (volume spendflow-redisdata)"
+  spendflow_compose up -d postgres redis
   spendflow_wait_container_healthy spendflow-postgres 90
+  spendflow_wait_container_healthy spendflow-redis 60
+  echo "    DATABASE_URL=${DATABASE_URL}"
+  echo "    REDIS_URL=${REDIS_URL}"
+}
+
+spendflow_dev_start_postgres() {
+  spendflow_dev_start_infra
+}
+
+spendflow_dev_stop_infra() {
+  export SPENDFLOW_COMPOSE_PROFILE=bundled-db
+  spendflow_compose stop postgres redis 2>/dev/null || true
 }
 
 spendflow_dev_stop_postgres() {
-  export SPENDFLOW_COMPOSE_PROFILE=bundled-db
-  spendflow_compose stop postgres 2>/dev/null || true
+  spendflow_dev_stop_infra
 }
 
 spendflow_dev_pid_file() {
@@ -373,7 +389,7 @@ spendflow_dev_start_api() {
   echo "==> Starting backend on http://localhost:${SPENDFLOW_DEV_API_PORT} (log: ${log_file})"
   (
     cd "${SPENDFLOW_REPO_ROOT}/backend"
-    export DATABASE_URL PORT NODE_ENV AUTH_ALLOW_DEV_USER CORS_ORIGIN CORS_ORIGINS APP_URL
+    export DATABASE_URL PORT NODE_ENV AUTH_ALLOW_DEV_USER CORS_ORIGIN CORS_ORIGINS APP_URL REDIS_URL
     export JWT_SECRET PLAID_CLIENT_ID PLAID_SECRET PLAID_ENV PLAID_PRODUCTS PLAID_COUNTRY_CODES
     export PLAID_REDIRECT_URI ENCRYPTION_KEY GOOGLE_CLIENT_ID GOOGLE_CLIENT_IDS GOOGLE_SECRET_KEY
     npm run dev >>"${log_file}" 2>&1
@@ -420,7 +436,8 @@ spendflow_dev_print_urls() {
 Dev stack:
   UI:       http://localhost:${SPENDFLOW_DEV_UI_PORT}
   API:      http://localhost:${SPENDFLOW_DEV_API_PORT}/api/v1/health
-  Postgres: 127.0.0.1:${POSTGRES_HOST_PORT} (container spendflow-postgres)
+  Postgres: 127.0.0.1:${POSTGRES_HOST_PORT} (container spendflow-postgres, volume spendflow-pgdata)
+  Redis:    127.0.0.1:${REDIS_HOST_PORT} (container spendflow-redis, volume spendflow-redisdata)
 
 Logs:
   $(spendflow_dev_log_file api)
@@ -429,7 +446,8 @@ Logs:
 Commands:
   ./scripts/podman/dev-logs.sh       # follow API + UI logs
   ./scripts/podman/dev-logs.sh -f postgres
-  ./scripts/podman/dev-down.sh       # stop API, UI, and Postgres
+  ./scripts/podman/dev-logs.sh -f redis
+  ./scripts/podman/dev-down.sh       # stop API, UI, Postgres, and Redis
 
 EOF
 }

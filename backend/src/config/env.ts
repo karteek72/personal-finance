@@ -24,6 +24,10 @@ const envSchema = z.object({
   /** Base URL for household invite links (web app). */
   UI_APP_URL: z.string().url().default("http://localhost:3002"),
   ENCRYPTION_KEY: z.string().optional(),
+  REDIS_URL: z.preprocess(
+    (value) => (value === "" || value === undefined ? undefined : value),
+    z.string().url().optional(),
+  ),
   DATABASE_URL: z
     .string()
     .default("postgresql://spendflow:spendflow@localhost:5433/spendflow"),
@@ -60,6 +64,17 @@ export function loadEnv(): Env {
       "ENCRYPTION_KEY is required when NODE_ENV=production (set in containers/.env; generate with: openssl rand -hex 32)",
     );
     throw new Error("ENCRYPTION_KEY is required in production");
+  }
+
+  if (
+    env.NODE_ENV === "production" &&
+    !(process.env.REDIS_URL ?? "").trim()
+  ) {
+    getRootLogger().fatal(
+      {},
+      "REDIS_URL is required when NODE_ENV=production (set in containers/.env; e.g. redis://redis:6379)",
+    );
+    throw new Error("REDIS_URL is required in production");
   }
 
   return env;

@@ -62,18 +62,23 @@ function TrendIcon({ trend }: { trend: string }) {
 }
 
 export function WellnessPanel() {
-  const { data } = useWellness();
+  const { data, isLoading } = useWellness();
 
-  const SCORE = data?.score ?? FALLBACK_SCORE;
+  const SCORE = data?.score ?? (isLoading ? 0 : FALLBACK_SCORE);
   const delta = data?.delta ?? FALLBACK_DELTA;
-  const dimensions: Dimension[] = data?.dimensions.length ? data.dimensions : FALLBACK_DIMENSIONS;
+  const dimensions: Dimension[] =
+    data?.dimensions.length ? data.dimensions : isLoading ? [] : FALLBACK_DIMENSIONS;
   const history = data?.history.length
     ? data.history.map((h) => h.score)
-    : FALLBACK_HISTORY;
+    : isLoading
+      ? []
+      : FALLBACK_HISTORY;
   const months = data?.history.length
     ? data.history.map((h) => shortMonth(h.month))
-    : FALLBACK_MONTHS;
-  const maxBar = Math.max(...history);
+    : isLoading
+      ? []
+      : FALLBACK_MONTHS;
+  const maxBar = Math.max(...history, 1);
 
   return (
     <div className="space-y-5">

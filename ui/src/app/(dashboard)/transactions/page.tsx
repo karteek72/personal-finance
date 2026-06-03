@@ -13,6 +13,7 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useCategories } from "@/hooks/use-categories";
 import type { InfiniteTransactionFilters } from "@/hooks/use-infinite-transactions";
 import { useHousehold } from "@/hooks/use-household";
+import { api } from "@/lib/api-client";
 import type { TransactionFilters } from "@/types/api";
 import { useViewModeStore } from "@/stores/view-mode-store";
 
@@ -67,6 +68,7 @@ function TransactionsContent() {
   const { data: householdData } = useHousehold();
 
   const [categoryFeedback, setCategoryFeedback] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const transactionFilters: InfiniteTransactionFilters = {
     type: filter === "all" ? undefined : filter,
@@ -122,15 +124,39 @@ function TransactionsContent() {
     });
   }
 
+  async function handleExportCsv() {
+    setExporting(true);
+    setCategoryFeedback(null);
+    try {
+      await api.exportTransactionsCsv(transactionFilters);
+    } catch (error) {
+      setCategoryFeedback(
+        error instanceof Error ? error.message : "Export failed",
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex min-w-0 flex-col gap-5">
       <PageHeader
         title="Recent activity"
         subtitle="Everything you've spent, earned, or moved"
+        action={
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={exporting}
+            className="rounded-[var(--radius-pill)] bg-surface px-3 py-2 text-xs font-semibold text-text card-shadow transition-colors hover:text-primary disabled:opacity-60 sm:px-4 sm:text-sm"
+          >
+            {exporting ? "Exporting…" : "Export CSV"}
+          </button>
+        }
       />
 
       {householdData && householdData.members.length > 0 ? (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
           <button
             type="button"
             onClick={() => setSelectedMemberId("")}
@@ -168,7 +194,7 @@ function TransactionsContent() {
       ) : null}
 
       <div
-        className="flex gap-2 overflow-x-auto pb-1"
+        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0"
         role="tablist"
         aria-label="Transaction type"
       >
@@ -179,7 +205,7 @@ function TransactionsContent() {
             role="tab"
             aria-selected={filter === option.id}
             onClick={() => setFilter(option.id)}
-            className={`flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-semibold transition-all ${
+            className={`flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-2 text-sm font-semibold transition-all sm:px-4 ${
               filter === option.id
                 ? "bg-primary text-text-inverse shadow-sm"
                 : "bg-surface text-text-muted card-shadow hover:text-text"
@@ -247,7 +273,7 @@ function TransactionsContent() {
         </p>
       ) : null}
 
-      <Card padding="none" className="overflow-hidden">
+      <Card padding="none" className="min-w-0 overflow-x-auto">
         <TransactionList
           filters={transactionFilters}
           pageSize={50}

@@ -103,7 +103,7 @@ export function MobileNav() {
       aria-label="Mobile navigation"
     >
       <div
-        className="glass mx-auto flex max-w-lg items-center justify-around overflow-x-auto rounded-[var(--radius-lg)] border border-border/60 px-1 py-1.5"
+        className="glass mx-auto flex w-full max-w-lg items-stretch overflow-hidden rounded-[var(--radius-lg)] border border-border/60 px-0.5 py-1.5"
         style={{ boxShadow: "var(--shadow-float)" }}
       >
         {navItems.map((item) => {
@@ -119,7 +119,7 @@ export function MobileNav() {
               aria-label={item.label}
               aria-current={isActive ? "page" : undefined}
               className={clsx(
-                "flex flex-col items-center gap-0.5 rounded-[var(--radius-sm)] px-2 py-1.5 transition-colors min-w-0",
+                "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-[var(--radius-sm)] px-1 py-1.5 transition-colors",
                 isActive ? "text-primary" : "text-text-muted",
               )}
             >

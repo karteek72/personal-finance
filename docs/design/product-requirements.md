@@ -2,8 +2,10 @@
 
 **Product:** SpendFlow  
 **Version:** 1.0  
-**Status:** Ready for Development  
-**Last Updated:** May 2026
+**Status:** In Development (Phase 2 largely complete; Phase 3 in progress)  
+**Last Updated:** June 2026
+
+> **Active backlog:** in-flight work and agent task claims are tracked in [`docs/development/TASK_BOARD.md`](../development/TASK_BOARD.md).
 
 ---
 
@@ -50,18 +52,18 @@ See [user-personas-and-scenarios.md](user-personas-and-scenarios.md) for target 
 
 ### MVP (launch)
 
-- [ ] Plaid integration for US banks & credit cards
-- [ ] OAuth-based account linking (no credential sharing)
-- [ ] Transaction sync via webhooks (daily refresh)
-- [ ] Auto-categorization (rule engine + Plaid categories, 15 categories)
-- [ ] Inter-account transfer reconciliation (CC payments, savings moves)
-- [ ] Dashboard: KPI cards, trend charts, donut category breakdown
-- [ ] Money Flow view (Income → Bank → CC)
-- [ ] Spending alerts (high category spend, subscription creep, low savings rate)
+- [x] Plaid integration for US banks & credit cards
+- [x] OAuth-based account linking (no credential sharing)
+- [x] Transaction sync via webhooks (daily refresh)
+- [x] Auto-categorization (rule engine + Plaid categories, 15 categories)
+- [x] Inter-account transfer reconciliation (CC payments, savings moves)
+- [x] Dashboard: KPI cards, trend charts, donut category breakdown
+- [x] Money Flow view (Income → Bank → CC)
+- [x] Spending alerts (high category spend, subscription creep, low savings rate)
 - [x] Transaction search, filter, manual re-categorization (with per-merchant memory)
-- [ ] CSV export
-- [ ] Dark/light mode
-- [ ] Mobile-responsive (375px+)
+- [x] CSV export
+- [x] Dark/light mode
+- [x] Mobile-responsive (375px+)
 
 ### V2 (post-launch)
 
@@ -89,37 +91,39 @@ Native SwiftUI app sharing the same backend API — see [mobile-ios.md](../archi
 
 ## Development Phases
 
-### Phase 1 — Foundation (Weeks 1–4)
+**Current state:** Phase 1 complete. Phase 2 complete (webhook sync, BullMQ queue, reconciliation, categorization, dashboard). Phase 3 polish (mobile responsive, production readiness) in progress.
 
-- [ ] Project scaffold: `ui/` (Next.js 15) + `backend/` (Fastify)
-- [ ] Auth system
-- [ ] Plaid Sandbox: Link → exchange token → fetch accounts
-- [ ] Database schema + Drizzle migrations
-- [ ] Basic transaction sync (polling first)
+### Phase 1 — Foundation (Weeks 1–4) ✅
 
-### Phase 2 — Core Product (Weeks 5–8)
+- [x] Project scaffold: `ui/` (Next.js 15) + `backend/` (Fastify)
+- [x] Auth system
+- [x] Plaid Sandbox: Link → exchange token → fetch accounts
+- [x] Database schema + Drizzle migrations
+- [x] Basic transaction sync (polling first)
 
-- [ ] Webhook receiver + BullMQ queue
-- [ ] Incremental sync with Plaid cursor
-- [ ] Reconciliation engine
-- [ ] Auto-categorization pipeline
-- [ ] Dashboard UI + Money Flow page
+### Phase 2 — Core Product (Weeks 5–8) ✅
 
-### Phase 3 — Polish & Launch (Weeks 9–12)
+- [x] Webhook receiver + BullMQ queue
+- [x] Incremental sync with Plaid cursor
+- [x] Reconciliation engine
+- [x] Auto-categorization pipeline
+- [x] Dashboard UI + Money Flow page
 
-- [ ] Categories page + transaction table
-- [ ] Smart alerts engine
-- [ ] CSV export
-- [ ] Mobile responsive
-- [ ] Reconnect flow for expired Plaid items
+### Phase 3 — Polish & Launch (Weeks 9–12) — in progress
+
+- [x] Categories page + transaction table
+- [x] Smart alerts engine
+- [x] CSV export
+- [x] Mobile responsive
+- [x] Reconnect flow for expired Plaid items
 - [ ] Production Plaid approval
 - [ ] Monitoring (Sentry, structured logs)
 
-### Phase 4 — iPhone (Weeks 13–16)
+### Phase 4 — iPhone (Weeks 13–16) — partial shell in `ios/`
 
-- [ ] iOS shell: auth, Keychain, tab navigation
-- [ ] Dashboard + transactions (read-only)
-- [ ] Native Plaid Link
+- [ ] iOS shell: auth, Keychain, tab navigation (partial)
+- [ ] Dashboard + transactions (read-only) (partial)
+- [ ] Native Plaid Link (partial)
 - [ ] All five screens at parity with web
 - [ ] APNs push for alerts
 - [ ] App Store submission

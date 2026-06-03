@@ -163,7 +163,7 @@ export function WrappedBanner() {
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg">🎁</div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-white">Your {(data ?? FALLBACK).year} Wrapped is ready</p>
-          <p className="truncate text-xs text-white/70">Preview · your year in money, as a story. Tap to play.</p>
+          <p className="truncate text-xs text-white/70">Your year in money, as a story. Tap to play.</p>
         </div>
         <span className="shrink-0 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">Play</span>
       </button>

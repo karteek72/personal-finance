@@ -416,6 +416,7 @@ export interface BudgetsResponse {
   periodMonth: string;
   safeToSpend: string;
   daysRemaining: number;
+  isLive: boolean;
   budgets: {
     category: string;
     emoji: string | null;
@@ -452,6 +453,7 @@ export interface RecurringResponse {
   annualTotal: string;
   activeCount: number;
   priceChanges: number;
+  isLive: boolean;
   subscriptions: RecurringItem[];
   bills: RecurringItem[];
   leaks: {
@@ -480,6 +482,7 @@ export interface WellnessResponse {
   score: number;
   delta: number;
   history: { month: string; score: number }[];
+  isLive: boolean;
   dimensions: {
     name: string;
     score: number;
@@ -581,6 +584,11 @@ export interface CoachResponse {
   qa: { q: string; a: string }[];
 }
 
+export interface CoachAskResponse {
+  answer: string;
+  isLive: boolean;
+}
+
 export interface WrappedResponse {
   year: number;
   totalSpent: string;
@@ -607,6 +615,7 @@ export interface MerchantsResponse {
   income: { months: string[]; primary: number[]; side: number[] };
   merchantCount: number;
   incomeSources: number;
+  isLive: boolean;
 }
 
 export interface CalendarResponse {

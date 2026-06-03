@@ -29,9 +29,9 @@ function formatMoney(n: number) {
 
 export function BudgetsPanel() {
   const [activeTab, setActiveTab] = useState<"budgets" | "goals">("budgets");
-  const { data } = useBudgets();
+  const { data, isLoading } = useBudgets();
 
-  const budgets = data
+  const budgets = data?.budgets.length
     ? data.budgets.map((b) => ({
         category: b.category,
         emoji: b.emoji ?? "💸",
@@ -39,9 +39,11 @@ export function BudgetsPanel() {
         limit: Number.parseFloat(b.limit),
         color: b.color ?? DEFAULT_BUDGET_COLOR,
       }))
-    : FALLBACK_BUDGETS;
+    : isLoading
+      ? []
+      : FALLBACK_BUDGETS;
 
-  const goals = data
+  const goals = data?.goals.length
     ? data.goals.map((g) => ({
         name: g.name,
         emoji: g.emoji ?? "🎯",
@@ -50,12 +52,14 @@ export function BudgetsPanel() {
         deadline: g.deadline ?? "—",
         color: g.color ?? DEFAULT_GOAL_COLOR,
       }))
-    : FALLBACK_GOALS;
+    : isLoading
+      ? []
+      : FALLBACK_GOALS;
 
-  const totalBudget = budgets.reduce((s, b) => s + b.limit, 0);
-  const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
   const safeToSpend = data ? Number.parseFloat(data.safeToSpend) : 47;
   const daysRemaining = data?.daysRemaining ?? 27;
+  const totalBudget = budgets.reduce((s, b) => s + b.limit, 0);
+  const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
 
   return (
     <div className="space-y-5">

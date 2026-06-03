@@ -114,6 +114,8 @@ interface PlaidLinkButtonProps {
   label?: string;
   className?: string;
   variant?: "default" | "dashed" | "icon";
+  /** DB plaid_items.id — opens Plaid Link in update mode for reconnect. */
+  itemId?: string;
   onSuccess?: () => void;
   onError?: (message: string) => void;
 }
@@ -122,6 +124,7 @@ export function PlaidLinkButton({
   label,
   className,
   variant = "default",
+  itemId,
   onSuccess,
   onError,
 }: PlaidLinkButtonProps) {
@@ -134,7 +137,7 @@ export function PlaidLinkButton({
     async function fetchLinkToken() {
       try {
         setLoading(true);
-        const response = await api.createPlaidLinkToken("web");
+        const response = await api.createPlaidLinkToken("web", itemId);
         if (!cancelled) {
           storePlaidLinkToken(response.linkToken);
           setLinkToken(response.linkToken);
@@ -158,7 +161,7 @@ export function PlaidLinkButton({
     return () => {
       cancelled = true;
     };
-  }, [onError]);
+  }, [itemId, onError]);
 
   if (loading || !linkToken) {
     if (variant === "icon") {

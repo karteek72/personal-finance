@@ -7,6 +7,7 @@ import { backfillSubCategories } from "./services/backfill-subcategories.js";
 import { backfillInternalTransfers } from "./services/backfill-transfers.js";
 import { createRootLogger, getRootLogger } from "./lib/logger.js";
 import { errorHandlerPlugin } from "./plugins/error-handler.js";
+import { rateLimitPlugin } from "./plugins/rate-limit.js";
 import { REQUEST_ID_HEADER, requestContextPlugin } from "./plugins/request-context.js";
 import { authRoutes } from "./routes/auth.js";
 import { householdRoutes } from "./routes/households.js";
@@ -58,6 +59,7 @@ async function main(): Promise<void> {
 
   await app.register(errorHandlerPlugin);
   await app.register(requestContextPlugin);
+  await app.register(rateLimitPlugin);
 
   const migrationLog = getRootLogger().child({ module: "db.migrate" });
   migrationLog.info("running database migrations");

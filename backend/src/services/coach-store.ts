@@ -8,6 +8,7 @@ import {
 } from "../db/schema.js";
 import { formatMoneyAmount, roundDecimal, roundPercent } from "../lib/money.js";
 import { resolveHouseholdContext } from "./household-access.js";
+import { computeWrappedFromTransactions } from "./compute-wrapped.js";
 
 export interface CoachResponse {
   narrative: string;
@@ -59,7 +60,7 @@ export async function getWrapped(
     .orderBy(asc(wrappedSummaries.year));
   const latest = rows[rows.length - 1];
   if (!latest) {
-    return null;
+    return computeWrappedFromTransactions(ctx.userIds);
   }
   const goals = await db
     .select()
@@ -110,6 +111,7 @@ export interface MerchantsResponse {
   income: { months: string[]; primary: number[]; side: number[] };
   merchantCount: number;
   incomeSources: number;
+  isLive: boolean;
 }
 
 export async function getMerchants(
@@ -196,6 +198,7 @@ export async function getMerchants(
       side: last6.map((mk) => Math.round(sideByMonth.get(mk) ?? 0)),
     },
     merchantCount: agg.size,
-    incomeSources: 2,
+    incomeSources: incomeByMonth.size > 0 ? (sideByMonth.size > 0 ? 2 : 1) : 0,
+    isLive: agg.size > 0 || incomeByMonth.size > 0,
   };
 }

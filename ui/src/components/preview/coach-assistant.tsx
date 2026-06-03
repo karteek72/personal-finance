@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { api } from "@/lib/api-client";
 import { useCoach } from "@/hooks/use-features";
 
 type Message = { role: "user" | "coach"; text: string };
@@ -58,18 +59,29 @@ export function CoachAssistant() {
     const qa = SAMPLE_QA.find((x) => x.q === q);
     setMessages((m) => [...m, { role: "user", text: q }]);
     setIsTyping(true);
-    setTimeout(() => {
-      setMessages((m) => [
-        ...m,
-        {
-          role: "coach",
-          text:
-            qa?.a ??
-            "Great question! In the live version, I'd pull your real transaction data to answer this accurately. For now, this is a preview of what the conversation would look like.",
-        },
-      ]);
-      setIsTyping(false);
-    }, 800);
+    void api
+      .askCoach(q)
+      .then((res) => {
+        setMessages((m) => [
+          ...m,
+          {
+            role: "coach",
+            text: res.answer,
+          },
+        ]);
+      })
+      .catch(() => {
+        setMessages((m) => [
+          ...m,
+          {
+            role: "coach",
+            text:
+              qa?.a ??
+              "I couldn't reach the coach service. Try again in a moment.",
+          },
+        ]);
+      })
+      .finally(() => setIsTyping(false));
   }
 
   function handleSend() {
@@ -78,13 +90,21 @@ export function CoachAssistant() {
     setInput("");
     setMessages((m) => [...m, { role: "user", text: q }]);
     setIsTyping(true);
-    setTimeout(() => {
-      setMessages((m) => [
-        ...m,
-        { role: "coach", text: "In the live version, I'd search your transactions and give you a precise answer. This is a preview of the chat interface." },
-      ]);
-      setIsTyping(false);
-    }, 800);
+    void api
+      .askCoach(q)
+      .then((res) => {
+        setMessages((m) => [...m, { role: "coach", text: res.answer }]);
+      })
+      .catch(() => {
+        setMessages((m) => [
+          ...m,
+          {
+            role: "coach",
+            text: "I couldn't reach the coach service. Try again in a moment.",
+          },
+        ]);
+      })
+      .finally(() => setIsTyping(false));
   }
 
   return (
@@ -113,7 +133,7 @@ export function CoachAssistant() {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-text">AI Coach</p>
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400">Preview · illustrative responses</p>
+                  <p className="text-[10px] text-text-muted">Ask about your spending, savings, and goals</p>
                 </div>
               </div>
               <button onClick={() => setOpen(false)} className="rounded-[var(--radius-sm)] p-1.5 text-text-muted hover:bg-surface-raised hover:text-text" aria-label="Close">

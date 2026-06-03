@@ -4,15 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useFire } from "@/hooks/use-features";
 
-const PREVIEW_BANNER = (
-  <div className="mb-5 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
-      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-    </svg>
-    <span><strong>Preview</strong> — Projections use a simplified constant-return model.</span>
-  </div>
-);
-
 const FALLBACK_AGE = 29;
 const FALLBACK_NET_WORTH = 84000;
 
@@ -75,8 +66,6 @@ export function FirePanel() {
 
   return (
     <div className="space-y-5">
-      {PREVIEW_BANNER}
-
       {/* Hero result */}
       <div className="rounded-[var(--radius-lg)] p-5" style={{ background: "var(--gradient-hero)" }}>
         <p className="text-xs font-semibold uppercase tracking-wide text-white/60">You can reach financial independence at</p>

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Stop local dev API/UI and optionally Postgres container.
+# Stop local dev API/UI and optionally Postgres + Redis containers.
 #
 # Usage:
-#   ./scripts/podman/dev-down.sh           # stop API, UI, and Postgres
-#   ./scripts/podman/dev-down.sh --keep-db # stop API + UI only
+#   ./scripts/podman/dev-down.sh           # stop API, UI, Postgres, and Redis
+#   ./scripts/podman/dev-down.sh --keep-db # stop API + UI only (keep infra running)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,7 +34,7 @@ spendflow_dev_stop_app_servers
 if [[ "${KEEP_DB}" -eq 0 ]]; then
   spendflow_require_cmd podman
   if podman ps >/dev/null 2>&1; then
-    echo "==> Stopping Postgres container"
+    echo "==> Stopping Postgres and Redis containers"
     spendflow_dev_stop_postgres
   fi
 fi

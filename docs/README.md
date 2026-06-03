@@ -28,6 +28,16 @@ Technical decisions and deployment.
 | [repository-layout.md](architecture/repository-layout.md) | All engineers | Monorepo conventions |
 | [container-deployment.md](architecture/container-deployment.md) | DevOps | Podman images, compose, networking |
 
+## Development (`development/`)
+
+Agent task coordination and implementation backlog.
+
+| File | Audience | Contents |
+|------|----------|----------|
+| [TASK_BOARD.md](development/TASK_BOARD.md) | All engineers, agents | Status dashboard, next items, doc audit |
+| [tasks.yaml](development/tasks.yaml) | Agents, automation | Machine-readable tasks with claim/complete workflow |
+| [README.md](development/README.md) | Agents | How to claim and complete tasks |
+
 ## Archive
 
 | File | Notes |

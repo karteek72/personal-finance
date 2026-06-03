@@ -108,7 +108,7 @@ Backed by the demo dataset (Drizzle tables + derived rollups). All scoped to the
 | GET | `/insights/dna` | `DnaResponse` — archetype, narrative, axes, peer rarity (`404` if none) |
 | GET | `/insights/patterns` | `PatternsResponse` — day-of-week averages + detected patterns |
 | GET | `/insights/behavioral` | `BehavioralResponse` — challenges, streaks, spending/income creep, reasons |
-| GET | `/insights/merchants` | `MerchantsResponse` — top/most-visited/fastest-growing merchants, income insights |
+| GET | `/insights/merchants` | `MerchantsResponse` — top/most-visited/fastest-growing merchants, income insights (`isLive` when computed from synced transactions) |
 
 ---
 
@@ -147,6 +147,7 @@ Backed by the demo dataset (Drizzle tables + derived rollups). All scoped to the
 | Method | Path | Response |
 |--------|------|----------|
 | GET | `/coach/insights` | `CoachResponse` — monthly narrative, Q&A pairs, 30-day forecast text |
+| POST | `/coach/ask` | `{ question: string }` → `{ answer: string, isLive: boolean }` — rule-based answers from transaction summaries (no LLM) |
 | GET | `/wrapped` | `WrappedResponse` — year-in-review totals, archetype, top category, moments |
 
 ---

@@ -10,6 +10,7 @@ import {
   wellnessScores,
 } from "../db/schema.js";
 import { formatMoneyAmount } from "../lib/money.js";
+import { computeWellnessFromTransactions } from "./compute-wellness.js";
 import { resolveHouseholdContext } from "./household-access.js";
 
 export interface WellnessResponse {
@@ -23,6 +24,7 @@ export interface WellnessResponse {
     description: string;
     trend: string;
   }>;
+  isLive: boolean;
 }
 
 export async function getWellness(userId: string): Promise<WellnessResponse> {
@@ -34,17 +36,22 @@ export async function getWellness(userId: string): Promise<WellnessResponse> {
     .where(inArray(wellnessScores.userId, ctx.userIds))
     .orderBy(asc(wellnessScores.periodMonth));
 
-  const latest = rows[rows.length - 1];
-  const prior = rows[rows.length - 2];
-  const dimensions =
-    (latest?.dimensions as WellnessResponse["dimensions"] | undefined) ?? [];
+  if (rows.length > 0) {
+    const latest = rows[rows.length - 1]!;
+    const prior = rows[rows.length - 2];
+    const dimensions =
+      (latest.dimensions as WellnessResponse["dimensions"] | undefined) ?? [];
 
-  return {
-    score: latest?.score ?? 0,
-    delta: latest && prior ? latest.score - prior.score : 0,
-    history: rows.map((r) => ({ month: r.periodMonth.slice(5), score: r.score })),
-    dimensions,
-  };
+    return {
+      score: latest.score,
+      delta: prior ? latest.score - prior.score : 0,
+      history: rows.map((r) => ({ month: r.periodMonth.slice(5), score: r.score })),
+      dimensions,
+      isLive: true,
+    };
+  }
+
+  return computeWellnessFromTransactions(ctx.userIds);
 }
 
 export interface DnaResponse {

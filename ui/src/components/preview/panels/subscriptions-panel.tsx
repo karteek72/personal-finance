@@ -37,9 +37,9 @@ function shortDate(iso: string | null): string {
 
 export function SubscriptionsPanel() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const { data } = useRecurring();
+  const { data, isLoading } = useRecurring();
 
-  const subs: Sub[] = data
+  const subs: Sub[] = data?.subscriptions.length
     ? data.subscriptions.map((s) => ({
         name: s.merchantName,
         amount: Number.parseFloat(s.amount),
@@ -50,7 +50,9 @@ export function SubscriptionsPanel() {
         changed: s.priceChanged,
         oldAmount: s.previousAmount ? Number.parseFloat(s.previousAmount) : 0,
       }))
-    : FALLBACK_SUBS;
+    : isLoading
+      ? []
+      : FALLBACK_SUBS;
 
   const active = subs.filter((s) => !dismissed.has(s.name));
   const monthly = active.reduce((sum, s) => sum + s.amount, 0);

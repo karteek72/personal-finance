@@ -115,9 +115,23 @@ interface AccountTileProps {
   deleting: boolean;
   onSync: (account: Account) => void;
   onDelete: (account: Account) => void;
+  onReconnectSuccess: () => void;
+  onReconnectError: (message: string) => void;
 }
 
-function AccountTile({ account, gradient, syncing, deleting, onSync, onDelete }: AccountTileProps) {
+function AccountTile({
+  account,
+  gradient,
+  syncing,
+  deleting,
+  onSync,
+  onDelete,
+  onReconnectSuccess,
+  onReconnectError,
+}: AccountTileProps) {
+  const needsReconnect =
+    account.source === "plaid" &&
+    (account.status === "reauth_required" || account.status === "error");
   return (
     <article className="overflow-hidden rounded-[var(--radius-card)] card-shadow">
       <div className="relative p-5 text-text-inverse" style={{ background: gradient }}>
@@ -198,6 +212,23 @@ function AccountTile({ account, gradient, syncing, deleting, onSync, onDelete }:
           <p className="mt-3 text-[11px] opacity-70">Not synced yet</p>
         ) : null}
       </div>
+
+      {needsReconnect && account.plaidItemId ? (
+        <div className="flex flex-col gap-2 border-t border-border/60 bg-surface px-4 py-3">
+          <p className="text-xs text-text-muted">
+            {account.status === "error"
+              ? "This connection was revoked or failed. Reconnect to resume syncing."
+              : "Your bank login expired or needs attention. Reconnect to keep balances current."}
+          </p>
+          <PlaidLinkButton
+            label="Reconnect account"
+            itemId={account.plaidItemId}
+            onSuccess={onReconnectSuccess}
+            onError={onReconnectError}
+            className="w-full justify-center py-2 text-sm"
+          />
+        </div>
+      ) : null}
 
       {(() => {
         if (account.type !== "credit") return null;
@@ -303,6 +334,15 @@ export function AccountsView() {
         "plaid-link",
       );
     });
+  }
+
+  function handleReconnectError(message: string) {
+    notifications.push(
+      "error",
+      "Could not reconnect account",
+      message,
+      "plaid-link",
+    );
   }
 
   async function handleSyncAll() {
@@ -525,6 +565,8 @@ export function AccountsView() {
                       deleting={deletingId === account.id}
                       onSync={(a) => void handleSyncAccount(a.id, a.name)}
                       onDelete={(a) => void handleDeleteAccount(a.id, a.name, a.mask)}
+                      onReconnectSuccess={handleConnected}
+                      onReconnectError={handleReconnectError}
                     />
                   ))}
                 </div>

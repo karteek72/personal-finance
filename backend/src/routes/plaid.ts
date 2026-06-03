@@ -12,6 +12,7 @@ import { Products } from "plaid";
 import {
   deletePlaidItem,
   exchangeAndSync,
+  getPlaidItemAccessToken,
   listPlaidItems,
   syncAllPlaidItems,
 } from "../services/plaid/item-store.js";
@@ -20,6 +21,8 @@ import { getPlaidAccountsResponse } from "./transactions.js";
 
 const linkTokenBodySchema = z.object({
   platform: z.enum(["web", "ios"]).optional(),
+  /** DB plaid_items.id — enables Plaid Link update mode for reconnect. */
+  itemId: z.string().uuid().optional(),
 });
 
 const exchangeTokenBodySchema = z.object({
@@ -40,7 +43,7 @@ function resolvePlaidRedirectUri(env: {
 
 export const plaidRoutes: FastifyPluginAsync = async (app) => {
   app.post("/plaid/link-token", async (request) => {
-    parseBody(linkTokenBodySchema, request.body);
+    const body = parseBody(linkTokenBodySchema, request.body);
 
     const user = await requireRequestUser(request, app.config.env);
     const client = getPlaidClient(app.config.env);
@@ -53,6 +56,14 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
       language: "en",
       webhook: `${app.config.env.APP_URL}/api/v1/webhooks/plaid`,
     };
+
+    if (body.itemId) {
+      linkTokenRequest.access_token = await getPlaidItemAccessToken(
+        body.itemId,
+        user.id,
+        app.config.env,
+      );
+    }
 
     if (products.includes(Products.Transactions)) {
       linkTokenRequest.transactions = { days_requested: 730 };

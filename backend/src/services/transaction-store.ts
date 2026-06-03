@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
+import { formatCsvRow } from "../lib/csv.js";
 import { countMonthsInclusive } from "../lib/date-range.js";
 import { formatMoneyAmount, roundDecimal, roundPercent } from "../lib/money.js";
 import {
@@ -183,7 +184,7 @@ function sqlUserIdsIn(userIds: string[]) {
   return sql`user_id IN (${sql.join(userIds.map((id) => sql`${id}`), sql`, `)})`;
 }
 
-export async function listTransactions(filters: {
+export type TransactionListFilters = {
   userIds: string[];
   month?: string;
   category?: string;
@@ -192,17 +193,14 @@ export async function listTransactions(filters: {
   scopedAccountIds?: string[] | null;
   q?: string;
   type?: string;
-  sort?: TransactionSort;
-  limit?: number;
-  cursor?: string;
-}) {
-  const db = getDb();
-  const limit = filters.limit ?? 50;
+};
+
+function buildTransactionFilterConditions(filters: TransactionListFilters) {
   const conditions = [transactionUserFilter(filters.userIds)];
 
   if (filters.scopedAccountIds !== undefined && filters.scopedAccountIds !== null) {
     if (filters.scopedAccountIds.length === 0) {
-      return { items: [], nextCursor: null };
+      return null;
     }
     conditions.push(inArray(transactions.accountId, filters.scopedAccountIds));
   }
@@ -240,6 +238,114 @@ export async function listTransactions(filters: {
       or(ilike(transactions.name, q), ilike(transactions.merchantName, q))!,
     );
   }
+
+  return conditions;
+}
+
+const CSV_EXPORT_HEADER =
+  "date,name,merchant,amount,category,subCategory,account,type";
+
+const CSV_EXPORT_BATCH_SIZE = 500;
+
+export async function* streamTransactionsCsv(
+  filters: TransactionListFilters & { sort?: TransactionSort },
+): AsyncGenerator<string> {
+  yield `${CSV_EXPORT_HEADER}\n`;
+
+  const baseConditions = buildTransactionFilterConditions(filters);
+  if (baseConditions === null) {
+    return;
+  }
+
+  const db = getDb();
+  const sort = filters.sort ?? "date_desc";
+  let cursor: string | undefined;
+
+  do {
+    const conditions = [...baseConditions];
+    if (cursor) {
+      const decoded = decodeCursor(cursor);
+      if (decoded) {
+        conditions.push(buildCursorCondition(decoded, sort));
+      }
+    }
+
+    let query = db
+      .select({
+        id: transactions.id,
+        date: transactions.date,
+        name: transactions.name,
+        merchantName: transactions.merchantName,
+        amount: transactions.amount,
+        category: transactions.category,
+        subCategory: transactions.subCategory,
+        accountName: accounts.name,
+        transactionType: transactions.transactionType,
+        createdAt: transactions.createdAt,
+      })
+      .from(transactions)
+      .innerJoin(accounts, eq(transactions.accountId, accounts.id))
+      .orderBy(...transactionOrderBy(sort))
+      .limit(CSV_EXPORT_BATCH_SIZE + 1);
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as typeof query;
+    }
+
+    const rows = await query;
+    const hasMore = rows.length > CSV_EXPORT_BATCH_SIZE;
+    const page = hasMore ? rows.slice(0, CSV_EXPORT_BATCH_SIZE) : rows;
+
+    for (const row of page) {
+      yield `${formatCsvRow([
+        row.date,
+        row.name,
+        row.merchantName ?? "",
+        formatMoneyAmount(row.amount),
+        row.category,
+        row.subCategory ?? "",
+        row.accountName,
+        row.transactionType,
+      ])}\n`;
+    }
+
+    const lastRow = page[page.length - 1];
+    cursor =
+      hasMore && lastRow
+        ? encodeCursor({
+            id: lastRow.id,
+            date: lastRow.date,
+            createdAt: lastRow.createdAt.toISOString(),
+            amount: lastRow.amount,
+            name: lastRow.name,
+            category: lastRow.category,
+          })
+        : undefined;
+  } while (cursor);
+}
+
+export async function listTransactions(filters: {
+  userIds: string[];
+  month?: string;
+  category?: string;
+  subCategory?: string;
+  accountId?: string;
+  scopedAccountIds?: string[] | null;
+  q?: string;
+  type?: string;
+  sort?: TransactionSort;
+  limit?: number;
+  cursor?: string;
+}) {
+  const db = getDb();
+  const limit = filters.limit ?? 50;
+  const baseConditions = buildTransactionFilterConditions(filters);
+
+  if (baseConditions === null) {
+    return { items: [], nextCursor: null };
+  }
+
+  const conditions = [...baseConditions];
 
   // Decode and apply cursor for keyset pagination
   if (filters.cursor) {

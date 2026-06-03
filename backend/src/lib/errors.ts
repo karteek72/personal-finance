@@ -13,6 +13,7 @@ export type ErrorCode =
   | "PLAID_ERROR"
   | "PLAID_SYNC_ERROR"
   | "NOT_PLAID_ACCOUNT"
+  | "RATE_LIMITED"
   | "INTERNAL_ERROR";
 
 export interface ApiErrorBody {
@@ -101,6 +102,10 @@ export class AppError extends Error {
       400,
       "Only Plaid-linked accounts can be synced",
     );
+  }
+
+  static rateLimited(message = "Too many requests; try again later"): AppError {
+    return new AppError("RATE_LIMITED", 429, message);
   }
 
   static internal(cause?: unknown): AppError {

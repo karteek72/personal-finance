@@ -12,6 +12,7 @@ import type {
   ChartDataFilters,
   ChartDataResponse,
   CoachResponse,
+  CoachAskResponse,
   CreditDebtSummary,
   DeleteAccountResponse,
   DnaResponse,
@@ -177,6 +178,51 @@ export const api = {
         scope: filters.scope,
       })}`,
     );
+  },
+
+  async exportTransactionsCsv(
+    filters: Omit<TransactionFilters, "limit" | "cursor"> = {},
+  ): Promise<void> {
+    const path = `/transactions/export.csv${buildQuery({
+      month: filters.month,
+      category: filters.category,
+      subCategory: filters.subCategory,
+      accountId: filters.accountId,
+      q: filters.q,
+      type: filters.type,
+      sort: filters.sort,
+      memberId: filters.memberId,
+      scope: filters.scope,
+    })}`;
+
+    if (USE_MOCKS) {
+      await exportMockTransactionsCsv(filters);
+      return;
+    }
+
+    const response = await fetch(`${getBaseUrl()}${path}`, {
+      headers: authHeaders(),
+    });
+
+    if (!response.ok) {
+      const body: unknown = await response.json().catch(() => null);
+      const message =
+        typeof body === "object" &&
+        body !== null &&
+        "error" in body &&
+        typeof (body as { error?: { message?: string } }).error?.message ===
+          "string"
+          ? (body as { error: { message: string } }).error.message
+          : `Export failed with status ${response.status}`;
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    const filename =
+      parseContentDispositionFilename(
+        response.headers.get("Content-Disposition"),
+      ) ?? "transactions.csv";
+    triggerBrowserDownload(blob, filename);
   },
 
   getAccounts(): Promise<AccountsResponse> {
@@ -394,14 +440,17 @@ export const api = {
     });
   },
 
-  createPlaidLinkToken(platform: "web" | "ios" = "web"): Promise<{ linkToken: string }> {
+  createPlaidLinkToken(
+    platform: "web" | "ios" = "web",
+    itemId?: string,
+  ): Promise<{ linkToken: string }> {
     if (USE_MOCKS) {
       return Promise.resolve({ linkToken: "mock-link-token" });
     }
     return fetchJson<{ linkToken: string }>("/plaid/link-token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ platform }),
+      body: JSON.stringify({ platform, itemId }),
     });
   },
 
@@ -514,11 +563,104 @@ export const api = {
     return fetchJson<CoachResponse>("/coach/insights");
   },
 
+  askCoach(question: string): Promise<CoachAskResponse> {
+    if (USE_MOCKS) {
+      const qa = mockApi.getCoach();
+      return qa.then((coach) => {
+        const match = coach.qa.find((x) =>
+          question.toLowerCase().includes(x.q.slice(0, 20).toLowerCase()),
+        );
+        return {
+          answer: match?.a ?? coach.qa[0]?.a ?? "I don't have enough context to answer that yet.",
+          isLive: false,
+        };
+      });
+    }
+    return fetchJson<CoachAskResponse>("/coach/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+  },
+
   getWrapped(): Promise<WrappedResponse> {
     if (USE_MOCKS) return mockApi.getWrapped();
     return fetchJson<WrappedResponse>("/wrapped");
   },
 };
+
+function parseContentDispositionFilename(
+  header: string | null,
+): string | null {
+  if (!header) return null;
+  const match = /filename="([^"]+)"/.exec(header);
+  return match?.[1] ?? null;
+}
+
+function triggerBrowserDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function escapeCsvField(value: string): string {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function formatCsvRow(fields: readonly string[]): string {
+  return fields.map(escapeCsvField).join(",");
+}
+
+async function exportMockTransactionsCsv(
+  filters: Omit<TransactionFilters, "limit" | "cursor">,
+): Promise<void> {
+  const accountsResponse = await mockApi.getAccounts();
+  const accountNames = new Map(
+    accountsResponse.accounts.map((account) => [account.id, account.name]),
+  );
+
+  const rows: string[] = [
+    "date,name,merchant,amount,category,subCategory,account,type",
+  ];
+  let cursor: string | undefined;
+
+  do {
+    const page = await mockApi.getTransactions({
+      ...filters,
+      limit: 500,
+      cursor,
+    });
+    for (const tx of page.items) {
+      rows.push(
+        formatCsvRow([
+          tx.date,
+          tx.name,
+          tx.merchantName ?? "",
+          tx.amount,
+          tx.category,
+          tx.subCategory ?? "",
+          accountNames.get(tx.accountId) ?? tx.accountMask ?? "",
+          tx.transactionType,
+        ]),
+      );
+    }
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor);
+
+  const filename = filters.month
+    ? `transactions-${filters.month}.csv`
+    : "transactions.csv";
+  triggerBrowserDownload(
+    new Blob([`${rows.join("\n")}\n`], { type: "text/csv;charset=utf-8" }),
+    filename,
+  );
+}
 
 export const getSummary = api.getSummary.bind(api);
 export const getTransactions = api.getTransactions.bind(api);

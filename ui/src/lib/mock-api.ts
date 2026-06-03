@@ -745,7 +745,7 @@ export async function getWrapped(): Promise<WrappedResponse> {
 
 export async function getMerchants(): Promise<MerchantsResponse> {
   await delay();
-  return merchantsData as MerchantsResponse;
+  return { ...(merchantsData as MerchantsResponse), isLive: false };
 }
 
 export async function getCalendar(): Promise<CalendarResponse> {

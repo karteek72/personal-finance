@@ -1,0 +1,276 @@
+# SpendFlow development task board — machine-readable source of truth.
+# Human dashboard: TASK_BOARD.md
+# CLI: npm run task -- <list|next|claim|release|complete|status> [args]
+#
+# Status: backlog | ready | in_progress | blocked | done | cancelled
+# Priority: P0 (critical) | P1 (high) | P2 (medium) | P3 (low)
+
+version: 1
+updated_at: "2026-06-03"
+
+tasks:
+  # ── P0 — Critical gaps (docs claim done but code missing) ─────────────────
+
+  - id: TASK-INFRA-001
+    title: BullMQ worker + Redis + async Plaid webhook sync
+    status: done
+    priority: P0
+    area: backend
+    phase: 2
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/system-overview.md
+      - backend/STRUCTURE.md
+      - README.md
+    description: |
+      Webhooks currently run syncPlaidItem inline. README and STRUCTURE.md specify BullMQ.
+      Add REDIS_URL to env, queue + worker entry, enqueue from webhook handler, update health
+      check, add Redis to compose, dev:worker script.
+    acceptance_criteria:
+      - bullmq and ioredis in backend dependencies
+      - src/jobs/queue.ts and sync-transactions.job.ts exist
+      - src/worker.ts consumes plaid-sync queue
+      - webhook handler enqueues instead of inline sync (when REDIS_URL set)
+      - GET /health reports real Redis connectivity
+      - containers/compose.yaml includes redis service
+      - backend/.env.example documents REDIS_URL
+
+  - id: TASK-API-001
+    title: Transaction CSV export endpoint + UI download
+    status: done
+    priority: P0
+    area: backend
+    phase: 3
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/design/api-contract.md
+      - docs/design/product-requirements.md
+    description: |
+      api-contract.md defines GET /transactions/export.csv but route is missing.
+      Implement streaming CSV with same filters as GET /transactions; wire UI export button.
+    acceptance_criteria:
+      - GET /api/v1/transactions/export.csv returns text/csv stream
+      - Filters match list endpoint (month, category, account, scope, q, type)
+      - UI exposes download on transactions page
+      - api-contract.md unchanged (already specified)
+
+  - id: TASK-DOCS-001
+    title: Sync product-requirements.md with implemented reality
+    status: done
+    priority: P0
+    area: docs
+    phase: 3
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/design/product-requirements.md
+      - README.md
+    description: |
+      PRD checkboxes are stale (most Phase 1–2 items done). Audit codebase vs PRD and
+      update checkboxes, phase notes, and link to TASK_BOARD.md.
+    acceptance_criteria:
+      - Completed MVP items marked [x] with accurate status
+      - Open items reflect real gaps (BullMQ, CSV, rate limit, etc.)
+      - Development Phases section matches README status section
+
+  # ── P1 — High priority (Phase 3 completion) ─────────────────────────────
+
+  - id: TASK-SEC-001
+    title: Per-user rate limiting (100 req/min)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-INFRA-001
+    source_docs:
+      - docs/architecture/data-security-compliance.md
+      - docs/design/api-contract.md
+    description: |
+      Security checklist and README claim 100 req/min/user via Redis sliding window.
+      Implement Fastify plugin; return 429 with Retry-After.
+    acceptance_criteria:
+      - Authenticated routes rate-limited per userId
+      - Returns HTTP 429 when exceeded
+      - Uses Redis when REDIS_URL set; graceful skip in dev without Redis
+
+  - id: TASK-INFRA-002
+    title: Worker container in Podman compose
+    status: done
+    priority: P1
+    area: infra
+    phase: 3
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-INFRA-001
+    source_docs:
+      - docs/architecture/container-deployment.md
+      - containers/compose.yaml
+    description: Add spendflow-worker service using same backend image with worker entrypoint.
+    acceptance_criteria:
+      - worker service in compose.yaml
+      - containers/README.md updated
+      - depends_on redis + api
+
+  - id: TASK-UI-001
+    title: Mobile responsive polish (375px breakpoints)
+    status: done
+    priority: P1
+    area: ui
+    phase: 3
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/design/ui-ux-specification.md
+      - docs/design/product-requirements.md
+    description: Audit dashboard shell, charts, and transaction table at 375px; fix overflow and nav.
+    acceptance_criteria:
+      - Sidebar collapses to mobile-nav without horizontal scroll
+      - KPI cards stack cleanly at 375px
+      - Transaction table readable (horizontal scroll OK if intentional)
+
+  - id: TASK-PLAID-001
+    title: Plaid ITEM_ERROR reconnect flow (UI + backend status)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/system-overview.md
+    description: Handle ITEM_ERROR webhook; mark item reauth_required; surface in accounts UI with reconnect CTA.
+    acceptance_criteria:
+      - Webhook sets plaid_items.status = reauth_required
+      - Accounts API exposes status
+      - UI shows reconnect Plaid Link for affected items
+
+  # ── P2 — Preview → live backend (Phase 3.5) ─────────────────────────────
+
+  - id: TASK-PREVIEW-001
+    title: Budgets API — real data from transaction aggregates
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.5
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/design/api-contract.md
+      - ui/src/hooks/use-features.ts
+    description: planning-store currently serves mocks. Compute budget progress from category totals vs user-set limits.
+    acceptance_criteria:
+      - GET /planning/budgets returns live data when user has transactions
+      - UI preview banner removed on Budgets tab when live
+
+  - id: TASK-PREVIEW-002
+    title: Recurring charges detector (subscription list)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.5
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - README.md
+    description: Detect recurring merchants from transaction history; expose GET /planning/recurring.
+    acceptance_criteria:
+      - Identifies charges with ≥3 occurrences at ~monthly interval
+      - Returns amount, merchant, next expected date
+
+  - id: TASK-PREVIEW-003
+    title: Financial wellness score endpoint
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.5
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - README.md
+      - mock/coach-insights.json
+    description: Composite 0–100 score from savings rate, debt, emergency runway, goal pace.
+    acceptance_criteria:
+      - GET /insights/wellness returns score + dimension breakdown
+      - Computed from real user data
+
+  - id: TASK-PREVIEW-004
+    title: Coach Q&A — RAG over transaction summaries (V2 stub)
+    status: done
+    priority: P2
+    area: backend
+    phase: 5
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - README.md
+    description: Wire coach endpoint to structured summaries first; optional LLM later.
+    acceptance_criteria:
+      - POST /coach/ask returns answers from precomputed monthly summaries
+      - No API keys required for MVP stub
+
+  # ── P3 — Phase 4 iOS ────────────────────────────────────────────────────
+
+  - id: TASK-IOS-001
+    title: iOS Face ID app unlock
+    status: backlog
+    priority: P3
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/mobile-ios.md
+      - ios/STRUCTURE.md
+    description: LocalAuthentication gate before showing dashboard when enabled in settings.
+    acceptance_criteria:
+      - Optional toggle in settings
+      - Keychain tokens remain; only UI gated
+
+  - id: TASK-IOS-002
+    title: iOS push notifications (APNs) for alerts
+    status: backlog
+    priority: P3
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PLAID-001
+    source_docs:
+      - docs/design/mobile-patterns.md
+    description: Register device token; backend sends alert push when new insight severity ≥ warning.
+    acceptance_criteria:
+      - Device token stored per user
+      - Test push from dev script
+
+  - id: TASK-SEC-002
+    title: GDPR JSON data export endpoint
+    status: backlog
+    priority: P3
+    area: backend
+    phase: 3
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/data-security-compliance.md
+    description: GET /auth/export returns portable JSON of user transactions, accounts, rules.
+    acceptance_criteria:
+      - Authenticated user only
+      - No secrets in export

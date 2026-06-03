@@ -1,6 +1,6 @@
 # SpendFlow — Podman deployment
 
-Run the full stack (PostgreSQL, API, UI) on your LAN and expose HTTPS on **stockpulse.win** via Cloudflare Tunnel.
+Run the full stack (PostgreSQL, Redis, API, BullMQ worker, UI) on your LAN and expose HTTPS on **stockpulse.win** via Cloudflare Tunnel.
 
 ## Quick start
 
@@ -37,24 +37,45 @@ The UI image is built with `NEXT_PUBLIC_API_URL` pointing at the **public API** 
 
 | Script | Purpose |
 |--------|---------|
-| `./scripts/podman/dev.sh` | **Local dev** — Postgres container + API/UI on host with logs |
-| `./scripts/podman/dev-down.sh` | Stop dev API/UI (and Postgres unless `--keep-db`) |
-| `./scripts/podman/dev-logs.sh` | Follow `logs/dev/*.log` or Postgres container logs |
+| `./scripts/podman/dev.sh` | **Local dev** — Postgres + Redis containers + API/UI on host with logs |
+| `./scripts/podman/dev-down.sh` | Stop dev API/UI (and Postgres/Redis unless `--keep-db`) |
+| `./scripts/podman/dev-logs.sh` | Follow `logs/dev/*.log` or Postgres/Redis container logs |
 | `./scripts/podman/deploy.sh` | **Production-style** — build + full stack in containers |
 | `./scripts/podman/build.sh` | Build API (Node) + UI (static `out/` in **nginx:alpine**) |
 | `./scripts/podman/deploy.sh --no-build` | Restart without rebuild |
 | `./scripts/podman/down.sh` | Stop and remove containers |
 | `./scripts/podman/logs.sh` | Follow compose logs (container stack) |
 
+## Worker service
+
+The **`worker`** container (`spendflow-worker`) runs BullMQ background jobs (Plaid transaction sync). It reuses the **`spendflow-api`** image with `node dist/worker.js` — no separate build or host ports.
+
+| Property | Value |
+|----------|-------|
+| Image | `localhost/spendflow-api:latest` (same as API) |
+| Container name | `spendflow-worker` |
+| Depends on | Redis (healthy), API (started) |
+| Host ports | None (internal only) |
+
+The API runs database migrations on boot; the worker starts after the API container is up so the schema is ready. Requires `REDIS_URL` (defaults to `redis://redis:6379` in compose) and the same secrets as the API (`DATABASE_URL`, `ENCRYPTION_KEY`, `PLAID_*`, etc.).
+
+```bash
+# Follow worker logs
+./scripts/podman/logs.sh worker
+
+# Or directly
+podman logs -f spendflow-worker
+```
+
 ### Local development (recommended for day-to-day coding)
 
-Postgres runs in Podman; API and UI run with `npm run dev` on your machine so logs are easy to read.
+Postgres and Redis run in Podman on the shared `spendflow-net` network with named volumes (`spendflow-pgdata`, `spendflow-redisdata`) so data survives container restarts. API and UI run with `npm run dev` on your machine so logs are easy to read.
 
 ```bash
 # One-time: secrets in containers/.env (from env.example)
 cp containers/env.example containers/.env
 
-# Start Postgres + API + UI, then stream logs (Ctrl+C stops tail only)
+# Start Postgres + Redis + API + UI, then stream logs (Ctrl+C stops tail only)
 ./scripts/podman/dev.sh
 
 # Or start in background
@@ -69,7 +90,8 @@ cp containers/env.example containers/.env
 |---------|---------|
 | UI | http://localhost:3002 |
 | API | http://localhost:4000/api/v1/health |
-| Postgres | `127.0.0.1:5433` (user/db from `containers/.env`) |
+| Postgres | `127.0.0.1:5433` (user/db from `containers/.env`, volume `spendflow-pgdata`) |
+| Redis | `127.0.0.1:6379` (volume `spendflow-redisdata`) |
 
 Log files: `logs/dev/api.log`, `logs/dev/ui.log`.
 

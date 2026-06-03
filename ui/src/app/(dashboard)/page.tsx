@@ -78,9 +78,9 @@ function DashboardContent({
       <div className="flex flex-col gap-4">
 
         {/* ── Greeting ──────────────────────────────────────────── */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-text">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold tracking-tight text-text sm:text-2xl">
               {getGreeting()} 👋
             </h2>
             <p className="mt-0.5 text-xs font-medium text-text-muted">
@@ -89,7 +89,7 @@ function DashboardContent({
           </div>
           <Link
             href="/transactions"
-            className="rounded-[var(--radius-pill)] border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:border-primary/40 hover:text-primary"
+            className="shrink-0 self-start rounded-[var(--radius-pill)] border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:border-primary/40 hover:text-primary sm:self-auto"
           >
             All transactions →
           </Link>
@@ -100,7 +100,7 @@ function DashboardContent({
 
         {/* ── Net Savings hero ──────────────────────────────────── */}
         <div
-          className="relative overflow-hidden rounded-[var(--radius-card)] p-6 text-white"
+          className="relative overflow-hidden rounded-[var(--radius-card)] p-4 text-white sm:p-6"
           style={{ background: "var(--gradient-hero)" }}
         >
           {/* Decorative circles */}
@@ -121,7 +121,7 @@ function DashboardContent({
                 Net Savings
               </p>
               <p
-                className="mt-1 text-4xl font-extrabold tracking-tight sm:text-5xl"
+                className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl"
                 data-money
               >
                 {formatMoney(summary.netSavings)}
@@ -163,19 +163,19 @@ function DashboardContent({
                 viewAllHref: "/transactions?type=expense",
               })
             }
-            className="group flex flex-col gap-1 rounded-[var(--radius-card)] border border-border bg-surface p-4 text-left transition-all hover:border-danger/30 hover:bg-danger/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="group flex min-w-0 flex-col gap-1 rounded-[var(--radius-card)] border border-border bg-surface p-3 text-left transition-all hover:border-danger/30 hover:bg-danger/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:p-4"
           >
             <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
               <span
-                className="h-1.5 w-1.5 rounded-full bg-danger"
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-danger"
                 aria-hidden="true"
               />
               Spent
             </p>
-            <p className="text-2xl font-extrabold tabular-nums tracking-tight text-danger" data-money>
+            <p className="truncate text-lg font-extrabold tabular-nums tracking-tight text-danger sm:text-2xl" data-money>
               {formatMoney(summary.totalSpent)}
             </p>
-            <p className="text-[11px] text-text-muted">
+            <p className="truncate text-[11px] text-text-muted">
               {formatMoney(summary.avgMonthlySpend)}/mo avg
             </p>
           </button>
@@ -190,26 +190,26 @@ function DashboardContent({
                 viewAllHref: "/transactions?type=income",
               })
             }
-            className="group flex flex-col gap-1 rounded-[var(--radius-card)] border border-border bg-surface p-4 text-left transition-all hover:border-success/30 hover:bg-success/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="group flex min-w-0 flex-col gap-1 rounded-[var(--radius-card)] border border-border bg-surface p-3 text-left transition-all hover:border-success/30 hover:bg-success/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:p-4"
           >
             <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
               <span
-                className="h-1.5 w-1.5 rounded-full bg-success"
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-success"
                 aria-hidden="true"
               />
               Income
             </p>
-            <p className="text-2xl font-extrabold tabular-nums tracking-tight text-success" data-money>
+            <p className="truncate text-lg font-extrabold tabular-nums tracking-tight text-success sm:text-2xl" data-money>
               {formatMoney(summary.income)}
             </p>
-            <p className="text-[11px] text-text-muted">
+            <p className="truncate text-[11px] text-text-muted">
               {summary.transactionCount} transactions
             </p>
           </button>
         </div>
 
         {/* ── KPI strip ─────────────────────────────────────────── */}
-        <MetricGrid minColumnWidth="10rem">
+        <MetricGrid minColumnWidth="8.5rem">
           <KpiCard
             label="Savings rate"
             value={`${savingsRatePct}%`}

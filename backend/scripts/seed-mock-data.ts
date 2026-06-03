@@ -3,6 +3,7 @@
  *
  * Usage (from backend/):
  *   npm run db:seed
+ *   npm run seed:mock          # alias for db:seed
  *   npm run db:seed -- --no-reset   # append without clearing prior seed users
  */
 import { readFileSync } from "node:fs";

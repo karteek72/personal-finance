@@ -10,6 +10,8 @@ import {
   transactions,
 } from "../db/schema.js";
 import { formatMoneyAmount, roundDecimal } from "../lib/money.js";
+import { categoryMeta } from "./category-meta.js";
+import { detectRecurringFromTransactions } from "./detect-recurring.js";
 import { resolveHouseholdContext } from "./household-access.js";
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -52,6 +54,7 @@ export interface BudgetsResponse {
   periodMonth: string;
   safeToSpend: string;
   daysRemaining: number;
+  isLive: boolean;
   budgets: Array<{
     category: string;
     emoji: string | null;
@@ -78,12 +81,8 @@ export async function getBudgets(userId: string): Promise<BudgetsResponse> {
     .from(budgets)
     .where(inArray(budgets.userId, ctx.userIds));
 
-  const period =
-    budgetRows.reduce<string>(
-      (latest, b) => (b.periodMonth > latest ? b.periodMonth : latest),
-      "0000-00",
-    ) || "2026-05";
-  const current = budgetRows.filter((b) => b.periodMonth === period);
+  const period = await latestMonth(ctx.userIds);
+  const configured = budgetRows.filter((b) => b.periodMonth === period);
   const { start, end } = monthBounds(period);
 
   const spentRows = await db
@@ -107,21 +106,90 @@ export async function getBudgets(userId: string): Promise<BudgetsResponse> {
     spentRows.map((r) => [r.category, Number.parseFloat(r.total ?? "0")]),
   );
 
+  const hasTransactionData = spentRows.length > 0;
+  let budgetItems: BudgetsResponse["budgets"];
+  let isLive = false;
+
+  if (configured.length > 0) {
+    isLive = true;
+    budgetItems = configured.map((b) => {
+      const limit = Number.parseFloat(b.limitAmount);
+      const spent = spentByCategory.get(b.category) ?? 0;
+      return {
+        category: b.category,
+        emoji: b.emoji,
+        color: b.color,
+        spent: formatMoneyAmount(spent),
+        limit: formatMoneyAmount(limit),
+      };
+    });
+  } else if (hasTransactionData) {
+    // Suggested limits from prior 3 months average spend (+10% buffer)
+    const [y, mo] = period.split("-").map(Number);
+    const priorMonths: string[] = [];
+    for (let i = 1; i <= 3; i++) {
+      const d = new Date(y!, mo! - 1 - i, 1);
+      priorMonths.push(
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      );
+    }
+    const avgByCategory = new Map<string, number[]>();
+    for (const pm of priorMonths) {
+      const bounds = monthBounds(pm);
+      const rows = await db
+        .select({
+          category: transactions.category,
+          total: sql<string>`sum(${transactions.amount})`,
+        })
+        .from(transactions)
+        .where(
+          and(
+            inArray(transactions.userId, ctx.userIds),
+            eq(transactions.transactionType, "expense"),
+            eq(transactions.isTransfer, false),
+            eq(transactions.pending, false),
+            gte(transactions.date, bounds.start),
+            lte(transactions.date, bounds.end),
+          ),
+        )
+        .groupBy(transactions.category);
+      for (const r of rows) {
+        const list = avgByCategory.get(r.category) ?? [];
+        list.push(Number.parseFloat(r.total ?? "0"));
+        avgByCategory.set(r.category, list);
+      }
+    }
+
+    budgetItems = [...avgByCategory.entries()]
+      .map(([category, totals]) => {
+        const avg = totals.reduce((s, v) => s + v, 0) / totals.length;
+        const meta = categoryMeta(category);
+        const spent = spentByCategory.get(category) ?? 0;
+        const limit = Math.max(avg * 1.1, spent);
+        return {
+          category,
+          emoji: meta.emoji,
+          color: meta.color,
+          spent: formatMoneyAmount(spent),
+          limit: formatMoneyAmount(limit),
+        };
+      })
+      .sort(
+        (a, b) =>
+          Number.parseFloat(b.spent) - Number.parseFloat(a.spent),
+      )
+      .slice(0, 10);
+    isLive = budgetItems.length > 0;
+  } else {
+    budgetItems = [];
+  }
+
   let totalLimit = 0;
   let totalSpent = 0;
-  const budgetItems = current.map((b) => {
-    const limit = Number.parseFloat(b.limitAmount);
-    const spent = spentByCategory.get(b.category) ?? 0;
-    totalLimit += limit;
-    totalSpent += spent;
-    return {
-      category: b.category,
-      emoji: b.emoji,
-      color: b.color,
-      spent: formatMoneyAmount(spent),
-      limit: formatMoneyAmount(limit),
-    };
-  });
+  for (const b of budgetItems) {
+    totalLimit += Number.parseFloat(b.limit);
+    totalSpent += Number.parseFloat(b.spent);
+  }
 
   const goalRows = await db
     .select()
@@ -143,6 +211,7 @@ export async function getBudgets(userId: string): Promise<BudgetsResponse> {
     periodMonth: period,
     safeToSpend: formatMoneyAmount(safeToSpend),
     daysRemaining,
+    isLive,
     budgets: budgetItems,
     goals: goalRows.map((g) => ({
       name: g.name,
@@ -160,6 +229,7 @@ export interface RecurringResponse {
   annualTotal: string;
   activeCount: number;
   priceChanges: number;
+  isLive: boolean;
   subscriptions: RecurringItem[];
   bills: RecurringItem[];
   leaks: {
@@ -198,7 +268,7 @@ export async function getRecurring(userId: string): Promise<RecurringResponse> {
     .from(recurringSeries)
     .where(inArray(recurringSeries.userId, ctx.userIds));
 
-  const toItem = (r: typeof rows[number]): RecurringItem => ({
+  const toItem = (r: (typeof rows)[number]): RecurringItem => ({
     merchantName: r.merchantName,
     category: r.category,
     kind: r.kind,
@@ -212,8 +282,48 @@ export async function getRecurring(userId: string): Promise<RecurringResponse> {
     brandColor: r.brandColor,
   });
 
-  const subscriptions = rows.filter((r) => r.kind === "subscription").map(toItem);
-  const bills = rows.filter((r) => r.kind === "bill").map(toItem);
+  let subscriptions: RecurringItem[];
+  let bills: RecurringItem[];
+  let isLive = false;
+
+  if (rows.length > 0) {
+    subscriptions = rows.filter((r) => r.kind === "subscription").map(toItem);
+    bills = rows.filter((r) => r.kind === "bill").map(toItem);
+    isLive = true;
+  } else {
+    const detected = await detectRecurringFromTransactions(ctx.userIds);
+    subscriptions = detected
+      .filter((d) => d.kind === "subscription")
+      .map((d) => ({
+        merchantName: d.merchantName,
+        category: d.category,
+        kind: d.kind,
+        amount: d.amount,
+        cadence: d.cadence,
+        nextChargeDate: d.nextChargeDate,
+        lastChargeDate: d.lastChargeDate,
+        previousAmount: d.previousAmount,
+        priceChanged: d.priceChanged,
+        status: d.status,
+        brandColor: d.brandColor,
+      }));
+    bills = detected
+      .filter((d) => d.kind === "bill")
+      .map((d) => ({
+        merchantName: d.merchantName,
+        category: d.category,
+        kind: d.kind,
+        amount: d.amount,
+        cadence: d.cadence,
+        nextChargeDate: d.nextChargeDate,
+        lastChargeDate: d.lastChargeDate,
+        previousAmount: d.previousAmount,
+        priceChanged: d.priceChanged,
+        status: d.status,
+        brandColor: d.brandColor,
+      }));
+    isLive = detected.length > 0;
+  }
 
   const monthlyTotal = subscriptions.reduce(
     (s, r) => s + Number.parseFloat(r.amount),
@@ -246,6 +356,7 @@ export async function getRecurring(userId: string): Promise<RecurringResponse> {
     annualTotal: formatMoneyAmount(monthlyTotal * 12),
     activeCount: subscriptions.filter((s) => s.status === "active").length,
     priceChanges: subscriptions.filter((s) => s.priceChanged).length,
+    isLive,
     subscriptions,
     bills,
     leaks: {

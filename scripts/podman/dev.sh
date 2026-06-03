@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Local dev: Postgres in Podman; API + UI on the host with logs under logs/dev/
+# Local dev: Postgres + Redis in Podman; API + UI on the host with logs under logs/dev/
 #
 # Usage:
 #   ./scripts/podman/dev.sh              # start all, then follow API + UI logs
 #   ./scripts/podman/dev.sh --detach     # start in background (no log follow)
-#   ./scripts/podman/dev.sh --postgres-only
-#   ./scripts/podman/dev.sh --no-postgres   # API + UI only (Postgres already up)
+#   ./scripts/podman/dev.sh --infra-only   # Postgres + Redis only (alias: --postgres-only)
+#   ./scripts/podman/dev.sh --no-infra     # API + UI only (infra already up; alias: --no-postgres)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,8 +19,8 @@ START_APPS=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --detach | -d) DETACH=1; shift ;;
-    --postgres-only) START_APPS=0; shift ;;
-    --no-postgres) START_POSTGRES=0; shift ;;
+    --postgres-only | --infra-only) START_APPS=0; shift ;;
+    --no-postgres | --no-infra) START_POSTGRES=0; shift ;;
     -h | --help)
       sed -n '2,8p' "$0"
       exit 0

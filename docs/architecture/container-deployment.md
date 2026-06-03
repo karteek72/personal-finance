@@ -72,7 +72,7 @@ Worker shares the API image with a different `CMD` — same codebase, no secrets
 | `postgres` | `docker.io/library/postgres:16-alpine` | — | named volume `pgdata` |
 | `redis` | `docker.io/library/redis:7-alpine` | — | optional persistence |
 | `api` | `spendflow-api` | postgres, redis | — |
-| `worker` | `spendflow-api` | postgres, redis | — |
+| `worker` | `spendflow-api` | redis, api (migrations) | — |
 | `ui` | `spendflow-ui` | api | — |
 
 Environment via `containers/.env` (gitignored) or Podman secrets.
@@ -120,5 +120,4 @@ See [containers/README.md](../../containers/README.md) for Cloudflare Tunnel hos
 
 ## Next steps
 
-- Add `spendflow-worker` image when BullMQ worker entry ships.
 - TLS / Caddy on host is optional when using Cloudflare Tunnel.
