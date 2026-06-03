@@ -5,7 +5,9 @@ import { useIsFetching } from "@tanstack/react-query";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { UserMenu } from "@/components/layout/user-menu";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useTheme } from "@/hooks/use-theme";
+import { greetingWithName, userDisplayName } from "@/lib/user-display";
 
 interface TopBarProps {
   title: string;
@@ -41,21 +43,29 @@ function ThemeToggleIcon({ theme }: { theme: "light" | "dark" }) {
 export function TopBar({ title }: TopBarProps) {
   const { theme, toggleTheme } = useTheme();
   const isFetching = useIsFetching() > 0;
+  const user = useCurrentUser();
+  const firstName = user ? userDisplayName(user) : null;
 
   return (
     <header className="sticky top-0 z-20 flex min-w-0 items-center justify-between gap-2 px-4 py-3 md:gap-4 md:px-5 md:py-4">
-      {/* Left: title (mobile only) + fetch spinner */}
       <div className="flex min-w-0 flex-1 items-center gap-2">
         {isFetching ? (
           <LoadingSpinner size="sm" label="Updating data" className="shrink-0" />
         ) : null}
-        {/* Page title: visible on mobile only — desktop sidebar provides navigation context */}
-        <h1 className="truncate text-lg font-bold tracking-tight text-text sm:text-xl md:hidden">
-          {title}
-        </h1>
+        {firstName ? (
+          <div className="min-w-0">
+            <p className="truncate text-base font-bold tracking-tight text-text sm:text-lg">
+              {greetingWithName(firstName)}
+            </p>
+            <p className="truncate text-xs font-medium text-text-muted md:hidden">{title}</p>
+          </div>
+        ) : (
+          <h1 className="truncate text-lg font-bold tracking-tight text-text sm:text-xl md:hidden">
+            {title}
+          </h1>
+        )}
       </div>
 
-      {/* Right: actions */}
       <div className="flex shrink-0 items-center gap-1">
         <NotificationBell />
         <UserMenu />

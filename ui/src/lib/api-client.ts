@@ -124,6 +124,10 @@ export const api = {
     });
   },
 
+  getMe(): Promise<{ user: AuthSessionResponse["user"] }> {
+    return fetchJson<{ user: AuthSessionResponse["user"] }>("/auth/me");
+  },
+
   getSummary(from?: string, to?: string): Promise<TransactionSummary> {
     if (USE_MOCKS) {
       return mockApi.getSummary(from, to);

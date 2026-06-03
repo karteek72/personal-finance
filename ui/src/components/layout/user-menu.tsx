@@ -4,6 +4,9 @@ import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "@/lib/api-client";
+import { requiresSignIn } from "@/lib/auth-session";
+import { userDisplayName } from "@/lib/user-display";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useAuthStore } from "@/stores/auth-store";
 
 function PersonIcon() {
@@ -25,16 +28,9 @@ function PersonIcon() {
   );
 }
 
-function displayLabel(email: string, displayName: string | null): string {
-  if (displayName?.trim()) return displayName.trim();
-  const local = email.split("@")[0] ?? "";
-  return local.length > 0 ? local : email;
-}
-
 export function UserMenu() {
-  const user = useAuthStore((s) => s.user);
-  const status = useAuthStore((s) => s.status);
-  const hydrated = useAuthStore((s) => s.hydrated);
+  const user = useCurrentUser();
+  const hasSession = useAuthStore((s) => s.status === "authenticated");
   const clearSession = useAuthStore((s) => s.clearSession);
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -61,11 +57,12 @@ export function UserMenu() {
     };
   }, [open]);
 
-  if (!hydrated || status !== "authenticated" || !user) {
+  if (!user) {
     return null;
   }
 
-  const label = displayLabel(user.email, user.displayName);
+  const firstName = userDisplayName(user);
+  const fullName = user.displayName?.trim() || firstName;
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -75,7 +72,7 @@ export function UserMenu() {
       // Clear local session even if the API call fails.
     } finally {
       clearSession();
-      window.location.assign("/login");
+      window.location.assign(requiresSignIn() ? "/login" : "/");
     }
   }
 
@@ -96,7 +93,7 @@ export function UserMenu() {
           <PersonIcon />
         </span>
         <span className="hidden max-w-[120px] truncate text-xs font-semibold text-text sm:inline">
-          {label}
+          {firstName}
         </span>
       </button>
 
@@ -106,18 +103,20 @@ export function UserMenu() {
           className="absolute right-0 z-30 mt-2 w-56 rounded-[var(--radius-sm)] border border-border bg-surface p-1 card-shadow"
         >
           <div className="border-b border-border px-3 py-2.5">
-            <p className="truncate text-sm font-semibold text-text">{label}</p>
+            <p className="truncate text-sm font-semibold text-text">{fullName}</p>
             <p className="truncate text-xs text-text-muted">{user.email}</p>
           </div>
-          <button
-            type="button"
-            role="menuitem"
-            disabled={signingOut}
-            onClick={() => void handleSignOut()}
-            className="flex w-full rounded-[var(--radius-sm)] px-3 py-2.5 text-left text-sm font-semibold text-danger transition-colors hover:bg-bg disabled:opacity-60"
-          >
-            {signingOut ? "Signing out…" : "Sign out"}
-          </button>
+          {hasSession ? (
+            <button
+              type="button"
+              role="menuitem"
+              disabled={signingOut}
+              onClick={() => void handleSignOut()}
+              className="flex w-full rounded-[var(--radius-sm)] px-3 py-2.5 text-left text-sm font-semibold text-danger transition-colors hover:bg-bg disabled:opacity-60"
+            >
+              {signingOut ? "Signing out…" : "Sign out"}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

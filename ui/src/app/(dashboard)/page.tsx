@@ -19,13 +19,6 @@ import {
 } from "@/lib/date-ranges";
 import { formatMoney } from "@/lib/format-money";
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 export default function DashboardPage() {
   const { from, to } = plaidHistoryDateRange();
   const {
@@ -77,16 +70,11 @@ function DashboardContent({
     <>
       <div className="flex flex-col gap-4">
 
-        {/* ── Greeting ──────────────────────────────────────────── */}
+        {/* ── Period context (greeting lives in TopBar) ─────────── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h2 className="text-xl font-bold tracking-tight text-text sm:text-2xl">
-              {getGreeting()} 👋
-            </h2>
-            <p className="mt-0.5 text-xs font-medium text-text-muted">
-              {plaidHistoryPeriodLabel()}
-            </p>
-          </div>
+          <p className="text-xs font-medium text-text-muted sm:text-sm">
+            {plaidHistoryPeriodLabel()}
+          </p>
           <Link
             href="/transactions"
             className="shrink-0 self-start rounded-[var(--radius-pill)] border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:border-primary/40 hover:text-primary sm:self-auto"
