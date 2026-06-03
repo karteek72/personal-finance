@@ -26,6 +26,7 @@ fi
 
 touch "${SPENDFLOW_CONTAINERS_DIR}/.env"
 spendflow_ensure_jwt_secret
+spendflow_ensure_encryption_key
 spendflow_prepare_postgres
 spendflow_apply_build_urls
 spendflow_stop_dev_servers

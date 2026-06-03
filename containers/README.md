@@ -136,6 +136,32 @@ Postgres is bound to `127.0.0.1:5433` only (not exposed on LAN).
 
 ## Troubleshooting
 
+### Plaid fails with `ENCRYPTION_KEY is required in production`
+
+The API container runs with `NODE_ENV=production`. An empty `ENCRYPTION_KEY=` in `containers/.env` breaks Plaid Link exchange and sync.
+
+1. Generate a stable secret (keep the same value across redeploys):
+
+   ```bash
+   openssl rand -hex 32
+   ```
+
+2. Set it in `containers/.env`:
+
+   ```text
+   ENCRYPTION_KEY=<paste-the-value>
+   ```
+
+3. Restart: `./scripts/podman/deploy.sh --no-build`
+
+`./scripts/podman/deploy.sh` also auto-generates `ENCRYPTION_KEY` when the line is missing or empty (see `spendflow_ensure_encryption_key` in `scripts/podman/lib.sh`).
+
+If you previously linked banks in **local dev** without `ENCRYPTION_KEY`, tokens were encrypted with the dev default. Use the same key in production or disconnect and re-link Plaid items:
+
+```text
+ENCRYPTION_KEY=dev-insecure-plaid-key-change-in-production
+```
+
 ```bash
 ./scripts/podman/logs.sh api
 curl -s "http://192.168.68.100:4000/api/v1/health" | jq .
