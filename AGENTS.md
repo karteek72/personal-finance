@@ -63,4 +63,6 @@ Plaid Link (web/iOS SDK) ─┘
 
 ## Current phase
 
-Structure and rules only. Phase 1: backend schema + health endpoint, then web UI shell. iOS starts Phase 4 per [mobile-ios.md](docs/architecture/mobile-ios.md).
+**Active:** Phase 3.6 statement import (web). Track work in [`docs/development/TASK_BOARD.md`](docs/development/TASK_BOARD.md).
+
+**Deferred:** iPhone app (`ios/`) — **lowest priority (P4)**; partial shell only; no new iOS features until import path ships on web.

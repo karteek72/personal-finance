@@ -25,6 +25,7 @@ import { planningRoutes } from "./routes/planning.js";
 import { insightRoutesV2 } from "./routes/insights.js";
 import { protectRoutes } from "./routes/protect.js";
 import { coachRoutes } from "./routes/coach.js";
+import { importRoutes } from "./routes/imports.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -104,6 +105,7 @@ async function main(): Promise<void> {
   await app.register(insightRoutesV2, { prefix: "/api/v1" });
   await app.register(protectRoutes, { prefix: "/api/v1" });
   await app.register(coachRoutes, { prefix: "/api/v1" });
+  await app.register(importRoutes, { prefix: "/api/v1" });
 
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
   app.log.info({ port: env.PORT }, "SpendFlow API listening");

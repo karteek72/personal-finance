@@ -446,6 +446,18 @@ export function AccountsView() {
         action={
           <>
             <Link
+              href="/accounts/import"
+              title="Import history"
+              aria-label="Import history"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] bg-surface text-text-muted transition-all hover:bg-primary-soft hover:text-primary card-shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+                <path d="M12 3v12" />
+                <path d="m7 10 5 5 5-5" />
+                <path d="M5 21h14" />
+              </svg>
+            </Link>
+            <Link
               href="/categories"
               title="Cash flow"
               aria-label="Cash flow"

@@ -16,10 +16,13 @@
     "db:assign-legacy": "tsx scripts/assign-legacy-data.ts",
     "db:gen-mock": "tsx scripts/generate-mock-dataset.ts",
     "db:seed": "tsx scripts/seed-mock-data.ts",
-    "seed:mock": "tsx scripts/seed-mock-data.ts"
+    "seed:mock": "tsx scripts/seed-mock-data.ts",
+    "test:import": "tsx --test src/services/import/__tests__/*.test.ts",
+    "test:export": "tsx --test src/services/__tests__/export-user-data.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
+    "@fastify/multipart": "^9.4.0",
     "bullmq": "^5.34.8",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.3",

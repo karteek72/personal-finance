@@ -661,3 +661,73 @@ export interface TransactionFilters {
   limit?: number;
   cursor?: string;
 }
+
+export interface ImportFormatInfo {
+  id: string;
+  label: string;
+  extensions: string[];
+  description: string;
+  brokers: string[];
+}
+
+export interface ImportFormatsResponse {
+  formats: ImportFormatInfo[];
+  limits: {
+    maxFiles: number;
+    maxFileBytes: number;
+    maxBatchBytes: number;
+  };
+  consentVersion: string;
+}
+
+export interface ImportBatchCreateResponse {
+  batchId: string;
+  status: "pending" | "processing" | "awaiting_confirmation" | "completed" | "failed";
+  filesTotal: number;
+  message: string;
+}
+
+export interface ImportFilePreviewSummary {
+  accounts: {
+    institutionName: string;
+    mask: string;
+    type: string;
+    subtype: string;
+    matchedAccountId: string | null;
+    bankingCount: number;
+    investmentCount: number;
+  }[];
+  dateRange: { min: string | null; max: string | null };
+  sampleTransactions: { date: string; name: string; amount: string }[];
+}
+
+export interface ImportBatchStatusResponse {
+  batch: {
+    id: string;
+    status: string;
+    filesTotal: number;
+    filesProcessed: number;
+    txnsInserted: number;
+    txnsSkipped: number;
+    errorMessage: string | null;
+    createdAt: string;
+    completedAt: string | null;
+  };
+  files: {
+    id: string;
+    filename: string;
+    format: string;
+    byteSize: number;
+    status: string;
+    errorMessage: string | null;
+    preview: ImportFilePreviewSummary | null;
+  }[];
+}
+
+export interface ImportConfirmResponse {
+  batchId: string;
+  status: "completed";
+  txnsInserted: number;
+  txnsSkipped: number;
+  message: string;
+}

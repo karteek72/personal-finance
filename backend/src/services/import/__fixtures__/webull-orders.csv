@@ -1,0 +1,4 @@
+Name,Symbol,Side,Status,Filled,Avg Price,Filled Time
+AAPL,AAPL,Buy,Filled,10,182.50,03/15/2024 10:30:00
+AAPL,AAPL,Buy,Cancelled,0,0,03/15/2024 11:00:00
+TSLA,TSLA,Sell,Filled,2,250.00,03/16/2024 14:00:00

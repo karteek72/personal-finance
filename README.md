@@ -463,7 +463,8 @@ Research shows that tracking data alone doesn't change behavior. What changes be
 - ✅ Phase 2: Webhook receiver, BullMQ queue, reconciliation engine, categorization, dashboard UI
 - 🔄 Phase 3: Spend page, smart alerts, CSV export, mobile responsive polish, **unified navigation IA + Accounts/Debt merge**
 - 🧪 Phase 3.5: Roadmap features prototyped as interactive **preview** hubs (Plan, Wealth, Insights, Protect, Coach, Wrapped) — Net Worth & Investments wired to real balances, rest on illustrative data pending backend endpoints
-- ⏳ Phase 4: iPhone app (SwiftUI)
+- 🔄 Phase 3.6: **Statement import** — UI upload + encrypted storage shipped; CSV parsers (E*TRADE/Fidelity/Webull) + worker next — see [TASK_BOARD.md](docs/development/TASK_BOARD.md)
+- ⏸️ Phase 4: iPhone app (SwiftUI) — **deferred / lowest priority**
 - ⏳ Phase 5: Productionize AI coach, budgets, net worth, investment analysis (back the previews with real APIs)
 
 ---

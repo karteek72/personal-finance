@@ -1,0 +1,3 @@
+TransactionDate,TransactionType,Symbol,Quantity,Price,Amount,Description,Account Number
+03/15/2024,Bought,AAPL,10,182.50,-1825.00,APPLE INC,****1234
+03/16/2024,Sold,AAPL,5,185.00,925.00,APPLE INC,****1234

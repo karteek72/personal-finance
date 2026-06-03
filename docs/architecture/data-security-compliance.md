@@ -14,13 +14,25 @@ Covers secure storage of customer accounts, Plaid connection details, financial 
 | Plaid `access_token` | **Critical secret** | Backend PostgreSQL only | AES-256-GCM + envelope encryption (KMS in cloud) |
 | Bank login credentials | **Never stored** | Plaid OAuth only | N/A |
 | Transactions, balances | **Sensitive financial PII** | PostgreSQL | DB volume encryption + TLS in transit |
+| Uploaded statement files (pre-parse) | **Sensitive financial PII** | PostgreSQL `import_files.content_encrypted` | AES-256-GCM per file; purged after parse (≤24h) |
 | Email, user profile | **PII** | PostgreSQL | Same |
 | JWT refresh token | **High** | Web: httpOnly cookie; iOS: Keychain | OS / cookie flags |
 | JWT access token | **Medium** | Memory only (short TTL) | N/A |
 | APNs device token | **Medium** | PostgreSQL `devices` table | Standard DB security |
 | Plaid webhook payloads | **Transient** | Process in memory; log metadata only | N/A |
 
-**Rule:** Plaid `access_token`, `PLAID_SECRET`, `ENCRYPTION_KEY`, and `DATABASE_URL` never appear in `ui/`, `ios/`, logs, analytics, or crash reports.
+**Rule:** Plaid `access_token`, `PLAID_SECRET`, `ENCRYPTION_KEY`, and `DATABASE_URL` never appear in `ui/`, `ios/`, logs, analytics, or crash reports. Uploaded statement **file contents** are never logged — only batch id, byte size, and format metadata.
+
+### Uploaded statement files
+
+```
+User upload (TLS) → API validates + encrypts (AES-256-GCM, import salt)
+  → import_files.content_encrypted
+  → worker decrypts in memory → parse → transactions / investment_transactions
+  → delete encrypted blob (retention ≤24h, configurable)
+```
+
+See [statement-import-ui-and-security.md](../design/statement-import-ui-and-security.md).
 
 ---
 
@@ -81,7 +93,7 @@ SpendFlow processes personal financial data. Obligations vary by user location.
 |------------|----------------|
 | Consent | Explicit checkbox at signup + before first Plaid Link; store in `consent_records` |
 | Right to erasure | `DELETE /users/me` — revoke Plaid items, cascade delete DB rows |
-| Right to portability | CSV export (MVP); JSON export (add for GDPR) |
+| Right to portability | CSV export + `GET /auth/export` JSON (GDPR/CCPA) |
 | Right to know | Privacy policy + in-app data summary screen (V2) |
 | Breach response | Documented playbook with 72h EU notification timeline |
 | Sub-processors | Published list: Plaid, cloud host, push/email provider |

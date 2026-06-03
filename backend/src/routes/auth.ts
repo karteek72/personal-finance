@@ -1,7 +1,14 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { AppError } from "../lib/errors.js";
+import { requireRequestUser } from "../lib/auth-http.js";
+import { getDb } from "../db/client.js";
 import { parseBody } from "../lib/validate.js";
+import {
+  auditContextFromRequest,
+  logAuditEvent,
+} from "../services/import/import-audit.js";
+import { buildUserDataExport } from "../services/export-user-data.js";
 import { verifyGoogleIdToken } from "../services/auth/google.js";
 import {
   signAccessToken,
@@ -99,6 +106,38 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       throw AppError.unauthenticated();
     }
     return { user: serializeUser(user) };
+  });
+
+  app.get("/auth/export", async (request, reply) => {
+    const user = await requireRequestUser(request, app.config.env);
+    const db = getDb();
+    const auditCtx = auditContextFromRequest(request);
+
+    const payload = await buildUserDataExport(user.id, db);
+
+    await logAuditEvent(
+      db,
+      user.id,
+      "data_export",
+      "user",
+      user.id,
+      {
+        exportVersion: payload.exportVersion,
+        transactionCount: payload.transactions.length,
+        accountCount: payload.accounts.length,
+      },
+      auditCtx,
+    );
+
+    const stamp = payload.exportedAt.slice(0, 10);
+    reply.header("Content-Type", "application/json; charset=utf-8");
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="spendflow-export-${stamp}.json"`,
+    );
+    reply.header("Cache-Control", "no-store");
+
+    return payload;
   });
 
   app.post("/auth/logout", async (_request, reply) => {

@@ -15,6 +15,7 @@ Requirements and UX artifacts — read these before implementing features.
 | [design-tokens.json](design/design-tokens.json) | Design, web, iOS | Platform-agnostic color, type, category tokens |
 | [mobile-patterns.md](design/mobile-patterns.md) | iOS engineers | Keychain, Plaid native, push, SwiftUI mapping |
 | [api-contract.md](design/api-contract.md) | All clients, backend | Shared REST API contract |
+| [statement-import-ui-and-security.md](design/statement-import-ui-and-security.md) | UI, backend | Import wizard, upload limits, encryption |
 
 ## Architecture (`architecture/`)
 
@@ -27,6 +28,8 @@ Technical decisions and deployment.
 | [data-security-compliance.md](architecture/data-security-compliance.md) | Backend, legal, DevOps | Encryption, GDPR/CCPA, Postgres migration |
 | [repository-layout.md](architecture/repository-layout.md) | All engineers | Monorepo conventions |
 | [container-deployment.md](architecture/container-deployment.md) | DevOps | Podman images, compose, networking |
+| [import-parser-design.md](architecture/import-parser-design.md) | Backend | Universal QFX/CSV/PDF parsers, brokerage day-trade |
+| [statement-import-and-plaid-bridge.md](architecture/statement-import-and-plaid-bridge.md) | Backend, PM | Import-first vs Plaid merge strategy |
 
 ## Development (`development/`)
 

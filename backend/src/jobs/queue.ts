@@ -6,13 +6,19 @@ import { createLogger } from "../lib/logger.js";
 const log = createLogger("jobs.queue");
 
 export const PLAID_SYNC_QUEUE_NAME = "plaid-sync";
+export const IMPORT_BATCH_QUEUE_NAME = "import-batch";
 
 export interface PlaidSyncJobData {
   plaidItemId: string;
   webhookCode: string;
 }
 
+export interface ImportBatchJobData {
+  batchId: string;
+}
+
 let queue: Queue<PlaidSyncJobData> | null = null;
+let importBatchQueue: Queue<ImportBatchJobData> | null = null;
 let pingClient: Redis | null = null;
 
 export function isRedisConfigured(env: Env): boolean {
@@ -90,5 +96,45 @@ export async function enqueuePlaidSync(
   await q.add("sync", data, {
     jobId: `plaid-sync-${data.plaidItemId}`,
   });
+  return true;
+}
+
+export function getImportBatchQueue(
+  env: Env,
+): Queue<ImportBatchJobData> | null {
+  if (!isRedisConfigured(env)) {
+    return null;
+  }
+
+  if (!importBatchQueue) {
+    const connection = getRedisConnectionOptions(env);
+    if (!connection) {
+      return null;
+    }
+
+    importBatchQueue = new Queue<ImportBatchJobData>(IMPORT_BATCH_QUEUE_NAME, {
+      connection,
+      defaultJobOptions: {
+        attempts: 2,
+        backoff: { type: "exponential", delay: 2000 },
+        removeOnComplete: 100,
+        removeOnFail: 200,
+      },
+    });
+  }
+
+  return importBatchQueue;
+}
+
+export async function enqueueImportBatch(
+  env: Env,
+  batchId: string,
+): Promise<boolean> {
+  const q = getImportBatchQueue(env);
+  if (!q) {
+    return false;
+  }
+
+  await q.add("parse", { batchId }, { jobId: `import-batch-${batchId}` });
   return true;
 }

@@ -1,0 +1,10 @@
+SoFi Securities LLC
+SoFi Invest Account Statement
+Account Number: ****5678
+
+Trade Activity
+Date       Symbol  Buy/Sell  Quantity  Price    Amount
+01/15/2024  AAPL   Buy       10        150.00   -1500.00
+02/01/2024  TSLA   Sell      2         200.00   400.00
+
+Account Summary

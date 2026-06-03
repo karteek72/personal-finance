@@ -1,0 +1,4 @@
+Activity Date,Process Date,Settle Date,Instrument,Description,Trans Code,Quantity,Price,Amount
+01/15/2024,01/15/2024,01/16/2024,AAPL,Apple Inc,Buy,1,150.00,-150.00
+02/01/2024,02/01/2024,02/02/2024,AAPL,Apple Inc,Sell,1,160.00,160.00
+01/20/2024,01/20/2024,01/21/2024,,ACH Deposit,ACH,,,500.00

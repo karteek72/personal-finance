@@ -124,7 +124,8 @@ export const transactions = pgTable(
     transactionType: text("transaction_type").notNull(), // expense | income | transfer
     isTransfer: boolean("is_transfer").notNull().default(false),
     pending: boolean("pending").notNull().default(false),
-    source: text("source").notNull(), // qfx | bofa_pdf
+    source: text("source").notNull(), // qfx | bofa_pdf | csv | plaid
+    dedupFingerprint: text("dedup_fingerprint"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -289,6 +290,7 @@ export const investmentTransactions = pgTable(
     price: numeric("price", { precision: 18, scale: 4 }),
     amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
     fees: numeric("fees", { precision: 12, scale: 2 }).notNull().default("0"),
+    dedupFingerprint: text("dedup_fingerprint"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -625,3 +627,73 @@ export const wrappedSummaries = pgTable(
     uniqueIndex("wrapped_user_year_idx").on(table.userId, table.year),
   ],
 );
+
+/* ------------------------------------------------------------------ *
+ * Statement import (encrypted uploads → worker parse)
+ * ------------------------------------------------------------------ */
+
+export const importBatches = pgTable("import_batches", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"), // pending | processing | awaiting_confirmation | completed | failed
+  filesTotal: integer("files_total").notNull().default(0),
+  filesProcessed: integer("files_processed").notNull().default(0),
+  txnsInserted: integer("txns_inserted").notNull().default(0),
+  txnsSkipped: integer("txns_skipped").notNull().default(0),
+  errorMessage: text("error_message"),
+  consentVersion: text("consent_version").notNull().default("statement_import_v1"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
+export const importFiles = pgTable("import_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  batchId: uuid("batch_id")
+    .notNull()
+    .references(() => importBatches.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  format: text("format").notNull(), // qfx | ofx | csv | pdf
+  byteSize: integer("byte_size").notNull(),
+  contentEncrypted: text("content_encrypted").notNull(),
+  status: text("status").notNull().default("stored"), // stored | parsing | preview_ready | parsed | failed | purged
+  parsedPreview: jsonb("parsed_preview"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  parsedAt: timestamp("parsed_at", { withTimezone: true }),
+});
+
+export const consentRecords = pgTable("consent_records", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  consentType: text("consent_type").notNull(),
+  version: text("version").notNull(),
+  grantedAt: timestamp("granted_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+});
+
+export const auditEvents = pgTable("audit_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  resourceType: text("resource_type"),
+  resourceId: uuid("resource_id"),
+  metadata: jsonb("metadata"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

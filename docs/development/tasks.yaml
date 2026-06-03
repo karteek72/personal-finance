@@ -3,7 +3,7 @@
 # CLI: npm run task -- <list|next|claim|release|complete|status> [args]
 #
 # Status: backlog | ready | in_progress | blocked | done | cancelled
-# Priority: P0 (critical) | P1 (high) | P2 (medium) | P3 (low)
+# Priority: P0 (critical) | P1 (high) | P2 (medium) | P3 (low) | P4 (deferred)
 
 version: 1
 updated_at: "2026-06-03"
@@ -223,46 +223,183 @@ tasks:
       - POST /coach/ask returns answers from precomputed monthly summaries
       - No API keys required for MVP stub
 
-  # ── P3 — Phase 4 iOS ────────────────────────────────────────────────────
+  # ── P0 — Statement import (current focus) ───────────────────────────────
 
-  - id: TASK-IOS-001
-    title: iOS Face ID app unlock
-    status: backlog
-    priority: P3
-    area: ios
-    phase: 4
+  - id: TASK-IMPORT-001
+    title: Import UI + encrypted multipart upload API (Phase A)
+    status: done
+    priority: P0
+    area: backend
+    phase: 3.6
     assignee: null
     claimed_at: null
     dependencies: []
     source_docs:
-      - docs/architecture/mobile-ios.md
-      - ios/STRUCTURE.md
-    description: LocalAuthentication gate before showing dashboard when enabled in settings.
+      - docs/design/statement-import-ui-and-security.md
+      - docs/design/api-contract.md
+      - docs/architecture/data-security-compliance.md
+    description: |
+      /accounts/import wizard, GET/POST /imports/* routes, AES-256-GCM blob storage,
+      upload limits (10 files, 10 MiB/file, 50 MiB batch), format detection scaffold.
     acceptance_criteria:
-      - Optional toggle in settings
-      - Keychain tokens remain; only UI gated
+      - UI at /accounts/import with format cards, consent, drag-drop
+      - POST /imports/batches stores encrypted files in import_files
+      - GET /imports/formats returns limits for client validation
+      - No file contents in logs
 
-  - id: TASK-IOS-002
-    title: iOS push notifications (APNs) for alerts
-    status: backlog
-    priority: P3
-    area: ios
-    phase: 4
+  - id: TASK-IMPORT-002
+    title: Day-trade CSV parsers — E*TRADE, Fidelity, Webull + worker parse job
+    status: done
+    priority: P0
+    area: backend
+    phase: 3.6
     assignee: null
     claimed_at: null
     dependencies:
-      - TASK-PLAID-001
+      - TASK-IMPORT-001
     source_docs:
-      - docs/design/mobile-patterns.md
-    description: Register device token; backend sends alert push when new insight severity ≥ warning.
+      - docs/architecture/import-parser-design.md
+      - docs/architecture/statement-import-and-plaid-bridge.md
+    description: |
+      Extract parsers to services/import/; decrypt blob in worker; batch insert
+      investment_transactions + securities; auto-detect account from CSV headers.
+      Wave 1 brokers (highest day-trade volume).
     acceptance_criteria:
-      - Device token stored per user
-      - Test push from dev script
+      - fidelity-activity, etrade-transactions, webull-orders templates detect headers
+      - Worker job processes import_batches; updates status + txn counts
+      - Webull filters non-Filled orders
+      - Unit tests with sanitized fixture headers
+
+  - id: TASK-IMPORT-003
+    title: OFX/QFX parser — bank, credit, and investment blocks
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.6
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IMPORT-002
+    source_docs:
+      - docs/architecture/import-parser-design.md
+    description: |
+      Parse multi-account OFX; route STMTRS → transactions, INVSTMTRS → investment_transactions;
+      extract account identity from ACCTID, FI.ORG, BROKERID.
+    acceptance_criteria:
+      - Single file can yield multiple ParsedStatement objects
+      - Fidelity QFX invest block maps buy/sell with FITID external_id
+    notes: |
+      parse-ofx.ts + persist-banking.ts; migration 0010; 8 import tests pass.
+
+  - id: TASK-IMPORT-004
+    title: Import review UI — detected accounts + confirm before persist
+    status: done
+    priority: P1
+    area: ui
+    phase: 3.6
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IMPORT-002
+    source_docs:
+      - docs/design/statement-import-ui-and-security.md
+    description: |
+      After parse preview, show detected institution/mask/type per file; user confirms
+      merge with existing account or create new; then commit batch.
+    acceptance_criteria:
+      - GET batch returns parsed account previews (no raw file content)
+      - User can map file → existing account or accept auto-match
+      - Confirm triggers final persist (or re-queue job)
+    notes: |
+      previewImportBatch + confirmImportBatch; ImportReview component; POST /imports/batches/:id/confirm.
+
+  - id: TASK-IMPORT-005
+    title: Plaid ↔ import account merge + cross-source dedup fingerprint
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.6
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IMPORT-002
+    source_docs:
+      - docs/architecture/statement-import-and-plaid-bridge.md
+    description: |
+      Account link suggestions (institution + mask + type); merge sets source=hybrid;
+      dedup_fingerprint on transactions and investment_transactions; Plaid sync skips duplicates.
+    acceptance_criteria:
+      - GET /accounts/link-suggestions after Plaid exchange
+      - POST /accounts/:id/link-plaid merges without duplicate account row
+      - Same purchase from import + Plaid not inserted twice
+    notes: |
+      dedup_fingerprint columns; fingerprint.ts; GET /imports/link-suggestions; POST /imports/accounts/merge; Plaid upsert skips fingerprint dupes.
+
+  - id: TASK-IMPORT-006
+    title: Import compliance — blob retention, consent_records, audit_events
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.6
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IMPORT-002
+    source_docs:
+      - docs/architecture/data-security-compliance.md
+      - docs/design/statement-import-ui-and-security.md
+    description: |
+      Purge import_files.content_encrypted after parse (IMPORT_BLOB_RETENTION_HOURS);
+      persist consent_records on upload; audit_events for upload/complete/delete.
+    acceptance_criteria:
+      - Encrypted blob nulled after successful parse
+      - consent_records row on first upload with version string
+      - audit_events logged without PII or file content
+    notes: |
+      Migration 0011; import-audit.ts; purge-import-blobs.ts; consent on every upload batch.
+
+  - id: TASK-IMPORT-007
+    title: Secondary CSV templates — Schwab, Robinhood, Coinbase + SoFi checking
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.6
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IMPORT-002
+    source_docs:
+      - docs/architecture/import-parser-design.md
+    description: Wave 2 broker templates; Coinbase → crypto securities.
+    acceptance_criteria:
+      - schwab-transactions skips account-info prefix rows
+      - coinbase-tx-history maps to investment_transactions with assetType crypto
+    notes: |
+      schwab-transactions, robinhood-activity, coinbase-tx-history, sofi-checking templates + fixtures.
+
+  - id: TASK-IMPORT-008
+    title: PDF statement plugins — SoFi Invest, brokerage fallbacks
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.6
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IMPORT-002
+    source_docs:
+      - docs/architecture/import-parser-design.md
+    description: Institution detect + pdftotext plugins where CSV unavailable.
+    acceptance_criteria:
+      - sofi-invest PDF extracts trades or flags manual review
+      - Generic detection fails gracefully with user-visible warning
+    notes: |
+      pdf/detect-institution.ts, sofi-invest.ts, parseImportFileAsync; graceful errors for unknown PDFs.
 
   - id: TASK-SEC-002
     title: GDPR JSON data export endpoint
-    status: backlog
-    priority: P3
+    status: done
+    priority: P2
     area: backend
     phase: 3
     assignee: null
@@ -274,3 +411,45 @@ tasks:
     acceptance_criteria:
       - Authenticated user only
       - No secrets in export
+    notes: |
+      export-user-data.ts; GET /auth/export with attachment; assertExportHasNoSecrets; data_export audit event.
+
+  # ── P4 — iPhone app (deferred — lowest priority) ────────────────────────
+
+  - id: TASK-IOS-001
+    title: iOS Face ID app unlock
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/mobile-ios.md
+      - ios/STRUCTURE.md
+    description: |
+      LocalAuthentication gate before showing dashboard when enabled in settings.
+      Deferred until web + statement import path complete.
+    acceptance_criteria:
+      - Optional toggle in settings
+      - Keychain tokens remain; only UI gated
+
+  - id: TASK-IOS-002
+    title: iOS push notifications (APNs) for alerts
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PLAID-001
+    source_docs:
+      - docs/design/mobile-patterns.md
+    description: |
+      Register device token; backend sends alert push when new insight severity ≥ warning.
+      Deferred until web + statement import path complete.
+    acceptance_criteria:
+      - Device token stored per user
+      - Test push from dev script

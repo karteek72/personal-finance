@@ -24,7 +24,7 @@ Run from repo root: `npm run task -- next` — uses backend `tsx` + `yaml` (no r
 ## Task fields
 
 - **status:** `backlog` → `ready` → `in_progress` → `done` (or `blocked` / `cancelled`)
-- **priority:** P0 critical · P1 high · P2 medium · P3 low
+- **priority:** P0 critical · P1 high · P2 medium · P3 low · **P4 deferred** (iOS)
 - **area:** `backend` · `ui` · `ios` · `docs` · `infra`
 - **dependencies:** Task IDs that must be `done` before this task becomes `ready`
 

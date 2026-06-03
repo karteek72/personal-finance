@@ -65,6 +65,20 @@ See [user-personas-and-scenarios.md](user-personas-and-scenarios.md) for target 
 - [x] Dark/light mode
 - [x] Mobile-responsive (375px+)
 
+### Data ingestion strategy (planned)
+
+Two onboarding paths to control Plaid cost and maximize history depth — see [statement-import-and-plaid-bridge.md](../architecture/statement-import-and-plaid-bridge.md):
+
+- [x] **Import UI (Phase A)** — `/accounts/import` wizard; multipart upload; AES-256-GCM encrypted storage
+- [x] **CSV parsers + worker (Wave 1)** — E*TRADE, Fidelity, Webull → `investment_transactions`
+- [ ] **Statements first** — bulk upload 5–10 years of monthly **QFX/OFX, CSV, or PDF**; parser auto-identifies account from file content
+- [ ] **All account types** — checking, savings, credit cards, brokerage (day/swing trades), IRA/401k; banking → `transactions`, trades → `investment_transactions`
+- [ ] **High-volume brokerage** — batch worker for thousands of trades per monthly statement
+- [ ] **Plaid first** — direct Link for users with ≤10 accounts who accept ~24 months of history
+- [ ] **Smart merge** — when Plaid links after import, match accounts by institution + mask + type; dedup transactions by fingerprint; upsert only net-new Plaid rows
+
+Parser spec: [import-parser-design.md](../architecture/import-parser-design.md). CLI prototype: `npm run import:statements` (QFX + BofA PDF only today).
+
 ### V2 (post-launch)
 
 - [ ] MX & Finicity as fallback aggregators
@@ -76,9 +90,9 @@ See [user-personas-and-scenarios.md](user-personas-and-scenarios.md) for target 
 - [ ] Tax export (Schedule C, 1099 category tagging)
 - [x] Multi-user household mode (invites, partner sign-in, shared dashboard)
 
-### iPhone app (post-web MVP)
+### iPhone app (deferred — lowest priority)
 
-Native SwiftUI app sharing the same backend API — see [mobile-ios.md](../architecture/mobile-ios.md).
+Native SwiftUI app sharing the same backend API — see [mobile-ios.md](../architecture/mobile-ios.md). **No active development** until statement import (Phase 3.6) is usable on web.
 
 - [ ] Auth + Keychain session
 - [ ] Tab navigation (5 screens)
@@ -91,7 +105,29 @@ Native SwiftUI app sharing the same backend API — see [mobile-ios.md](../archi
 
 ## Development Phases
 
-**Current state:** Phase 1 complete. Phase 2 complete (webhook sync, BullMQ queue, reconciliation, categorization, dashboard). Phase 3 polish (mobile responsive, production readiness) in progress.
+**Current state:** Phase 1–2 complete. Phase 3 polish largely complete. **Phase 3.6 statement import** is the active track (UI upload shipped; parsers + worker next). Phase 4 iPhone **deferred**.
+
+### Phase 3.6 — Statement import (active)
+
+- [x] Import UI + encrypted upload API (`/accounts/import`, `/imports/*`)
+- [x] CSV parsers: E*TRADE, Fidelity, Webull (day-trade Wave 1) + worker job
+- [ ] OFX/QFX multi-account parser
+- [ ] Import review UI (detected accounts)
+- [ ] Plaid ↔ import merge + transaction dedup
+- [ ] Blob retention, consent records, audit events
+- [ ] Secondary brokers + PDF plugins
+
+See [TASK_BOARD.md](../development/TASK_BOARD.md).
+
+### Phase 3 — Polish & Launch — largely complete
+
+- [x] Categories page + transaction table
+- [x] Smart alerts engine
+- [x] CSV export
+- [x] Mobile responsive
+- [x] Reconnect flow for expired Plaid items
+- [ ] Production Plaid approval
+- [ ] Monitoring (Sentry, structured logs)
 
 ### Phase 1 — Foundation (Weeks 1–4) ✅
 
@@ -109,17 +145,9 @@ Native SwiftUI app sharing the same backend API — see [mobile-ios.md](../archi
 - [x] Auto-categorization pipeline
 - [x] Dashboard UI + Money Flow page
 
-### Phase 3 — Polish & Launch (Weeks 9–12) — in progress
+### Phase 4 — iPhone (deferred — lowest priority)
 
-- [x] Categories page + transaction table
-- [x] Smart alerts engine
-- [x] CSV export
-- [x] Mobile responsive
-- [x] Reconnect flow for expired Plaid items
-- [ ] Production Plaid approval
-- [ ] Monitoring (Sentry, structured logs)
-
-### Phase 4 — iPhone (Weeks 13–16) — partial shell in `ios/`
+Partial shell in `ios/`. **Not scheduled** until Phase 3.6 statement import is usable on web.
 
 - [ ] iOS shell: auth, Keychain, tab navigation (partial)
 - [ ] Dashboard + transactions (read-only) (partial)
@@ -141,7 +169,7 @@ Native SwiftUI app sharing the same backend API — see [mobile-ios.md](../archi
 2. **Plaid production account** — confirm acceptable for personal vs SaaS use.
 3. **AI coach (V2)** — cloud LLM vs local Ollama for privacy.
 4. **Hosting** — Podman self-hosted (preferred) vs managed PaaS for dev/staging.
-5. **Mobile** — **SwiftUI native iPhone app** (decided). See [mobile-ios.md](../architecture/mobile-ios.md).
+5. **Mobile** — SwiftUI iPhone app decided but **deferred (P4)** until statement import ships on web. See [mobile-ios.md](../architecture/mobile-ios.md).
 6. **Data residency** — single region initially; `users.data_region` for future EU split. See [data-security-compliance.md](../architecture/data-security-compliance.md).
 
 ---

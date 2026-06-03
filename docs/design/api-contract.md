@@ -34,6 +34,7 @@ HTTP status codes: `200` success, `201` created, `204` no content, `400` validat
 | POST | `/auth/refresh` | `{ refreshToken }` | `{ accessToken, refreshToken }` |
 | POST | `/auth/logout` | — | `204` |
 | GET | `/auth/me` | — | `{ user }` |
+| GET | `/auth/export` | — | Portable JSON download (`Content-Disposition: attachment`). No secrets (Plaid tokens, encrypted import blobs, invitation tokens). Logs `data_export` audit event. |
 | DELETE | `/users/me` | — | `204` (CCPA cascade delete) |
 
 ---
@@ -87,6 +88,21 @@ Requires `PLAID_PRODUCTS=transactions,liabilities`. Existing items must be re-li
 | DELETE | `/accounts/:accountId` | — | `{ deleted: true }` |
 | POST | `/accounts/:accountId/sync` | — | `{ status: "queued" }` |
 | POST | `/plaid/sync` | — | `{ queued: number }` (sync all items) |
+
+---
+
+## Imports (statement upload)
+
+Multipart upload for QFX/OFX/CSV/PDF statement files. Files encrypted at rest (AES-256-GCM) before parsing. See [statement-import-ui-and-security.md](statement-import-ui-and-security.md).
+
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| GET | `/imports/formats` | — | `{ formats, limits, consentVersion }` |
+| POST | `/imports/batches` | `multipart/form-data`: `files[]`, `consentAccepted=true` | `{ batchId, status, filesTotal, message }` |
+| GET | `/imports/batches/:batchId` | — | `{ batch, files }` |
+| DELETE | `/imports/batches/:batchId` | — | `204` |
+
+**Limits (defaults, env-configurable):** 10 files, 10 MiB/file, 50 MiB/batch.
 
 ---
 

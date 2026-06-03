@@ -43,6 +43,10 @@ import type {
   UpdateTransactionCategoryResponse,
   WellnessResponse,
   WrappedResponse,
+  ImportFormatsResponse,
+  ImportBatchCreateResponse,
+  ImportBatchStatusResponse,
+  ImportConfirmResponse,
 } from "@/types/api";
 
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== "false";
@@ -226,6 +230,43 @@ export const api = {
       parseContentDispositionFilename(
         response.headers.get("Content-Disposition"),
       ) ?? "transactions.csv";
+    triggerBrowserDownload(blob, filename);
+  },
+
+  async exportUserDataJson(): Promise<void> {
+    if (USE_MOCKS) {
+      triggerBrowserDownload(
+        new Blob(
+          [JSON.stringify({ exportVersion: "1.0", exportedAt: new Date().toISOString() }, null, 2)],
+          { type: "application/json" },
+        ),
+        "spendflow-export-mock.json",
+      );
+      return;
+    }
+
+    const response = await fetch(`${getBaseUrl()}/auth/export`, {
+      headers: authHeaders(),
+    });
+
+    if (!response.ok) {
+      const body: unknown = await response.json().catch(() => null);
+      const message =
+        typeof body === "object" &&
+        body !== null &&
+        "error" in body &&
+        typeof (body as { error?: { message?: string } }).error?.message ===
+          "string"
+          ? (body as { error: { message: string } }).error.message
+          : `Export failed with status ${response.status}`;
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    const filename =
+      parseContentDispositionFilename(
+        response.headers.get("Content-Disposition"),
+      ) ?? "spendflow-export.json";
     triggerBrowserDownload(blob, filename);
   },
 
@@ -505,6 +546,114 @@ export const api = {
   getFire(): Promise<FireResponse> {
     if (USE_MOCKS) return mockApi.getFire();
     return fetchJson<FireResponse>("/wealth/fire");
+  },
+
+  getImportFormats(): Promise<ImportFormatsResponse> {
+    if (USE_MOCKS) {
+      return Promise.resolve({
+        formats: [
+          {
+            id: "qfx_ofx",
+            label: "QFX / OFX",
+            extensions: [".qfx", ".ofx"],
+            description: "Bank, credit, and brokerage exports.",
+            brokers: ["Fidelity"],
+          },
+          {
+            id: "csv",
+            label: "CSV",
+            extensions: [".csv"],
+            description: "Broker activity exports.",
+            brokers: ["E*TRADE", "Fidelity", "Webull"],
+          },
+          {
+            id: "pdf",
+            label: "PDF",
+            extensions: [".pdf"],
+            description: "Monthly statements.",
+            brokers: ["SoFi Invest"],
+          },
+        ],
+        limits: {
+          maxFiles: 10,
+          maxFileBytes: 10 * 1024 * 1024,
+          maxBatchBytes: 50 * 1024 * 1024,
+        },
+        consentVersion: "statement_import_v1",
+      });
+    }
+    return fetchJson<ImportFormatsResponse>("/imports/formats");
+  },
+
+  async uploadImportBatch(
+    files: File[],
+    consentAccepted: boolean,
+  ): Promise<ImportBatchCreateResponse> {
+    if (USE_MOCKS) {
+      return Promise.resolve({
+        batchId: "mock-batch-id",
+        status: "pending",
+        filesTotal: files.length,
+        message: "Mock upload received.",
+      });
+    }
+    const form = new FormData();
+    form.set("consentAccepted", consentAccepted ? "true" : "false");
+    for (const file of files) {
+      form.append("files", file);
+    }
+    const response = await fetch(`${getBaseUrl()}/imports/batches`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: form,
+    });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      throw new Error(body?.error?.message ?? `Upload failed (${response.status})`);
+    }
+    return response.json() as Promise<ImportBatchCreateResponse>;
+  },
+
+  getImportBatch(batchId: string): Promise<ImportBatchStatusResponse> {
+    if (USE_MOCKS) {
+      return Promise.resolve({
+        batch: {
+          id: batchId,
+          status: "pending",
+          filesTotal: 1,
+          filesProcessed: 0,
+          txnsInserted: 0,
+          txnsSkipped: 0,
+          errorMessage: null,
+          createdAt: new Date().toISOString(),
+          completedAt: null,
+        },
+        files: [],
+      });
+    }
+    return fetchJson<ImportBatchStatusResponse>(`/imports/batches/${batchId}`);
+  },
+
+  confirmImportBatch(
+    batchId: string,
+    accountMappings?: Record<string, string>,
+  ): Promise<ImportConfirmResponse> {
+    if (USE_MOCKS) {
+      return Promise.resolve({
+        batchId,
+        status: "completed",
+        txnsInserted: 42,
+        txnsSkipped: 3,
+        message: "Mock import confirmed.",
+      });
+    }
+    return fetchJson<ImportConfirmResponse>(`/imports/batches/${batchId}/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ accountMappings }),
+    });
   },
 
   getBudgets(): Promise<BudgetsResponse> {

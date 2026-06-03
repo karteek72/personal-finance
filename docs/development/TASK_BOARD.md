@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-06-03  
 **Source of truth:** [`tasks.yaml`](tasks.yaml)  
-**CLI:** `npm run task -- <command>` from repo root (uses backend `tsx`; no root `npm install` needed)
+**CLI:** `npm run task -- <command>` from repo root
 
 ---
 
@@ -10,31 +10,37 @@
 
 | Status | Count |
 |--------|------:|
-| done | 11 |
-| backlog | 3 |
+| done | 20 |
 | ready | 0 |
+| backlog | 1 |
 
-**Phase 3.5 preview→live complete.** Next: Phase 4 iOS + GDPR export.
+**Statement import + GDPR export: complete.**
+
+**Next:** iOS at P4 (`TASK-IOS-001`, `TASK-IOS-002`).
 
 ---
 
-## Recently completed ✅ (P2)
+## Recently completed
 
 | ID | Title |
 |----|-------|
-| TASK-PREVIEW-001 | Budgets from transaction aggregates + suggested limits |
-| TASK-PREVIEW-002 | Recurring charge detector (≥3 monthly pattern) |
-| TASK-PREVIEW-003 | Wellness score computed from live data |
-| TASK-PREVIEW-004 | Coach `POST /coach/ask` rule-based Q&A |
+| TASK-SEC-002 | GDPR JSON data export (`GET /auth/export`) |
+| TASK-IMPORT-006–008 | Import compliance, Wave 2 CSV, PDF plugins |
+| TASK-IMPORT-001–005 | Full statement import pipeline |
 
 ---
 
-## Next up (backlog)
+## Verify
 
-| ID | Priority | Area | Title |
-|----|----------|------|-------|
-| TASK-IOS-001 | P3 | ios | Face ID app unlock |
-| TASK-IOS-002 | P3 | ios | APNs push for alerts |
-| TASK-SEC-002 | P3 | backend | GDPR JSON data export |
+```bash
+cd backend && npm run test:import   # 19 tests
+cd backend && npm run test:export   # export secret scan
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:4000/api/v1/auth/export -o spendflow-export.json
+```
 
-Claim: `npm run task -- claim TASK-IOS-001 your-agent-name`
+---
+
+## iPhone app (deferred — P4)
+
+No active work. See tasks `TASK-IOS-001`, `TASK-IOS-002`.
