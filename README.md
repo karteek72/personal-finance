@@ -363,6 +363,55 @@ The items below are grouped by theme. Priorities were shaped by user needs and 2
 
 ---
 
+### 📉 Inflation Intelligence
+
+> **Goal:** Show users how inflation is silently eroding their purchasing power using their *own* spending data — not a government average that may not reflect their life at all. The CPI is a national basket; your personal inflation rate is what actually matters.
+
+The core insight: a 3% salary raise during 4.5% personal inflation is a 1.5% pay cut that never shows up on your paycheck. SpendFlow can make this visible automatically.
+
+| Feature | Description |
+|---------|-------------|
+| **Personal inflation rate** | Calculate your household's real inflation rate by weighting BLS CPI sub-index rates (food, housing, healthcare, transport, etc.) by your *actual* spending distribution — not the national average. Updated monthly as your spending shifts |
+| **Purchasing power timeline** | Chart showing how much your income could buy at each point in time — "Your $80K salary buys what $71K bought in 2020" — with category-level breakdown of where the erosion is worst |
+| **Category inflation heatmap** | Color-coded grid of your spending categories ranked by how fast they're inflating — healthcare at 4.1%, groceries at 3.8%, shelter at 3.0% — cross-referenced with what share of your budget each consumes |
+| **Real wage tracker** | Enter your salary history; SpendFlow computes your *real* wage after personal inflation. Flag years when you effectively took a pay cut despite a nominal raise. Show cumulative purchasing power loss since hire date |
+| **Salary negotiation brief** | Auto-generate a data-backed brief for your next raise conversation: "Your personal inflation rate this year was 4.3%. A 3% raise is a 1.2% real pay cut. You need X to break even, Y to actually advance." |
+| **Inflation break-even alert** | Notify when your income growth is falling behind your personal inflation rate — month by month, not just annually |
+| **Inflation-adjusted spending comparison** | When comparing this year's spending to last year, show both nominal and inflation-adjusted numbers so you know if you genuinely changed behavior or just paid more for the same things |
+| **Category price spike detector** | Track recurring merchant prices over time (groceries, gas, utilities) to detect when a specific store or service has raised prices above the category average |
+| **Tariff & policy impact estimator** | When major policy changes (tariffs, healthcare rules) hit, estimate the projected impact on your specific spending basket |
+| **Safe real savings rate** | Show savings rate in *real* terms — a 5% savings rate with 4% inflation is only growing your wealth by ~1% in purchasing power; make this explicit |
+
+**Data sources:** BLS CPI sub-indices (API), FRED economic data, BEA PCE deflators
+
+---
+
+### 🧠 Lifestyle & Behavioral Finance
+
+> **Goal:** Help users understand the *psychology* behind their spending — identify lifestyle creep, surface emotional spending patterns, build lasting financial habits through behavioral science, and give them a single score that tells them if they're on the right track.
+
+Research shows that tracking data alone doesn't change behavior. What changes behavior is surfacing the right insight, at the right moment, in the right framing. SpendFlow can be the app that actually rewires financial habits — not just records them.
+
+| Feature | Description |
+|---------|-------------|
+| **Financial Wellness Score (0–100)** | A single composite score updated monthly across 7 dimensions: savings rate, debt health, emergency fund runway, income-to-expense ratio, personal inflation beat, investment growth, and goal pace. Color-coded: green / yellow / red. No interpretation required |
+| **Lifestyle creep detector** | Track your spending-to-income ratio over time. When income rises and spending rises proportionally, flag it: "Since your last raise in March, your discretionary spending grew 22% — your savings rate hasn't improved" |
+| **Spending personality profile** | Monthly archetype based on your category mix: "Foodie," "Homebody," "Commuter," "Experience Seeker." Show how your type has evolved over 12 months and what it costs annually vs. national median for that archetype |
+| **Emotional spending patterns** | Detect temporal spending clusters: late-night purchases, weekend spikes, post-payday splurges, stress-period spikes in food delivery / retail. Surface these patterns non-judgmentally: "You spend 43% more on weekends than weekdays" |
+| **Habit streaks & milestones** | Gamified savings streaks (7-day, 30-day under-budget runs), category improvement badges, net worth milestones. Research shows streaks reduce financial slip-ups by up to 40% |
+| **Safe-to-spend calculator** | After accounting for bills, scheduled transfers, and savings goals, show a daily/weekly discretionary budget — "You have $47 left to spend freely this week without touching your goals" |
+| **Peer benchmarking** | Anonymized, opt-in comparison of your category spending vs. similar income bracket / city / household size. "You spend 2.1x the median on dining for your income bracket in your city" |
+| **Financial momentum score** | Week-over-week velocity metric: are you trending toward better or worse financial health? A simple up/down arrow with a plain-English reason — "Your savings rate improved 3pts this month but food spending is creeping up" |
+| **30-day spending challenge** | Structured challenges: "Cut dining by 20% this month," "No impulse purchases over $50 without 24h wait," "Automate $200 extra to savings." Track in-app with daily progress |
+| **Counterfactual cost calculator** | Show the true annual and 10-year cost of habits: "Your $6/day coffee habit costs $2,190/year and $27,000 over 10 years if invested at 7% return" — but frame it as information, not guilt |
+| **Life stage financial compass** | Adapt insights to life stage (early career, family building, peak earning, pre-retirement). Goals, benchmarks, and alerts shift automatically based on age, household size, and income level |
+| **Annual financial review** | Auto-generated year-in-review: biggest spending changes, goals hit and missed, net worth delta, biggest wins, and 3 concrete priorities for next year |
+| **Financial decision journal** | Log major financial decisions (car purchase, lease renewal, salary negotiation) and tag relevant transactions. Review 6 months later to see if the decision played out as expected — builds decision quality over time |
+
+**Research basis:** Behavioral finance principles from Kahneman, Thaler & Sunstein (nudge theory), Laibson (present bias), BLS ECI data for wage tracking
+
+---
+
 ### 🌐 Open Banking Expansion
 
 | Feature | Description |
