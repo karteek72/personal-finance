@@ -72,6 +72,10 @@ export class AppError extends Error {
     return new AppError("NOT_FOUND", 404, message);
   }
 
+  static conflict(message: string): AppError {
+    return new AppError("CONFLICT", 409, message);
+  }
+
   static authNotConfigured(message: string): AppError {
     return new AppError("AUTH_NOT_CONFIGURED", 503, message);
   }

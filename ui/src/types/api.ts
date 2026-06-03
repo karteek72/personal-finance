@@ -220,6 +220,13 @@ export interface ChartDataFilters {
 
 export type HouseholdMemberRole = "owner" | "partner" | "child" | "other";
 
+export interface HouseholdMemberInvite {
+  id: string;
+  email: string;
+  expiresAt: string;
+  status: "pending" | "expired";
+}
+
 export interface HouseholdMember {
   id: string;
   displayName: string;
@@ -227,6 +234,7 @@ export interface HouseholdMember {
   avatarColor: string;
   userId: string | null;
   createdAt: string;
+  pendingInvite?: HouseholdMemberInvite | null;
 }
 
 export interface HouseholdAccountLink {
@@ -238,9 +246,12 @@ export interface HouseholdAccountLink {
   memberId: string | null;
   memberName: string | null;
   memberColor: string | null;
+  ownedByCurrentUser?: boolean;
+  ownerUserId?: string;
 }
 
 export interface HouseholdResponse {
+  accessRole: "owner" | "member";
   household: {
     id: string;
     name: string;
@@ -248,6 +259,29 @@ export interface HouseholdResponse {
   };
   members: HouseholdMember[];
   accounts: HouseholdAccountLink[];
+}
+
+export interface HouseholdInviteResponse {
+  invitationId: string;
+  inviteUrl: string;
+  expiresAt: string;
+  email: string;
+}
+
+export interface HouseholdInvitePreview {
+  householdName: string;
+  memberName: string;
+  memberRole: string;
+  email: string;
+  expiresAt: string;
+  status: "pending" | "expired" | "accepted";
+}
+
+export interface HouseholdInviteAcceptResponse {
+  householdId: string;
+  householdName: string;
+  memberId: string;
+  memberDisplayName: string;
 }
 
 export interface HouseholdMemberInsight {

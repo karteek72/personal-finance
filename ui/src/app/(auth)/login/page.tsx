@@ -2,23 +2,26 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { isGoogleAuthEnabled, requiresSignIn } from "@/lib/auth-session";
 import { useAuthStore } from "@/stores/auth-store";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const status = useAuthStore((s) => s.status);
   const googleEnabled = isGoogleAuthEnabled();
+  const nextPath = searchParams.get("next")?.trim() || "/";
 
   useEffect(() => {
     if (!requiresSignIn()) return;
     if (status === "authenticated") {
-      router.replace("/");
+      router.replace(nextPath.startsWith("/") ? nextPath : "/");
     }
-  }, [router, status]);
+  }, [router, status, nextPath]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
@@ -32,7 +35,7 @@ export default function LoginPage() {
         </p>
 
         <div className="mt-6">
-          <GoogleSignInButton />
+          <GoogleSignInButton redirectPath={nextPath.startsWith("/") ? nextPath : "/"} />
         </div>
 
         {googleEnabled ? (
@@ -92,5 +95,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-text-muted">Loading…</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

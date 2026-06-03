@@ -32,6 +32,10 @@ export const accountRoutes: FastifyPluginAsync = async (app) => {
       throw AppError.notFound("Account not found");
     }
 
+    if (account.userId !== user.id) {
+      throw AppError.forbidden("Only the account owner can sync this account");
+    }
+
     if (!account.plaidItemId) {
       throw AppError.notPlaidAccount();
     }

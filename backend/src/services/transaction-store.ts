@@ -67,8 +67,21 @@ function transactionOrderBy(sort: TransactionSort = "date_desc") {
   }
 }
 
+function transactionUserFilter(userIds: string[]) {
+  return userIds.length === 1
+    ? eq(transactions.userId, userIds[0]!)
+    : inArray(transactions.userId, userIds);
+}
+
+function sqlUserIdsIn(userIds: string[]) {
+  if (userIds.length === 1) {
+    return sql`user_id = ${userIds[0]!}`;
+  }
+  return sql`user_id IN (${sql.join(userIds.map((id) => sql`${id}`), sql`, `)})`;
+}
+
 export async function listTransactions(filters: {
-  userId: string;
+  userIds: string[];
   month?: string;
   category?: string;
   accountId?: string;
@@ -81,7 +94,7 @@ export async function listTransactions(filters: {
 }) {
   const db = getDb();
   const limit = filters.limit ?? 50;
-  const conditions = [eq(transactions.userId, filters.userId)];
+  const conditions = [transactionUserFilter(filters.userIds)];
 
   if (filters.scopedAccountIds !== undefined && filters.scopedAccountIds !== null) {
     if (filters.scopedAccountIds.length === 0) {
@@ -173,8 +186,13 @@ export async function listTransactions(filters: {
   };
 }
 
-export async function getSummary(userId: string, from?: string, to?: string) {
+export async function getSummary(
+  userIds: string[],
+  from?: string,
+  to?: string,
+) {
   const db = getDb();
+  const userFilter = sqlUserIdsIn(userIds);
   const dateFilter =
     from && to
       ? sql`date >= ${from} AND date <= ${to}`
@@ -183,7 +201,7 @@ export async function getSummary(userId: string, from?: string, to?: string) {
   const spendRows = await db.execute<{ total: string }>(sql`
     SELECT COALESCE(SUM(amount::numeric), 0)::text AS total
     FROM transactions
-    WHERE user_id = ${userId}
+    WHERE ${userFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND ${dateFilter}
@@ -192,7 +210,7 @@ export async function getSummary(userId: string, from?: string, to?: string) {
   const incomeRows = await db.execute<{ total: string }>(sql`
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
-    WHERE user_id = ${userId}
+    WHERE ${userFilter}
       AND transaction_type = 'income'
       AND is_transfer = false
       AND ${dateFilter}
@@ -201,7 +219,7 @@ export async function getSummary(userId: string, from?: string, to?: string) {
   const transferRows = await db.execute<{ total: string }>(sql`
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
-    WHERE user_id = ${userId}
+    WHERE ${userFilter}
       AND is_transfer = true
       AND ${dateFilter}
   `);
@@ -212,7 +230,7 @@ export async function getSummary(userId: string, from?: string, to?: string) {
   }>(sql`
     SELECT category AS name, SUM(amount::numeric)::text AS amount
     FROM transactions
-    WHERE user_id = ${userId}
+    WHERE ${userFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND ${dateFilter}
@@ -239,8 +257,13 @@ export async function getSummary(userId: string, from?: string, to?: string) {
   };
 }
 
-export async function getCategories(userId: string, from?: string, to?: string) {
+export async function getCategories(
+  userIds: string[],
+  from?: string,
+  to?: string,
+) {
   const db = getDb();
+  const userFilter = sqlUserIdsIn(userIds);
   const dateFilter =
     from && to
       ? sql`date >= ${from} AND date <= ${to}`
@@ -252,7 +275,7 @@ export async function getCategories(userId: string, from?: string, to?: string) 
   }>(sql`
     SELECT category AS name, SUM(amount::numeric)::text AS amount
     FROM transactions
-    WHERE user_id = ${userId}
+    WHERE ${userFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND ${dateFilter}
@@ -275,15 +298,24 @@ export async function getCategories(userId: string, from?: string, to?: string) 
   };
 }
 
-export async function getMoneyFlow(userId: string, from?: string, to?: string) {
+export async function getMoneyFlow(
+  userIds: string[],
+  from?: string,
+  to?: string,
+) {
   void from;
   void to;
   const db = getDb();
+  const userFilter = sqlUserIdsIn(userIds);
+  const tUserFilter =
+    userIds.length === 1
+      ? sql`t.user_id = ${userIds[0]!}`
+      : sql`t.user_id IN (${sql.join(userIds.map((id) => sql`${id}`), sql`, `)})`;
 
   const incomeSources = await db.execute<{ label: string; amount: string }>(sql`
     SELECT name AS label, SUM(ABS(amount::numeric))::text AS amount
     FROM transactions
-    WHERE user_id = ${userId}
+    WHERE ${userFilter}
       AND transaction_type = 'income' AND is_transfer = false
     GROUP BY name
     ORDER BY SUM(ABS(amount::numeric)) DESC
@@ -294,7 +326,7 @@ export async function getMoneyFlow(userId: string, from?: string, to?: string) {
     SELECT a.name AS label, SUM(ABS(t.amount::numeric))::text AS amount
     FROM transactions t
     JOIN accounts a ON a.id = t.account_id
-    WHERE t.user_id = ${userId}
+    WHERE ${tUserFilter}
       AND a.type = 'depository' AND t.transaction_type = 'expense' AND t.is_transfer = false
     GROUP BY a.name
   `);
@@ -303,7 +335,7 @@ export async function getMoneyFlow(userId: string, from?: string, to?: string) {
     SELECT a.name AS label, SUM(t.amount::numeric)::text AS amount
     FROM transactions t
     JOIN accounts a ON a.id = t.account_id
-    WHERE t.user_id = ${userId}
+    WHERE ${tUserFilter}
       AND a.type = 'credit' AND t.transaction_type = 'expense' AND t.is_transfer = false
     GROUP BY a.name
   `);
@@ -320,7 +352,7 @@ export async function getMoneyFlow(userId: string, from?: string, to?: string) {
       COALESCE(SUM(CASE WHEN transaction_type = 'expense' AND NOT is_transfer THEN amount::numeric ELSE 0 END), 0)::text AS expenses,
       COALESCE(SUM(CASE WHEN transaction_type = 'income' AND NOT is_transfer THEN ABS(amount::numeric) WHEN transaction_type = 'expense' AND NOT is_transfer THEN -amount::numeric ELSE 0 END), 0)::text AS net
     FROM transactions
-    WHERE user_id = ${userId}
+    WHERE ${userFilter}
     GROUP BY date_trunc('month', date)
     ORDER BY month
   `);
@@ -331,7 +363,7 @@ export async function getMoneyFlow(userId: string, from?: string, to?: string) {
   );
   const transferTotal = await db.execute<{ total: string }>(sql`
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
-    FROM transactions WHERE user_id = ${userId} AND is_transfer = true
+    FROM transactions WHERE ${userFilter} AND is_transfer = true
   `);
   const ccTotal = creditCards.reduce(
     (s, r) => s + Number.parseFloat(r.amount),
@@ -355,10 +387,15 @@ export async function getMoneyFlow(userId: string, from?: string, to?: string) {
   };
 }
 
-export async function getTrends(userId: string, from?: string, to?: string) {
+export async function getTrends(
+  userIds: string[],
+  from?: string,
+  to?: string,
+) {
   void from;
   void to;
   const db = getDb();
+  const userFilter = sqlUserIdsIn(userIds);
 
   const rows = await db.execute<{
     name: string;
@@ -370,7 +407,7 @@ export async function getTrends(userId: string, from?: string, to?: string) {
       to_char(date_trunc('month', date), 'YYYY-MM') AS month,
       SUM(amount::numeric)::text AS amount
     FROM transactions
-    WHERE user_id = ${userId}
+    WHERE ${userFilter}
       AND transaction_type = 'expense' AND NOT is_transfer
     GROUP BY category, date_trunc('month', date)
     ORDER BY category, month
@@ -391,7 +428,7 @@ export async function getTrends(userId: string, from?: string, to?: string) {
 }
 
 export interface ChartDataParams {
-  userId: string;
+  userIds: string[];
   from?: string;
   to?: string;
   accountId?: string;
@@ -400,7 +437,11 @@ export interface ChartDataParams {
 }
 
 function buildChartFilters(params: ChartDataParams) {
-  const parts = [sql`t.user_id = ${params.userId}`];
+  const userFilter =
+    params.userIds.length === 1
+      ? sql`t.user_id = ${params.userIds[0]!}`
+      : sql`t.user_id IN (${sql.join(params.userIds.map((id) => sql`${id}`), sql`, `)})`;
+  const parts = [userFilter];
   if (params.from && params.to) {
     parts.push(sql`t.date >= ${params.from} AND t.date <= ${params.to}`);
   }

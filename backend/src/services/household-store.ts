@@ -7,6 +7,12 @@ import {
   households,
   transactions,
 } from "../db/schema.js";
+import {
+  type HouseholdContext,
+  requireHouseholdOwner,
+  resolveHouseholdContext,
+} from "./household-access.js";
+import { getPendingInvitationForMember } from "./household-invitations.js";
 
 export type HouseholdMemberRole = "owner" | "partner" | "child" | "other";
 
@@ -26,7 +32,7 @@ function yearToDateRange(): { from: string; to: string } {
   return { from: `${year}-01-01`, to: `${year}-12-31` };
 }
 
-export async function getHouseholdForUser(userId: string) {
+export async function bootstrapOwnerHousehold(userId: string) {
   const db = getDb();
   const [household] = await db
     .select()
@@ -75,20 +81,25 @@ export async function getHouseholdForUser(userId: string) {
   return created!;
 }
 
+/** @deprecated Use bootstrapOwnerHousehold — owner-only household creation */
+export async function getHouseholdForUser(userId: string) {
+  return bootstrapOwnerHousehold(userId);
+}
+
 export async function getHouseholdDetails(userId: string) {
-  const household = await getHouseholdForUser(userId);
+  const ctx = await resolveHouseholdContext(userId);
   const db = getDb();
 
   const members = await db
     .select()
     .from(householdMembers)
-    .where(eq(householdMembers.householdId, household.id))
+    .where(eq(householdMembers.householdId, ctx.householdId))
     .orderBy(householdMembers.createdAt);
 
   const assignments = await db
     .select()
     .from(householdAccountAssignments)
-    .where(eq(householdAccountAssignments.householdId, household.id));
+    .where(eq(householdAccountAssignments.householdId, ctx.householdId));
 
   const assignmentByAccount = new Map(
     assignments.map((row) => [row.accountId, row.memberId]),
@@ -97,28 +108,49 @@ export async function getHouseholdDetails(userId: string) {
   const accountRows = await db
     .select()
     .from(accounts)
-    .where(and(eq(accounts.userId, userId), eq(accounts.isActive, true)))
+    .where(
+      and(inArray(accounts.userId, ctx.userIds), eq(accounts.isActive, true)),
+    )
     .orderBy(accounts.name);
 
   const memberById = new Map(members.map((member) => [member.id, member]));
 
+  const [householdRow] = await db
+    .select()
+    .from(households)
+    .where(eq(households.id, ctx.householdId))
+    .limit(1);
+
+  const memberPayload = await Promise.all(
+    members.map(async (member) => {
+      const pendingInvite =
+        ctx.role === "owner" && !member.userId && member.role !== "owner"
+          ? await getPendingInvitationForMember(ctx.householdId, member.id)
+          : null;
+      return {
+        id: member.id,
+        displayName: member.displayName,
+        role: member.role as HouseholdMemberRole,
+        avatarColor: member.avatarColor,
+        userId: member.userId,
+        createdAt: member.createdAt.toISOString(),
+        pendingInvite,
+      };
+    }),
+  );
+
   return {
+    accessRole: ctx.role,
     household: {
-      id: household.id,
-      name: household.name,
-      createdAt: household.createdAt.toISOString(),
+      id: ctx.householdId,
+      name: ctx.householdName,
+      createdAt: householdRow?.createdAt.toISOString() ?? new Date().toISOString(),
     },
-    members: members.map((member) => ({
-      id: member.id,
-      displayName: member.displayName,
-      role: member.role as HouseholdMemberRole,
-      avatarColor: member.avatarColor,
-      userId: member.userId,
-      createdAt: member.createdAt.toISOString(),
-    })),
+    members: memberPayload,
     accounts: accountRows.map((account) => {
       const memberId = assignmentByAccount.get(account.id) ?? null;
       const member = memberId ? memberById.get(memberId) : undefined;
+      const ownerUserId = account.userId;
       return {
         accountId: account.id,
         name: account.name,
@@ -128,18 +160,21 @@ export async function getHouseholdDetails(userId: string) {
         memberId,
         memberName: member?.displayName ?? null,
         memberColor: member?.avatarColor ?? null,
+        ownedByCurrentUser: ownerUserId === userId,
+        ownerUserId,
       };
     }),
   };
 }
 
 export async function updateHouseholdName(userId: string, name: string) {
-  const household = await getHouseholdForUser(userId);
+  const ctx = await resolveHouseholdContext(userId);
+  requireHouseholdOwner(ctx);
   const db = getDb();
   const [updated] = await db
     .update(households)
     .set({ name })
-    .where(eq(households.id, household.id))
+    .where(eq(households.id, ctx.householdId))
     .returning();
   return updated!;
 }
@@ -148,7 +183,9 @@ export async function createHouseholdMember(
   userId: string,
   input: { displayName: string; role: HouseholdMemberRole },
 ) {
-  const household = await getHouseholdForUser(userId);
+  const ctx = await resolveHouseholdContext(userId);
+  requireHouseholdOwner(ctx);
+  const household = { id: ctx.householdId };
   const db = getDb();
 
   const existing = await db
@@ -183,7 +220,9 @@ export async function updateHouseholdMember(
   memberId: string,
   input: { displayName?: string; role?: HouseholdMemberRole },
 ) {
-  const household = await getHouseholdForUser(userId);
+  const ctx = await resolveHouseholdContext(userId);
+  requireHouseholdOwner(ctx);
+  const household = { id: ctx.householdId };
   const db = getDb();
 
   const [member] = await db
@@ -225,7 +264,9 @@ export async function updateHouseholdMember(
 }
 
 export async function deleteHouseholdMember(userId: string, memberId: string) {
-  const household = await getHouseholdForUser(userId);
+  const ctx = await resolveHouseholdContext(userId);
+  requireHouseholdOwner(ctx);
+  const household = { id: ctx.householdId };
   const db = getDb();
 
   const [member] = await db
@@ -254,16 +295,25 @@ export async function assignAccountToMember(
   accountId: string,
   memberId: string,
 ) {
-  const household = await getHouseholdForUser(userId);
+  const ctx = await resolveHouseholdContext(userId);
   const db = getDb();
 
   const [account] = await db
-    .select({ id: accounts.id })
+    .select({ id: accounts.id, userId: accounts.userId })
     .from(accounts)
-    .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
+    .where(
+      and(
+        eq(accounts.id, accountId),
+        inArray(accounts.userId, ctx.userIds),
+      ),
+    )
     .limit(1);
 
   if (!account) {
+    return null;
+  }
+
+  if (ctx.role === "member" && account.userId !== ctx.userId) {
     return null;
   }
 
@@ -273,7 +323,7 @@ export async function assignAccountToMember(
     .where(
       and(
         eq(householdMembers.id, memberId),
-        eq(householdMembers.householdId, household.id),
+        eq(householdMembers.householdId, ctx.householdId),
       ),
     )
     .limit(1);
@@ -287,17 +337,17 @@ export async function assignAccountToMember(
     .values({
       accountId,
       memberId,
-      householdId: household.id,
+      householdId: ctx.householdId,
     })
     .onConflictDoUpdate({
       target: householdAccountAssignments.accountId,
-      set: { memberId, householdId: household.id },
+      set: { memberId, householdId: ctx.householdId },
     });
 
   return { accountId, memberId };
 }
 
-/** Assign accounts with no household member to the owner (e.g. after Plaid link). */
+/** Assign new Plaid accounts to the member row linked to this user. */
 export async function ensureAccountsAssignedToOwner(
   userId: string,
   accountIds: string[],
@@ -306,23 +356,8 @@ export async function ensureAccountsAssignedToOwner(
     return;
   }
 
-  const household = await getHouseholdForUser(userId);
+  const ctx = await resolveHouseholdContext(userId);
   const db = getDb();
-
-  const [owner] = await db
-    .select({ id: householdMembers.id })
-    .from(householdMembers)
-    .where(
-      and(
-        eq(householdMembers.householdId, household.id),
-        eq(householdMembers.role, "owner"),
-      ),
-    )
-    .limit(1);
-
-  if (!owner) {
-    return;
-  }
 
   const ownedAccounts = await db
     .select({ id: accounts.id })
@@ -357,8 +392,8 @@ export async function ensureAccountsAssignedToOwner(
   await db.insert(householdAccountAssignments).values(
     unassigned.map((accountId) => ({
       accountId,
-      memberId: owner.id,
-      householdId: household.id,
+      memberId: ctx.memberId,
+      householdId: ctx.householdId,
     })),
   );
 }
@@ -368,19 +403,24 @@ export async function resolveScopedAccountIds(
   scope?: "all" | "household" | "personal",
   memberId?: string,
 ): Promise<string[] | null> {
+  const ctx = await resolveHouseholdContext(userId);
+  return resolveScopedAccountIdsForContext(ctx, scope, memberId);
+}
+
+export async function resolveScopedAccountIdsForContext(
+  ctx: HouseholdContext,
+  scope?: "all" | "household" | "personal",
+  memberId?: string,
+): Promise<string[] | null> {
+  const db = getDb();
+
   if (memberId) {
-    const db = getDb();
     const rows = await db
       .select({ accountId: householdAccountAssignments.accountId })
       .from(householdAccountAssignments)
-      .innerJoin(
-        householdMembers,
-        eq(householdAccountAssignments.memberId, householdMembers.id),
-      )
-      .innerJoin(households, eq(householdMembers.householdId, households.id))
       .where(
         and(
-          eq(households.ownerUserId, userId),
+          eq(householdAccountAssignments.householdId, ctx.householdId),
           eq(householdAccountAssignments.memberId, memberId),
         ),
       );
@@ -388,48 +428,22 @@ export async function resolveScopedAccountIds(
   }
 
   if (scope === "household") {
-    const db = getDb();
     const rows = await db
       .select({ accountId: householdAccountAssignments.accountId })
       .from(householdAccountAssignments)
-      .innerJoin(households, eq(householdAccountAssignments.householdId, households.id))
-      .where(eq(households.ownerUserId, userId));
+      .where(eq(householdAccountAssignments.householdId, ctx.householdId));
     return rows.map((row) => row.accountId);
   }
 
   if (scope === "personal") {
-    const household = await getHouseholdForUser(userId);
-    const db = getDb();
-    const [owner] = await db
-      .select({ id: householdMembers.id })
-      .from(householdMembers)
-      .where(
-        and(
-          eq(householdMembers.householdId, household.id),
-          eq(householdMembers.role, "owner"),
-        ),
-      )
-      .limit(1);
-
-    if (!owner) {
-      return [];
-    }
-
     const rows = await db
       .select({ accountId: householdAccountAssignments.accountId })
       .from(householdAccountAssignments)
-      .where(eq(householdAccountAssignments.memberId, owner.id));
-
+      .where(eq(householdAccountAssignments.memberId, ctx.memberId));
     return rows.map((row) => row.accountId);
   }
 
-  const db = getDb();
-  const rows = await db
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(and(eq(accounts.userId, userId), eq(accounts.isActive, true)));
-
-  return rows.map((row) => row.id);
+  return null;
 }
 
 export async function getHouseholdInsights(userId: string) {

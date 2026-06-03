@@ -10,6 +10,9 @@ import type {
   ChartDataResponse,
   DeleteAccountResponse,
   HouseholdInsightsResponse,
+  HouseholdInviteAcceptResponse,
+  HouseholdInvitePreview,
+  HouseholdInviteResponse,
   HouseholdMember,
   HouseholdResponse,
   MoneyFlowResponse,
@@ -290,6 +293,54 @@ export const api = {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ memberId }),
+    });
+  },
+
+  inviteHouseholdMember(
+    memberId: string,
+    email: string,
+  ): Promise<HouseholdInviteResponse> {
+    if (USE_MOCKS) {
+      return mockApi.inviteHouseholdMember(memberId, email);
+    }
+    return fetchJson<HouseholdInviteResponse>(
+      `/household/members/${memberId}/invite`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      },
+    );
+  },
+
+  revokeHouseholdInvite(memberId: string): Promise<{ status: string }> {
+    if (USE_MOCKS) {
+      return mockApi.revokeHouseholdInvite(memberId);
+    }
+    return fetchJson(`/household/members/${memberId}/invite`, {
+      method: "DELETE",
+    });
+  },
+
+  previewHouseholdInvite(token: string): Promise<HouseholdInvitePreview> {
+    if (USE_MOCKS) {
+      return mockApi.previewHouseholdInvite(token);
+    }
+    return fetchJson<HouseholdInvitePreview>(
+      `/household/invites/preview?token=${encodeURIComponent(token)}`,
+    );
+  },
+
+  acceptHouseholdInvite(
+    token: string,
+  ): Promise<HouseholdInviteAcceptResponse> {
+    if (USE_MOCKS) {
+      return mockApi.acceptHouseholdInvite(token);
+    }
+    return fetchJson<HouseholdInviteAcceptResponse>("/household/invites/accept", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
     });
   },
 

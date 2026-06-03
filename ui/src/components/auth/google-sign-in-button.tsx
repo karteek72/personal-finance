@@ -9,6 +9,8 @@ import { useAuthStore } from "@/stores/auth-store";
 
 type GoogleSignInButtonProps = {
   label?: string;
+  /** Path after sign-in (e.g. /accept-invite?token=…) */
+  redirectPath?: string;
 };
 
 declare global {
@@ -36,6 +38,7 @@ declare global {
 
 export function GoogleSignInButton({
   label = "Continue with Google",
+  redirectPath = "/",
 }: GoogleSignInButtonProps) {
   if (!isGoogleAuthEnabled()) {
     return (
@@ -49,10 +52,13 @@ export function GoogleSignInButton({
     );
   }
 
-  return <GoogleSignInButtonInner label={label} />;
+  return <GoogleSignInButtonInner label={label} redirectPath={redirectPath} />;
 }
 
-function GoogleSignInButtonInner({ label }: GoogleSignInButtonProps) {
+function GoogleSignInButtonInner({
+  label,
+  redirectPath,
+}: GoogleSignInButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const callbackRef = useRef<(response: CredentialResponse) => void>(() => {});
   const setSession = useAuthStore((s) => s.setSession);
@@ -77,7 +83,7 @@ function GoogleSignInButtonInner({ label }: GoogleSignInButtonProps) {
     try {
       const session = await api.signInWithGoogle(idToken);
       setSession(session);
-      window.location.assign("/");
+      window.location.assign(redirectPath ?? "/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");
       setPending(false);

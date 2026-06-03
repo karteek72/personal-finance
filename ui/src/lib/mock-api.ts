@@ -364,6 +364,7 @@ export async function getChartData(params: {
 }
 
 const mockHouseholdState: HouseholdResponse = {
+  accessRole: "owner",
   household: {
     id: "mock-household",
     name: "My Family",
@@ -497,4 +498,59 @@ export async function assignAccountToMember(
       : account,
   );
   return { accountId, memberId };
+}
+
+export async function inviteHouseholdMember(
+  memberId: string,
+  email: string,
+) {
+  await delay();
+  const member = mockHouseholdState.members.find((row) => row.id === memberId);
+  if (!member) throw new Error("Member not found");
+  const inviteUrl = `http://localhost:3002/accept-invite?token=mock-invite-token`;
+  member.pendingInvite = {
+    id: "mock-invite",
+    email: email.trim().toLowerCase(),
+    expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+    status: "pending",
+  };
+  return {
+    invitationId: "mock-invite",
+    inviteUrl,
+    expiresAt: member.pendingInvite.expiresAt,
+    email: member.pendingInvite.email,
+  };
+}
+
+export async function revokeHouseholdInvite(memberId: string) {
+  await delay();
+  const member = mockHouseholdState.members.find((row) => row.id === memberId);
+  if (member) member.pendingInvite = null;
+  return { status: "revoked" };
+}
+
+export async function previewHouseholdInvite(token: string) {
+  await delay();
+  void token;
+  return {
+    householdName: mockHouseholdState.household.name,
+    memberName: "Partner",
+    memberRole: "partner",
+    email: "partner@example.com",
+    expiresAt: new Date(Date.now() + 86400000).toISOString(),
+    status: "pending" as const,
+  };
+}
+
+export async function acceptHouseholdInvite(token: string) {
+  await delay();
+  void token;
+  const partner = mockHouseholdState.members.find((m) => m.role === "partner");
+  if (partner) partner.userId = "mock-partner-user";
+  return {
+    householdId: mockHouseholdState.household.id,
+    householdName: mockHouseholdState.household.name,
+    memberId: partner?.id ?? "mock-member-partner",
+    memberDisplayName: partner?.displayName ?? "Partner",
+  };
 }

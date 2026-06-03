@@ -9,7 +9,8 @@ import {
   getTrends,
   listTransactions,
 } from "../services/transaction-store.js";
-import { resolveScopedAccountIds } from "../services/household-store.js";
+import { resolveScopedAccountIdsForContext } from "../services/household-store.js";
+import { resolveHouseholdContext } from "../services/household-access.js";
 import { requireRequestUser } from "../lib/auth-http.js";
 import type { Env } from "../config/env.js";
 
@@ -24,20 +25,22 @@ async function resolveScopeFilters(
   },
 ) {
   const user = await requireRequestUser(request, env);
+  const ctx = await resolveHouseholdContext(user.id);
   const scope = (query.scope as ViewScope | undefined) ?? "all";
-  const scopedAccountIds = await resolveScopedAccountIds(
-    user.id,
+  const scopedAccountIds = await resolveScopedAccountIdsForContext(
+    ctx,
     query.memberId ? undefined : scope === "all" ? undefined : scope,
     query.memberId,
   );
-  return { user, scopedAccountIds };
+  return { user, ctx, scopedAccountIds };
 }
 
 export const transactionRoutes: FastifyPluginAsync = async (app) => {
   app.get("/transactions/summary", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
+    const ctx = await resolveHouseholdContext(user.id);
     const query = request.query as { from?: string; to?: string };
-    return getSummary(user.id, query.from, query.to);
+    return getSummary(ctx.userIds, query.from, query.to);
   });
 
   app.get("/transactions", async (request) => {
@@ -45,7 +48,7 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
     const scope = await resolveScopeFilters(request, app.config.env, query);
 
     return listTransactions({
-      userId: scope.user.id,
+      userIds: scope.ctx.userIds,
       month: query.month,
       category: query.category,
       accountId: query.accountId,
@@ -68,8 +71,9 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/transactions/by-category", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
+    const ctx = await resolveHouseholdContext(user.id);
     const query = request.query as { from?: string; to?: string };
-    return getCategories(user.id, query.from, query.to);
+    return getCategories(ctx.userIds, query.from, query.to);
   });
 
   app.get("/transactions/chart-data", async (request) => {
@@ -84,7 +88,7 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
     const scope = await resolveScopeFilters(request, app.config.env, query);
 
     return getChartData({
-      userId: scope.user.id,
+      userIds: scope.ctx.userIds,
       from: query.from,
       to: query.to,
       accountId: query.accountId,
@@ -95,8 +99,9 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/transactions/flow", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
+    const ctx = await resolveHouseholdContext(user.id);
     const query = request.query as { from?: string; to?: string };
-    return getMoneyFlow(user.id, query.from, query.to);
+    return getMoneyFlow(ctx.userIds, query.from, query.to);
   });
 };
 
@@ -108,8 +113,9 @@ export const insightRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/insights/trends", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
+    const ctx = await resolveHouseholdContext(user.id);
     const query = request.query as { from?: string; to?: string };
-    return getTrends(user.id, query.from, query.to);
+    return getTrends(ctx.userIds, query.from, query.to);
   });
 };
 

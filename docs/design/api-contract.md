@@ -169,6 +169,22 @@ interface Alert {
 
 ---
 
+## Household & partner invites
+
+Multi-user households: owner invites partners by email; partner signs in with Google and accepts. Dashboard/transactions aggregate all linked members' data.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| GET | `/household` | Bearer | Returns `accessRole` (`owner` \| `member`), members, accounts |
+| POST | `/household/members/:memberId/invite` | Owner | Body `{ email }` → `{ inviteUrl, expiresAt, … }` |
+| DELETE | `/household/members/:memberId/invite` | Owner | Revoke pending invite |
+| GET | `/household/invites/preview?token=` | Public | Invite metadata before sign-in |
+| POST | `/household/invites/accept` | Bearer | Body `{ token }`; email must match signed-in user |
+
+Partners link banks on **Accounts** (their own Plaid items). Owner can still link banks and assign accounts on **Family**.
+
+---
+
 ## CORS (web client only)
 
 CORS applies to the browser (`ui/`) only. Native iOS clients use Bearer tokens over HTTPS — no CORS.

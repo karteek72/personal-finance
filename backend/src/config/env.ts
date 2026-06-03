@@ -21,6 +21,8 @@ const envSchema = z.object({
     z.string().url().optional(),
   ),
   APP_URL: z.string().url().default("http://localhost:4000"),
+  /** Base URL for household invite links (web app). */
+  UI_APP_URL: z.string().url().default("http://localhost:3002"),
   ENCRYPTION_KEY: z.string().optional(),
   DATABASE_URL: z
     .string()
