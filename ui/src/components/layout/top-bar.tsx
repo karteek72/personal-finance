@@ -64,6 +64,7 @@ export function TopBar({ title }: TopBarProps) {
           onClick={toggleTheme}
           className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] text-text-muted transition-colors hover:bg-primary-soft/40 hover:text-primary"
           aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+          title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
         >
           <ThemeToggleIcon theme={theme} />
         </button>

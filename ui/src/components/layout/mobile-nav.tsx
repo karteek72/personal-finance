@@ -9,7 +9,6 @@ const navItems = [
   { href: "/categories", label: "Spend" },
   { href: "/transactions", label: "Activity" },
   { href: "/accounts", label: "Accounts" },
-  { href: "/debt", label: "Debt" },
   { href: "/family", label: "Family" },
 ] as const;
 

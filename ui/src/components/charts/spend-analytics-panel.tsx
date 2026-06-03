@@ -8,7 +8,6 @@ import { InteractiveAreaChart } from "@/components/charts/interactive-area-chart
 import { InteractiveBarChart } from "@/components/charts/interactive-bar-chart";
 import { InteractiveDonutChart } from "@/components/charts/interactive-donut-chart";
 import { InteractiveMemberChart } from "@/components/charts/interactive-member-chart";
-import { InteractiveMultiLineChart } from "@/components/charts/interactive-multi-line-chart";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useChartData } from "@/hooks/use-chart-data";
 import { useHousehold } from "@/hooks/use-household";
@@ -145,14 +144,6 @@ export function SpendAnalyticsPanel({ onOpenDrilldown }: SpendAnalyticsPanelProp
         slices={data.byAccount}
         selectedAccountId={selectedAccountId}
         onSelectAccount={setSelectedAccountId}
-      />
-
-      <InteractiveMultiLineChart
-        trends={data.categoryTrends}
-        highlightedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-        title="Top categories over time"
-        subtitle="Click a legend item to focus"
       />
     </section>
       ) : null}

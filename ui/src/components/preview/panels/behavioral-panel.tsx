@@ -11,13 +11,6 @@ const PREVIEW_BANNER = (
   </div>
 );
 
-const PATTERNS = [
-  { label: "Weekend spending", value: "+43%", description: "You spend 43% more on Saturdays and Sundays vs. weekdays", severity: "warning" },
-  { label: "Post-payday splurge", value: "+67%", description: "In the 3 days after your paycheck, spending spikes 67%", severity: "warning" },
-  { label: "Late-night orders", value: "$189/mo", description: "38% of your food delivery orders happen between 10pm–2am", severity: "neutral" },
-  { label: "Stress spending", value: "+28%", description: "Shopping and dining surge on high-workload weeks", severity: "neutral" },
-];
-
 const CHALLENGES = [
   { title: "Dining budget cut", goal: "Reduce dining by 20% this month", progress: 62, days: 18, color: "#f97316" },
   { title: "No impulse over $50", goal: "Wait 24h before any purchase >$50", progress: 85, days: 6, color: "#22c55e" },
@@ -147,22 +140,6 @@ export function BehavioralPanel() {
         <p className="mt-2 rounded-[var(--radius-sm)] bg-warning/10 p-2 text-xs text-warning">
           Since your March raise (+$500/mo), spending grew $420/mo — your savings rate improved only $80/mo.
         </p>
-      </div>
-
-      {/* Spending patterns detected */}
-      <div className="space-y-2">
-        <p className="px-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Spending patterns detected</p>
-        {PATTERNS.map((p) => (
-          <div key={p.label} className="flex items-start gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-3.5">
-            <div className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${p.severity === "warning" ? "bg-warning/10 text-warning" : "bg-border text-text-muted"}`}>
-              {p.value}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-text">{p.label}</p>
-              <p className="text-xs text-text-muted">{p.description}</p>
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* Why tagging — emotional spending */}

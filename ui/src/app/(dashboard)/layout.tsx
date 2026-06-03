@@ -15,14 +15,13 @@ const PAGE_TITLES: Record<string, string> = {
   "/flow": "Cash Flow",
   "/categories": "Spend",
   "/transactions": "Activity",
-  "/accounts": "Accounts",
-  "/debt": "Debt",
+  "/accounts": "Accounts & Debt",
+  "/debt": "Accounts & Debt",
   "/family": "Family",
   "/plan": "Plan",
-  "/grow": "Grow",
-  "/understand": "Understand",
+  "/wealth": "Wealth",
+  "/understand": "Insights",
   "/protect": "Protect",
-  "/trim": "Trim",
 };
 
 export default function DashboardLayout({

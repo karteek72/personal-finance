@@ -1,5 +1,5 @@
-import { CreditDebtDashboard } from "@/components/debt/credit-debt-dashboard";
+import { redirect } from "next/navigation";
 
 export default function DebtPage() {
-  return <CreditDebtDashboard />;
+  redirect("/accounts");
 }

@@ -108,7 +108,7 @@ export function AccountBalanceSummary() {
           <button
             key={group.type}
             type="button"
-            onClick={() => router.push("/accounts")}
+            onClick={() => router.push("/wealth")}
             className={clsx(
               "group flex flex-col rounded-[var(--radius-card)] border px-4 py-3 text-left transition-opacity hover:opacity-80",
               typeBg[group.type],

@@ -4,21 +4,34 @@ import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/categories", label: "Spend" },
-  { href: "/transactions", label: "Activity" },
-  { href: "/accounts", label: "Accounts" },
-  { href: "/debt", label: "Debt" },
-  { href: "/family", label: "Family" },
-] as const;
-
-const previewItems = [
-  { href: "/plan", label: "Plan" },
-  { href: "/grow", label: "Grow" },
-  { href: "/understand", label: "Understand" },
-  { href: "/protect", label: "Protect" },
-  { href: "/trim", label: "Trim" },
+const navSections = [
+  {
+    label: null,
+    items: [
+      { href: "/", label: "Home" },
+      { href: "/transactions", label: "Activity" },
+      { href: "/categories", label: "Spend" },
+    ],
+  },
+  {
+    label: "Money",
+    items: [
+      { href: "/plan", label: "Plan" },
+      { href: "/wealth", label: "Wealth" },
+      { href: "/accounts", label: "Accounts" },
+    ],
+  },
+  {
+    label: "Insights",
+    items: [
+      { href: "/understand", label: "Insights" },
+      { href: "/protect", label: "Protect" },
+    ],
+  },
+  {
+    label: null,
+    items: [{ href: "/family", label: "Family" }],
+  },
 ] as const;
 
 function NavIcon({ href, active }: { href: string; active: boolean }) {
@@ -98,6 +111,31 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
           />
         </svg>
       );
+    case "/plan":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
+          <rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
+          <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      );
+    case "/wealth":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
+          <path d="M4 19V5M4 19h16M8 16l4-5 3 3 4-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case "/understand":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
+          <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4.9 1 .9 1.6h5.2c0-.6.3-1.2.9-1.6A6 6 0 0 0 12 3Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+        </svg>
+      );
+    case "/protect":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
+          <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+        </svg>
+      );
     default:
       return null;
   }
@@ -130,76 +168,37 @@ export function Sidebar() {
 
       {/* Nav items */}
       <nav className="flex flex-1 flex-col gap-0.5 px-2" aria-label="Main navigation">
-        {navItems.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+        {navSections.map((section, sectionIndex) => (
+          <div key={section.label ?? `section-${sectionIndex}`} className={sectionIndex > 0 ? "mt-3" : undefined}>
+            {section.label ? (
+              <p className="mb-1 hidden px-3 text-[9px] font-bold uppercase tracking-widest text-text-muted/60 lg:block">
+                {section.label}
+              </p>
+            ) : null}
+            {section.items.map((item) => {
+              const isActive =
+                item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={item.label}
-              className={clsx(
-                "flex items-center gap-3 rounded-[var(--radius-sm)] px-2.5 py-2.5 text-sm font-semibold transition-all",
-                "justify-center lg:justify-start lg:px-3",
-                isActive
-                  ? "bg-primary-soft text-primary"
-                  : "text-text-muted hover:bg-primary-soft/30 hover:text-text",
-              )}
-            >
-              <NavIcon href={item.href} active={isActive} />
-              <span className="hidden lg:inline">{item.label}</span>
-            </Link>
-          );
-        })}
-
-        {/* Preview section */}
-        <div className="mt-4 hidden lg:block">
-          <p className="mb-1.5 px-3 text-[9px] font-bold uppercase tracking-widest text-text-muted/60">
-            Preview
-          </p>
-          {previewItems.map((item) => {
-            const isActive = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={item.label}
-                className={clsx(
-                  "flex items-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-xs font-semibold transition-all",
-                  isActive
-                    ? "bg-primary-soft text-primary"
-                    : "text-text-muted hover:bg-primary-soft/30 hover:text-text",
-                )}
-              >
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Preview icon-only (collapsed) */}
-        <div className="mt-4 lg:hidden">
-          {previewItems.map((item) => {
-            const isActive = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={item.label}
-                className={clsx(
-                  "flex items-center justify-center rounded-[var(--radius-sm)] p-2 transition-all",
-                  isActive ? "bg-primary-soft text-primary" : "text-text-muted hover:bg-primary-soft/30",
-                )}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-              </Link>
-            );
-          })}
-        </div>
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  title={item.label}
+                  className={clsx(
+                    "flex items-center gap-3 rounded-[var(--radius-sm)] px-2.5 py-2.5 text-sm font-semibold transition-all",
+                    "justify-center lg:justify-start lg:px-3",
+                    isActive
+                      ? "bg-primary-soft text-primary"
+                      : "text-text-muted hover:bg-primary-soft/30 hover:text-text",
+                  )}
+                >
+                  <NavIcon href={item.href} active={isActive} />
+                  <span className="hidden lg:inline">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
     </aside>
   );

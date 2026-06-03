@@ -8,7 +8,7 @@ import {
 } from "react-plaid-link";
 import clsx from "clsx";
 
-import { PlusIcon } from "@/components/ui/icon-button";
+import { IconButton, PlusIcon } from "@/components/ui/icon-button";
 import { api } from "@/lib/api-client";
 import { storePlaidLinkToken } from "@/lib/plaid-storage";
 
@@ -22,7 +22,7 @@ interface PlaidLinkLauncherProps {
   linkToken: string;
   label?: string;
   className?: string;
-  variant?: "default" | "dashed";
+  variant?: "default" | "dashed" | "icon";
   onSuccess?: () => void;
   onError?: (message: string) => void;
 }
@@ -68,6 +68,18 @@ function PlaidLinkLauncher({
 
   const { open, ready } = usePlaidLink(config);
 
+  if (variant === "icon") {
+    return (
+      <IconButton
+        label={exchanging ? "Connecting…" : (label ?? "Add account")}
+        disabled={!ready || exchanging}
+        onClick={() => open()}
+      >
+        <PlusIcon className={exchanging ? "animate-spin" : undefined} />
+      </IconButton>
+    );
+  }
+
   if (variant === "dashed") {
     return (
       <button
@@ -101,7 +113,7 @@ function PlaidLinkLauncher({
 interface PlaidLinkButtonProps {
   label?: string;
   className?: string;
-  variant?: "default" | "dashed";
+  variant?: "default" | "dashed" | "icon";
   onSuccess?: () => void;
   onError?: (message: string) => void;
 }
@@ -149,20 +161,27 @@ export function PlaidLinkButton({
   }, [onError]);
 
   if (loading || !linkToken) {
+    if (variant === "icon") {
+      return (
+        <IconButton label={label ?? "Add account"} disabled>
+          <PlusIcon />
+        </IconButton>
+      );
+    }
     if (variant === "dashed") {
       return (
         <div className={clsx(dashedClassName, "opacity-50")}>
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary">
             <PlusIcon />
           </span>
-          <span className="text-sm font-semibold">Loading…</span>
+          <span className="text-sm font-semibold">{label ?? "Add account"}</span>
         </div>
       );
     }
 
     return (
       <button type="button" disabled className={className ?? defaultClassName}>
-        Loading…
+        {label ?? "Add account"}
       </button>
     );
   }

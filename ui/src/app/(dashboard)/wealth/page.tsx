@@ -6,7 +6,7 @@ import { InvestmentsPanel } from "@/components/preview/panels/investments-panel"
 import { FirePanel } from "@/components/preview/panels/fire-panel";
 import { TimeMachinePanel } from "@/components/preview/panels/time-machine-panel";
 
-export default function GrowPage() {
+export default function WealthPage() {
   return (
     <PreviewHub
       tabs={[
