@@ -17,12 +17,12 @@ cp containers/env.example containers/.env
 ./scripts/podman/deploy.sh
 ```
 
-**LAN (Wi‑Fi / same subnet)**
+**LAN (Wi‑Fi / same subnet)** — ports from `deploy.env` (`SPENDFLOW_UI_PORT` / `SPENDFLOW_API_PORT`, default **3005** / **4000**)
 
 | Service | URL |
 |---------|-----|
-| UI | http://192.168.68.100:3000 |
-| API | http://192.168.68.100:4000/api/v1 |
+| UI | http://\<your-lan-ip\>:3005 |
+| API | http://\<your-lan-ip\>:4000/api/v1 |
 
 **Internet (after Cloudflare tunnel + DNS)**
 
@@ -41,6 +41,7 @@ The UI image is built with `NEXT_PUBLIC_API_URL` pointing at the **public API** 
 | `./scripts/podman/dev-down.sh` | Stop dev API/UI (and Postgres/Redis unless `--keep-db`) |
 | `./scripts/podman/dev-logs.sh` | Follow `logs/dev/*.log` or Postgres/Redis container logs |
 | `./scripts/podman/deploy.sh` | **Production-style** — build + full stack in containers |
+| `./scripts/podman/verify.sh` | Check config, images, and HTTP health (after deploy) |
 | `./scripts/podman/build.sh` | Build API (Node) + UI (static `out/` in **nginx:alpine**) |
 | `./scripts/podman/deploy.sh --no-build` | Restart without rebuild |
 | `./scripts/podman/down.sh` | Stop and remove containers |
@@ -110,8 +111,8 @@ With `--token`, ingress is configured in Cloudflare, not in a local file:
 
 | Hostname | Upstream URL |
 |----------|----------------|
-| `spendflow.stockpulse.win` | `http://192.168.68.100:3000` |
-| `spendflow-api.stockpulse.win` | `http://192.168.68.100:4000` |
+| `spendflow.stockpulse.win` | `http://<host-ip>:3005` |
+| `spendflow-api.stockpulse.win` | `http://<host-ip>:4000` |
 
 3. Leave the existing Kong route on `http://192.168.68.100:8000` unchanged.
 4. The `cloudflared` pod usually picks up new routes within ~1 minute (no restart required).
@@ -129,7 +130,7 @@ Set `SPENDFLOW_BUILD_TARGET=public` in `deploy.env` before `build.sh` so the UI 
 Add these to your Google OAuth client (**Authorized JavaScript origins**):
 
 - `https://spendflow.stockpulse.win`
-- `http://192.168.68.100:3000`
+- `http://<your-lan-ip>:3005`
 
 **Plaid** redirect URI (in Plaid Dashboard):
 
@@ -151,7 +152,7 @@ Use the same Google OAuth **iOS** client or Web client ID as configured in backe
 
 Allow inbound on the host (if you rely on LAN access without tunnel):
 
-- TCP `3000` (UI)
+- TCP `3005` (UI — default `SPENDFLOW_UI_PORT`)
 - TCP `4000` (API)
 
 Postgres is bound to `127.0.0.1:5433` only (not exposed on LAN).

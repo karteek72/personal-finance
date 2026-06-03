@@ -70,6 +70,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     env_file:
       - .env
     extra_hosts:
@@ -119,6 +121,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
       api:
         condition: service_started
     env_file:
@@ -128,6 +132,7 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       APP_URL: ${SPENDFLOW_API_PUBLIC_URL:-http://localhost:4000}
       CORS_ORIGIN: ${SPENDFLOW_UI_PUBLIC_URL:-http://localhost:3005}
       CORS_ORIGINS: ${CORS_ORIGINS}

@@ -27,7 +27,7 @@ fi
 touch "${SPENDFLOW_CONTAINERS_DIR}/.env"
 spendflow_ensure_jwt_secret
 spendflow_ensure_encryption_key
-spendflow_prepare_postgres
+spendflow_export_compose_runtime_env
 spendflow_apply_build_urls
 spendflow_stop_dev_servers
 
@@ -49,10 +49,7 @@ else
   spendflow_compose "${UP_ARGS[@]}"
 fi
 
-if [[ -n "${SPENDFLOW_COMPOSE_PROFILE:-}" ]]; then
-  spendflow_wait_container_healthy spendflow-postgres 90 || true
-  spendflow_compose up -d --no-build api ui 2>/dev/null || spendflow_compose up -d api ui
-fi
+spendflow_wait_container_healthy spendflow-api 90 || true
 
 echo ""
 echo "LAN:"

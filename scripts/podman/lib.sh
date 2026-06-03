@@ -10,7 +10,24 @@ spendflow_repo_root() {
 }
 
 spendflow_detect_lan_ip() {
-  ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true
+  local ip=""
+
+  if command -v ip >/dev/null 2>&1; then
+    ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}')"
+    [[ -n "${ip}" ]] && echo "${ip}" && return 0
+  fi
+
+  if [[ "$(uname -s 2>/dev/null)" == "Darwin" ]] && command -v ipconfig >/dev/null 2>&1; then
+    ip="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
+    [[ -n "${ip}" ]] && echo "${ip}" && return 0
+  fi
+
+  if command -v hostname >/dev/null 2>&1; then
+    ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    [[ -n "${ip}" ]] && echo "${ip}" && return 0
+  fi
+
+  return 0
 }
 
 spendflow_host_is_local() {
@@ -19,11 +36,28 @@ spendflow_host_is_local() {
 
   [[ "${host}" == "0.0.0.0" || "${host}" == "127.0.0.1" || "${host}" == "localhost" ]] && return 0
 
+  if command -v ip >/dev/null 2>&1; then
+    while IFS= read -r addr; do
+      [[ -n "${addr}" && "${addr}" == "${host}" ]] && return 0
+    done < <(ip -4 addr show 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1)
+  fi
+
   while IFS= read -r addr; do
     [[ -n "${addr}" && "${addr}" == "${host}" ]] && return 0
   done < <(ifconfig 2>/dev/null | awk '/inet / {print $2}' | sed 's/addr://')
 
   return 1
+}
+
+spendflow_sed_inplace() {
+  local file="$1"
+  local pattern="$2"
+
+  if sed --version >/dev/null 2>&1; then
+    sed -i -e "${pattern}" "${file}"
+  else
+    sed -i '' -e "${pattern}" "${file}"
+  fi
 }
 
 spendflow_validate_host() {
@@ -46,16 +80,16 @@ spendflow_ensure_podman() {
     return 0
   fi
 
-  echo "==> Starting Podman machine"
   if podman machine info >/dev/null 2>&1; then
-    podman machine start >/dev/null 2>&1 || podman machine start
+    echo "==> Starting Podman machine" >&2
+    podman machine start 2>/dev/null || true
   else
     echo "error: no Podman machine found — run: podman machine init && podman machine start" >&2
     exit 1
   fi
 
   local i
-  for ((i = 1; i <= 30; i++)); do
+  for ((i = 1; i <= 45; i++)); do
     if podman ps >/dev/null 2>&1; then
       return 0
     fi
@@ -63,17 +97,18 @@ spendflow_ensure_podman() {
   done
 
   echo "warn: Podman socket still unavailable — restarting machine" >&2
-  podman machine stop >/dev/null 2>&1 || true
-  podman machine start >/dev/null 2>&1 || podman machine start
+  podman machine stop 2>/dev/null || true
+  sleep 2
+  podman machine start 2>/dev/null || true
 
-  for ((i = 1; i <= 30; i++)); do
+  for ((i = 1; i <= 45; i++)); do
     if podman ps >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
   done
 
-  echo "error: Podman machine did not become ready — run: podman machine stop && podman machine start" >&2
+  echo "error: Podman did not become ready — run: podman machine stop && podman machine start" >&2
   exit 1
 }
 
@@ -176,7 +211,7 @@ spendflow_ensure_encryption_key() {
   local env_file="${SPENDFLOW_CONTAINERS_DIR}/.env"
   touch "${env_file}"
   if grep -qE '^[[:space:]]*ENCRYPTION_KEY=' "${env_file}" 2>/dev/null; then
-    sed -i "s/^[[:space:]]*ENCRYPTION_KEY=.*/ENCRYPTION_KEY=${ENCRYPTION_KEY}/" "${env_file}"
+    spendflow_sed_inplace "${env_file}" "s/^[[:space:]]*ENCRYPTION_KEY=.*/ENCRYPTION_KEY=${ENCRYPTION_KEY}/"
   else
     echo "ENCRYPTION_KEY=${ENCRYPTION_KEY}" >>"${env_file}"
   fi
@@ -200,11 +235,24 @@ spendflow_prepare_postgres() {
   if [[ "${SPENDFLOW_EXTERNAL_POSTGRES:-false}" == "true" ]]; then
     local host_port="${POSTGRES_HOST_PORT:-5433}"
     export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@host.containers.internal:${host_port}/${POSTGRES_DB:-spendflow}"
+    export REDIS_URL="${REDIS_URL:-redis://redis:6379}"
     echo "info: using external postgres at host.containers.internal:${host_port}" >&2
     return 0
   fi
   export SPENDFLOW_COMPOSE_PROFILE=bundled-db
   export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@postgres:5432/${POSTGRES_DB:-spendflow}"
+  export REDIS_URL="${REDIS_URL:-redis://redis:6379}"
+}
+
+# Values compose substitutes from the shell (see compose.yaml ${VAR} entries).
+spendflow_export_compose_runtime_env() {
+  spendflow_prepare_postgres
+  export DATABASE_URL REDIS_URL JWT_SECRET ENCRYPTION_KEY
+  export CORS_ORIGINS NEXT_PUBLIC_API_URL NEXT_PUBLIC_APP_URL NEXT_PUBLIC_GOOGLE_CLIENT_ID
+  export SPENDFLOW_HOST SPENDFLOW_UI_PORT SPENDFLOW_API_PORT
+  export SPENDFLOW_UI_PUBLIC_URL SPENDFLOW_API_PUBLIC_URL
+  export PLAID_CLIENT_ID PLAID_SECRET PLAID_ENV PLAID_PRODUCTS PLAID_COUNTRY_CODES PLAID_REDIRECT_URI
+  export GOOGLE_CLIENT_ID GOOGLE_CLIENT_IDS GOOGLE_SECRET_KEY AUTH_ALLOW_DEV_USER
 }
 
 spendflow_wait_container_healthy() {
