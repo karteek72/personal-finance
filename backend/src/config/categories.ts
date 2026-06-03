@@ -13,6 +13,7 @@ export const SPEND_CATEGORIES = [
   "Entertainment",
   "Personal Care",
   "Family & Kids",
+  "Pet",
   "Gifts & Donations",
   "Business & Professional",
   "Travel",
@@ -117,6 +118,13 @@ export const SUBCATEGORY_MAP = {
     "Childcare & Daycare",
     "Kids Activities",
     "Baby Supplies",
+  ],
+  Pet: [
+    "Food & Treats",
+    "Veterinary & Medical",
+    "Supplies & Toys",
+    "Grooming & Boarding",
+    "Pet Insurance",
   ],
   "Gifts & Donations": [
     "Charitable Donations",

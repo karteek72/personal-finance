@@ -81,11 +81,13 @@ export async function updateTransactionCategory(
     for (const row of items) {
       if (normalizeMerchantKey(row.merchantName, row.name) === merchantKey) {
         row.category = category;
+        row.subCategory = subCategory;
         merchantTransactionsUpdated++;
       }
     }
   } else {
     txn.category = category;
+    txn.subCategory = subCategory;
     merchantTransactionsUpdated = 1;
   }
 
@@ -388,6 +390,7 @@ export async function getChartData(params: {
   return {
     monthly,
     byCategory,
+    bySubCategory: [],
     byAccount,
     byMember: byCategory.map((slice, index) => ({
       id: `mock-member-${index}`,

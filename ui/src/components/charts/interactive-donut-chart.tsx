@@ -7,7 +7,7 @@ import { Doughnut } from "react-chartjs-2";
 
 import { ChartShell } from "@/components/charts/chart-shell";
 import { formatCurrency } from "@/lib/chart-utils";
-import { getCategoryColor } from "@/lib/category-colors";
+import { getCategoryColor, getSubCategoryColor } from "@/lib/category-colors";
 import type { ChartCategorySlice } from "@/types/api";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -16,6 +16,10 @@ interface InteractiveDonutChartProps {
   slices: ChartCategorySlice[];
   selectedCategory: string;
   onSelectCategory: (category: string) => void;
+  /** When set, slice colors use shades of this parent category (subcategory drill-down). */
+  parentCategory?: string;
+  title?: string;
+  subtitle?: string;
   className?: string;
 }
 
@@ -23,6 +27,9 @@ export function InteractiveDonutChart({
   slices,
   selectedCategory,
   onSelectCategory,
+  parentCategory,
+  title = "By category",
+  subtitle = "Click a slice to filter",
   className,
 }: InteractiveDonutChartProps) {
   const total = useMemo(
@@ -36,10 +43,12 @@ export function InteractiveDonutChart({
       datasets: [
         {
           data: slices.map((slice) => Number.parseFloat(slice.amount)),
-          backgroundColor: slices.map((slice) => {
-            const color = getCategoryColor(slice.name);
+          backgroundColor: slices.map((slice, index) => {
+            const color = parentCategory
+              ? getSubCategoryColor(parentCategory, index)
+              : getCategoryColor(slice.name);
             if (selectedCategory && selectedCategory !== slice.name) {
-              return `${color}55`;
+              return parentCategory ? `${color}` : `${color}55`;
             }
             return color;
           }),
@@ -49,7 +58,7 @@ export function InteractiveDonutChart({
         },
       ],
     }),
-    [slices, selectedCategory],
+    [slices, selectedCategory, parentCategory],
   );
 
   const centerLabel = selectedCategory || "Total spent";
@@ -59,8 +68,8 @@ export function InteractiveDonutChart({
 
   return (
     <ChartShell
-      title="By category"
-      subtitle="Click a slice to filter"
+      title={title}
+      subtitle={subtitle}
       className={clsx("relative", className)}
     >
       <div className="relative h-72">
@@ -106,7 +115,7 @@ export function InteractiveDonutChart({
                     callbacks: {
                       label: (context) => {
                         const value = context.parsed;
-                        const pct = total > 0 ? ((value / total) * 100).toFixed(1) : "0";
+                        const pct = total > 0 ? ((value / total) * 100).toFixed(2) : "0.00";
                         return `${formatCurrency(value)} (${pct}%)`;
                       },
                     },

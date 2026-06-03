@@ -64,7 +64,7 @@ const PFC_MAP: Record<string, PFCEntry> = {
   GENERAL_MERCHANDISE_GIFTS_AND_NOVELTIES:           { category: "Gifts & Donations",       subCategory: "Gifts" },
   GENERAL_MERCHANDISE_OFFICE_SUPPLIES:               { category: "Business & Professional", subCategory: "Office Supplies" },
   GENERAL_MERCHANDISE_ONLINE_MARKETPLACES:           { category: "Shopping & Retail",       subCategory: "Online Shopping" },
-  GENERAL_MERCHANDISE_PET_SUPPLIES:                  { category: "Shopping & Retail",       subCategory: "Home Goods" },
+  GENERAL_MERCHANDISE_PET_SUPPLIES:                  { category: "Pet",                       subCategory: "Supplies & Toys" },
   GENERAL_MERCHANDISE_SPORTING_GOODS:                { category: "Shopping & Retail",       subCategory: "Arts & Hobbies" },
   GENERAL_MERCHANDISE_SUPERSTORES:                   { category: "Shopping & Retail",       subCategory: "Department Stores" },
   GENERAL_MERCHANDISE_TOBACCO_AND_VAPE:              { category: "Personal Care",           subCategory: null },
@@ -95,7 +95,7 @@ const PFC_MAP: Record<string, PFCEntry> = {
   MEDICAL_PHARMACIES_AND_SUPPLEMENTS:                { category: "Health & Medical",        subCategory: "Pharmacy" },
   MEDICAL_PRIMARY_CARE:                              { category: "Health & Medical",        subCategory: "Doctor & Hospital" },
   MEDICAL_SPECIALTY_CARE:                            { category: "Health & Medical",        subCategory: "Doctor & Hospital" },
-  MEDICAL_VETERINARY_SERVICES:                       { category: "Health & Medical",        subCategory: "Doctor & Hospital" },
+  MEDICAL_VETERINARY_SERVICES:                       { category: "Pet",                       subCategory: "Veterinary & Medical" },
   MEDICAL_OTHER_MEDICAL:                             { category: "Health & Medical",        subCategory: null },
   // ── Personal Care ─────────────────────────────────────────────────────────
   PERSONAL_CARE:                                     { category: "Personal Care",           subCategory: null },

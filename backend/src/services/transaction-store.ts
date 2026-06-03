@@ -1,8 +1,12 @@
-import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { countMonthsInclusive } from "../lib/date-range.js";
+import { formatMoneyAmount, roundDecimal, roundPercent } from "../lib/money.js";
 import { accounts, transactions } from "../db/schema.js";
 import { getMemberMapForAccounts } from "./household-store.js";
+import {
+  GENERAL_SUBCATEGORY,
+} from "./infer-subcategory.js";
 
 export async function listAccounts(userId: string) {
   const db = getDb();
@@ -209,7 +213,11 @@ export async function listTransactions(filters: {
     conditions.push(eq(transactions.category, filters.category));
   }
   if (filters.subCategory) {
-    conditions.push(eq(transactions.subCategory, filters.subCategory));
+    if (filters.subCategory === GENERAL_SUBCATEGORY) {
+      conditions.push(isNull(transactions.subCategory));
+    } else {
+      conditions.push(eq(transactions.subCategory, filters.subCategory));
+    }
   }
   if (filters.accountId) {
     conditions.push(eq(transactions.accountId, filters.accountId));
@@ -369,16 +377,20 @@ export async function getSummary(
 
   const monthsInPeriod =
     from && to ? countMonthsInclusive(from, to) : 1;
-  const avgMonthlySpend = (spentNum / monthsInPeriod).toFixed(2);
 
   return {
-    totalSpent,
-    income,
-    netSavings: net.toFixed(2),
-    avgMonthlySpend,
-    topCategory: topCategoryRows[0] ?? { name: "None", amount: "0.00" },
-    ccPaymentsExcluded,
-    savingsRate: incomeNum > 0 ? net / incomeNum : 0,
+    totalSpent: formatMoneyAmount(totalSpent),
+    income: formatMoneyAmount(income),
+    netSavings: formatMoneyAmount(net),
+    avgMonthlySpend: formatMoneyAmount(spentNum / monthsInPeriod),
+    topCategory: topCategoryRows[0]
+      ? {
+          name: topCategoryRows[0].name,
+          amount: formatMoneyAmount(topCategoryRows[0].amount),
+        }
+      : { name: "None", amount: "0.00" },
+    ccPaymentsExcluded: formatMoneyAmount(ccPaymentsExcluded),
+    savingsRate: roundDecimal(incomeNum > 0 ? net / incomeNum : 0),
     monthsInPeriod,
   };
 }
@@ -425,6 +437,11 @@ export async function getCategories(
         row.sub_category,
         (existing.subs.get(row.sub_category) ?? 0) + rowAmount,
       );
+    } else {
+      existing.subs.set(
+        GENERAL_SUBCATEGORY,
+        (existing.subs.get(GENERAL_SUBCATEGORY) ?? 0) + rowAmount,
+      );
     }
     categoryMap.set(row.category, existing);
   }
@@ -442,14 +459,18 @@ export async function getCategories(
         .sort(([, a], [, b]) => b - a)
         .map(([subName, subAmount]) => ({
           name: subName,
-          amount: subAmount.toFixed(2),
-          percentage: catTotal > 0 ? (subAmount / catTotal) * 100 : 0,
+          amount: formatMoneyAmount(subAmount),
+          percentage: roundPercent(
+            catTotal > 0 ? (subAmount / catTotal) * 100 : 0,
+          ),
         }));
 
       return {
         name,
-        amount: catTotal.toFixed(2),
-        percentage: grandTotal > 0 ? (catTotal / grandTotal) * 100 : 0,
+        amount: formatMoneyAmount(catTotal),
+        percentage: roundPercent(
+          grandTotal > 0 ? (catTotal / grandTotal) * 100 : 0,
+        ),
         deltaVsPriorMonth: 0,
         subcategories,
       };
@@ -762,40 +783,85 @@ export async function getChartData(params: ChartDataParams) {
     0,
   );
 
+  let bySubCategory: { name: string; amount: string; percentage: number }[] = [];
+  if (params.category) {
+    const subRows = await db.execute<{
+      sub_category: string | null;
+      amount: string;
+    }>(sql`
+      SELECT
+        t.sub_category,
+        SUM(ABS(t.amount::numeric))::text AS amount
+      FROM transactions t
+      WHERE ${whereClause}
+        AND t.transaction_type = 'expense'
+        AND NOT t.is_transfer
+        AND t.category = ${params.category}
+      GROUP BY t.sub_category
+      ORDER BY SUM(ABS(t.amount::numeric)) DESC
+    `);
+    const subTotal = subRows.reduce(
+      (sum, row) => sum + Number.parseFloat(row.amount),
+      0,
+    );
+    bySubCategory = subRows.map((row) => ({
+      name: row.sub_category ?? GENERAL_SUBCATEGORY,
+      amount: formatMoneyAmount(row.amount),
+      percentage: roundPercent(
+        subTotal > 0 ? (Number.parseFloat(row.amount) / subTotal) * 100 : 0,
+      ),
+    }));
+  }
+
   return {
-    monthly,
+    monthly: monthly.map((row) => ({
+      month: row.month,
+      expenses: formatMoneyAmount(row.expenses),
+      income: formatMoneyAmount(row.income),
+      net: formatMoneyAmount(row.net),
+    })),
     byCategory: categoryRows.map((row) => ({
       name: row.name,
-      amount: row.amount,
-      percentage:
+      amount: formatMoneyAmount(row.amount),
+      percentage: roundPercent(
         categoryTotal > 0
           ? (Number.parseFloat(row.amount) / categoryTotal) * 100
           : 0,
+      ),
     })),
+    bySubCategory,
     byAccount: accountRows.map((row) => ({
       id: row.id,
       name: row.name,
-      amount: row.amount,
-      percentage:
+      amount: formatMoneyAmount(row.amount),
+      percentage: roundPercent(
         accountTotal > 0
           ? (Number.parseFloat(row.amount) / accountTotal) * 100
           : 0,
+      ),
     })),
     byMember: memberRows.map((row) => ({
       id: row.id,
       name: row.name,
       color: row.color,
-      amount: row.amount,
-      percentage:
+      amount: formatMoneyAmount(row.amount),
+      percentage: roundPercent(
         memberTotal > 0
           ? (Number.parseFloat(row.amount) / memberTotal) * 100
           : 0,
+      ),
     })),
-    categoryTrends,
+    categoryTrends: categoryTrends.map((trend) => ({
+      name: trend.name,
+      months: trend.months.map((point) => ({
+        month: point.month,
+        amount: formatMoneyAmount(point.amount),
+      })),
+    })),
     totals: {
-      expenses: expenseTotal.toFixed(2),
-      income: incomeTotal.toFixed(2),
-      net: (incomeTotal - expenseTotal).toFixed(2),
+      expenses: formatMoneyAmount(expenseTotal),
+      income: formatMoneyAmount(incomeTotal),
+      net: formatMoneyAmount(incomeTotal - expenseTotal),
     },
   };
 }

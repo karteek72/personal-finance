@@ -18,6 +18,7 @@ import {
   getMerchantCategoryRulesMap,
   type CategoryRule,
 } from "../category-rules.js";
+import { inferClassification } from "../infer-subcategory.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
 import { mapPlaidTransaction } from "./map-transaction.js";
 import {
@@ -76,12 +77,17 @@ function mapTxnToRow(
   categoryRules: Map<string, CategoryRule>,
 ): PlaidTransactionInsert {
   const mapped = mapPlaidTransaction(txn, accountType);
+  const inferred = inferClassification(
+    mapped.category,
+    mapped.merchantName,
+    mapped.name,
+  );
   const { category, subCategory } = applyMerchantCategoryRule(
     categoryRules,
     mapped.merchantName,
     mapped.name,
-    mapped.category,
-    mapped.subCategory,
+    inferred.category,
+    inferred.subCategory,
   );
 
   return {

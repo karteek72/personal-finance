@@ -6,14 +6,17 @@ import { useMemo, useState } from "react";
 import { CategoryRow } from "@/components/categories/category-row";
 import { TransactionList } from "@/components/transactions/transaction-list";
 import { Card } from "@/components/ui/card";
-import { getCategoryColor } from "@/lib/category-colors";
+import { getCategoryColor, getSubCategoryColor } from "@/lib/category-colors";
 import { formatMoney } from "@/lib/format-money";
+import { formatPercent } from "@/lib/money-format";
 import type { CategoryTotal } from "@/types/api";
 
 interface CategoriesBreakdownProps {
   categories: CategoryTotal[];
   selectedCategory?: string | null;
+  selectedSubCategory?: string | null;
   onSelectCategory?: (category: string | null) => void;
+  onSelectSubCategory?: (subCategory: string | null) => void;
 }
 
 function formatDeltaPercent(delta: number): string {
@@ -21,31 +24,27 @@ function formatDeltaPercent(delta: number): string {
   return `${sign}${delta.toFixed(1)}%`;
 }
 
-/** Slightly muted shade of the parent category color for subcategory bars. */
-function subCategoryColor(parentColor: string, index: number): string {
-  const opacities = [1, 0.72, 0.52, 0.38, 0.28, 0.22];
-  const opacity = opacities[Math.min(index, opacities.length - 1)] ?? 0.2;
-  if (parentColor.startsWith("#")) {
-    const r = parseInt(parentColor.slice(1, 3), 16);
-    const g = parseInt(parentColor.slice(3, 5), 16);
-    const b = parseInt(parentColor.slice(5, 7), 16);
-    return `rgba(${r},${g},${b},${opacity})`;
-  }
-  return parentColor;
-}
-
 export function CategoriesBreakdown({
   categories,
   selectedCategory: controlledCategory,
+  selectedSubCategory: controlledSubCategory,
   onSelectCategory,
+  onSelectSubCategory,
 }: CategoriesBreakdownProps) {
   const [internalCategory, setInternalCategory] = useState<string | null>(null);
-  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
+  const [internalSubCategory, setInternalSubCategory] = useState<string | null>(
+    null,
+  );
 
   const selectedCategory = controlledCategory ?? internalCategory;
+  const selectedSubCategory = controlledSubCategory ?? internalSubCategory;
 
   function setSelectedCategory(category: string | null) {
-    setSelectedSubCategory(null); // reset sub when parent changes
+    if (onSelectSubCategory) {
+      onSelectSubCategory(null);
+    } else {
+      setInternalSubCategory(null);
+    }
     if (onSelectCategory) {
       onSelectCategory(category);
     } else {
@@ -54,17 +53,18 @@ export function CategoriesBreakdown({
   }
 
   function handleSubCategoryClick(sub: string) {
-    setSelectedSubCategory((prev) => (prev === sub ? null : sub));
+    const next = selectedSubCategory === sub ? null : sub;
+    if (onSelectSubCategory) {
+      onSelectSubCategory(next);
+    } else {
+      setInternalSubCategory(next);
+    }
   }
 
   const activeCategoryData = useMemo(
     () => categories.find((c) => c.name === selectedCategory) ?? null,
     [categories, selectedCategory],
   );
-
-  const parentColor = selectedCategory
-    ? getCategoryColor(selectedCategory)
-    : "var(--color-primary)";
 
   const subcategories = activeCategoryData?.subcategories ?? [];
 
@@ -82,9 +82,7 @@ export function CategoriesBreakdown({
 
   return (
     <section aria-label="Category usage" className="flex flex-col gap-4">
-      {/* ── Category list card ── */}
       <Card padding="none" className="overflow-hidden">
-        {/* Proportional rainbow bar */}
         <div
           className="flex h-2 w-full"
           role="img"
@@ -98,7 +96,7 @@ export function CategoriesBreakdown({
                 width: `${category.percentage}%`,
                 backgroundColor: getCategoryColor(category.name),
               }}
-              title={`${category.name}: ${category.percentage.toFixed(1)}%`}
+              title={`${category.name}: ${formatPercent(category.percentage)}`}
             />
           ))}
         </div>
@@ -124,67 +122,76 @@ export function CategoriesBreakdown({
         </ul>
       </Card>
 
-      {/* ── Subcategory drill-down (only when a category with subs is selected) ── */}
-      {selectedCategory && subcategories.length > 0 ? (
+      {selectedCategory ? (
         <Card padding="none" className="overflow-hidden">
-          {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
             <div>
               <h3 className="text-sm font-bold text-text">{selectedCategory}</h3>
               <p className="text-xs text-text-muted">
-                {formatMoney(activeCategoryData?.amount ?? "0")} total ·{" "}
-                {subcategories.length} subcategor{subcategories.length === 1 ? "y" : "ies"}
+                {formatMoney(activeCategoryData?.amount ?? "0")} total
+                {subcategories.length > 0
+                  ? ` · ${subcategories.length} subcategor${subcategories.length === 1 ? "y" : "ies"}`
+                  : " · subcategories loading…"}
               </p>
             </div>
-            {selectedSubCategory && (
+            {selectedSubCategory ? (
               <button
                 type="button"
-                onClick={() => setSelectedSubCategory(null)}
+                onClick={() =>
+                  onSelectSubCategory
+                    ? onSelectSubCategory(null)
+                    : setInternalSubCategory(null)
+                }
                 className="rounded-[var(--radius-pill)] border border-border/60 px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:bg-border/40"
               >
                 Clear subcategory filter
               </button>
-            )}
+            ) : null}
           </div>
 
-          {/* Subcategory proportional bar */}
-          <div
-            className="flex h-1.5 w-full"
-            role="img"
-            aria-label={`Subcategory breakdown for ${selectedCategory}`}
-          >
-            {subcategories.map((sub, i) => (
+          {subcategories.length > 0 ? (
+            <>
               <div
-                key={sub.name}
-                className="h-full transition-all"
-                style={{
-                  width: `${sub.percentage}%`,
-                  backgroundColor: subCategoryColor(parentColor, i),
-                }}
-                title={`${sub.name}: ${sub.percentage.toFixed(1)}%`}
-              />
-            ))}
-          </div>
+                className="flex h-1.5 w-full"
+                role="img"
+                aria-label={`Subcategory breakdown for ${selectedCategory}`}
+              >
+                {subcategories.map((sub, i) => (
+                  <div
+                    key={sub.name}
+                    className="h-full transition-all"
+                    style={{
+                      width: `${sub.percentage}%`,
+                      backgroundColor: getSubCategoryColor(selectedCategory, i),
+                    }}
+                    title={`${sub.name}: ${formatPercent(sub.percentage)}`}
+                  />
+                ))}
+              </div>
 
-          {/* Subcategory rows */}
-          <ul className="space-y-0.5 p-2">
-            {subcategories.map((sub, i) => (
-              <li key={sub.name}>
-                <CategoryRow
-                  name={sub.name}
-                  percentage={sub.percentage}
-                  amount={formatMoney(sub.amount)}
-                  barColor={subCategoryColor(parentColor, i)}
-                  selected={selectedSubCategory === sub.name}
-                  onClick={() => handleSubCategoryClick(sub.name)}
-                />
-              </li>
-            ))}
-          </ul>
+              <ul className="space-y-0.5 p-2">
+                {subcategories.map((sub, i) => (
+                  <li key={sub.name}>
+                    <CategoryRow
+                      name={sub.name}
+                      percentage={sub.percentage}
+                      amount={formatMoney(sub.amount)}
+                      barColor={getSubCategoryColor(selectedCategory, i)}
+                      selected={selectedSubCategory === sub.name}
+                      onClick={() => handleSubCategoryClick(sub.name)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="px-4 py-6 text-center text-sm text-text-muted">
+              No subcategory breakdown yet for this category.
+            </p>
+          )}
         </Card>
       ) : null}
 
-      {/* ── Transaction list (filtered by category + optional subcat) ── */}
       {selectedCategory ? (
         <Card padding="none" className="overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-4">

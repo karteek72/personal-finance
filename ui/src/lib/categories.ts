@@ -13,6 +13,7 @@ export const SPEND_CATEGORIES = [
   "Entertainment",
   "Personal Care",
   "Family & Kids",
+  "Pet",
   "Gifts & Donations",
   "Business & Professional",
   "Travel",
@@ -109,6 +110,13 @@ export const SUBCATEGORY_MAP: Record<SpendCategory, readonly string[]> = {
   ],
   "Personal Care": ["Hair & Grooming", "Beauty & Cosmetics", "Spa & Wellness"],
   "Family & Kids": ["Childcare & Daycare", "Kids Activities", "Baby Supplies"],
+  Pet: [
+    "Food & Treats",
+    "Veterinary & Medical",
+    "Supplies & Toys",
+    "Grooming & Boarding",
+    "Pet Insurance",
+  ],
   "Gifts & Donations": [
     "Charitable Donations",
     "Gifts",
@@ -136,6 +144,14 @@ export const SUBCATEGORY_MAP: Record<SpendCategory, readonly string[]> = {
 
 export function getSubCategories(category: SpendCategory): readonly string[] {
   return SUBCATEGORY_MAP[category];
+}
+
+export function isSpendCategory(value: string): value is SpendCategory {
+  return (SPEND_CATEGORIES as readonly string[]).includes(value);
+}
+
+export function resolveSubCategories(category: string): readonly string[] {
+  return isSpendCategory(category) ? SUBCATEGORY_MAP[category] : [];
 }
 
 /** Categories excluded from expense analytics (income + system) */

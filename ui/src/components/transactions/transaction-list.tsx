@@ -106,22 +106,31 @@ export function TransactionList({
                   updateCategory.isPending &&
                   updateCategory.variables?.transactionId === transaction.id
                 }
-                onCategoryChange={(nextCategory) => {
-                  if (nextCategory === transaction.category) return;
+                onCategoryChange={(nextCategory, nextSubCategory) => {
+                  if (
+                    nextCategory === transaction.category &&
+                    (nextSubCategory ?? null) === (transaction.subCategory ?? null)
+                  ) {
+                    return;
+                  }
                   updateCategory.mutate(
                     {
                       transactionId: transaction.id,
                       category: nextCategory,
+                      subCategory: nextSubCategory,
                     },
                     {
                       onSuccess: (result) => {
                         const count = result.merchantTransactionsUpdated;
                         const merchant =
                           transaction.merchantName ?? transaction.name;
+                        const label = nextSubCategory
+                          ? `${nextCategory} → ${nextSubCategory}`
+                          : nextCategory;
                         onCategoryUpdated?.(
                           count > 1
-                            ? `Updated ${count} transactions for ${merchant} to ${nextCategory}.`
-                            : `Saved ${nextCategory} for ${merchant} on future transactions.`,
+                            ? `Updated ${count} transactions for ${merchant} to ${label}.`
+                            : `Saved ${label} for ${merchant} on future transactions.`,
                         );
                       },
                       onError: (err) => {

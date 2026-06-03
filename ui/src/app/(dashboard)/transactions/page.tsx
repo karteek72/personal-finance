@@ -53,6 +53,9 @@ function TransactionsContent() {
   const [category, setCategory] = useState(
     () => searchParams.get("category") ?? "",
   );
+  const [subCategory, setSubCategory] = useState(
+    () => searchParams.get("subCategory") ?? "",
+  );
   const [sort, setSort] = useState<NonNullable<TransactionFilters["sort"]>>(
     "date_desc",
   );
@@ -71,6 +74,7 @@ function TransactionsContent() {
     month: monthQueryValue(selectedMonth),
     accountId: accountId || undefined,
     category: category || undefined,
+    subCategory: subCategory || undefined,
     memberId: selectedMemberId || undefined,
     scope: selectedMemberId ? undefined : scope,
     sort,

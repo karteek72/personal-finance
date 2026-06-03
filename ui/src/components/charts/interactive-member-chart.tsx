@@ -104,7 +104,7 @@ export function InteractiveMemberChart({
                     callbacks: {
                       label: (context) => {
                         const value = context.parsed;
-                        const pct = total > 0 ? ((value / total) * 100).toFixed(1) : "0";
+                        const pct = total > 0 ? ((value / total) * 100).toFixed(2) : "0.00";
                         return `${formatCurrency(value)} (${pct}%)`;
                       },
                     },

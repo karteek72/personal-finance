@@ -222,6 +222,7 @@ export interface ChartMemberSlice {
 export interface ChartDataResponse {
   monthly: ChartMonthlyPoint[];
   byCategory: ChartCategorySlice[];
+  bySubCategory: ChartCategorySlice[];
   byAccount: ChartAccountSlice[];
   byMember: ChartMemberSlice[];
   categoryTrends: CategoryTrend[];

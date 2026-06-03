@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { loadEnv, type Env } from "./config/env.js";
 import { runMigrations } from "./db/migrate.js";
+import { backfillSubCategories } from "./services/backfill-subcategories.js";
 import { createRootLogger, getRootLogger } from "./lib/logger.js";
 import { errorHandlerPlugin } from "./plugins/error-handler.js";
 import { REQUEST_ID_HEADER, requestContextPlugin } from "./plugins/request-context.js";
@@ -55,6 +56,7 @@ async function main(): Promise<void> {
   migrationLog.info("running database migrations");
   await runMigrations(env.DATABASE_URL);
   migrationLog.info("database migrations complete");
+  await backfillSubCategories();
 
   const allowedOrigins = env.CORS_ORIGINS
     ? env.CORS_ORIGINS.split(",").map((origin) => origin.trim())

@@ -40,6 +40,8 @@ catch (err) {
 ## Money
 
 - Store as `numeric(12,2)` in Postgres; serialize as decimal strings in JSON.
+- **Always 2 decimal places** in API money strings — use `formatMoneyAmount()` from `lib/money.ts`.
+- **Percentages** in API responses use `roundPercent()` (2 decimal places, e.g. `62.05`).
 - Never use JavaScript `number` for currency arithmetic in business logic.
 
 ## Jobs
