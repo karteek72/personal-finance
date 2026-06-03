@@ -297,6 +297,72 @@ export async function assignAccountToMember(
   return { accountId, memberId };
 }
 
+/** Assign accounts with no household member to the owner (e.g. after Plaid link). */
+export async function ensureAccountsAssignedToOwner(
+  userId: string,
+  accountIds: string[],
+): Promise<void> {
+  if (accountIds.length === 0) {
+    return;
+  }
+
+  const household = await getHouseholdForUser(userId);
+  const db = getDb();
+
+  const [owner] = await db
+    .select({ id: householdMembers.id })
+    .from(householdMembers)
+    .where(
+      and(
+        eq(householdMembers.householdId, household.id),
+        eq(householdMembers.role, "owner"),
+      ),
+    )
+    .limit(1);
+
+  if (!owner) {
+    return;
+  }
+
+  const ownedAccounts = await db
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(
+      and(eq(accounts.userId, userId), inArray(accounts.id, accountIds)),
+    );
+
+  if (ownedAccounts.length === 0) {
+    return;
+  }
+
+  const existing = await db
+    .select({ accountId: householdAccountAssignments.accountId })
+    .from(householdAccountAssignments)
+    .where(
+      inArray(
+        householdAccountAssignments.accountId,
+        ownedAccounts.map((row) => row.id),
+      ),
+    );
+
+  const assigned = new Set(existing.map((row) => row.accountId));
+  const unassigned = ownedAccounts
+    .map((row) => row.id)
+    .filter((id) => !assigned.has(id));
+
+  if (unassigned.length === 0) {
+    return;
+  }
+
+  await db.insert(householdAccountAssignments).values(
+    unassigned.map((accountId) => ({
+      accountId,
+      memberId: owner.id,
+      householdId: household.id,
+    })),
+  );
+}
+
 export async function resolveScopedAccountIds(
   userId: string,
   scope?: "all" | "household" | "personal",

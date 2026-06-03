@@ -7,6 +7,7 @@ import { AppError } from "../../lib/errors.js";
 import { createLogger } from "../../lib/logger.js";
 import { getPlaidClient } from "./client.js";
 import { decryptPlaidToken } from "./crypto.js";
+import { ensureAccountsAssignedToOwner } from "../household-store.js";
 import { mapPlaidTransaction } from "./map-transaction.js";
 
 const log = createLogger("plaid.sync");
@@ -138,6 +139,11 @@ export async function syncPlaidItem(
 
     accountIdByPlaidId.set(plaidAccount.account_id, inserted!.id);
   }
+
+  await ensureAccountsAssignedToOwner(
+    item.userId,
+    [...accountIdByPlaidId.values()],
+  );
 
   let cursor = item.cursor ?? undefined;
   let added = 0;

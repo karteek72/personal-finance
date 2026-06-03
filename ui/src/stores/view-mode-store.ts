@@ -13,7 +13,7 @@ interface ViewModeState {
 export const useViewModeStore = create<ViewModeState>()(
   persist(
     (set) => ({
-      scope: "household",
+      scope: "all",
       setScope: (scope) => set({ scope }),
     }),
     { name: "spendflow-view-mode" },

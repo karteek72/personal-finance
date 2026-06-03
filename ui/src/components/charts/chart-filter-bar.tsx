@@ -33,7 +33,7 @@ export function ChartFilterBar({
   selectedAccountId,
   selectedCategory,
   selectedMemberId = "",
-  scope = "household",
+  scope = "all",
   onScopeChange,
   onAccountChange,
   onCategoryChange,
