@@ -1,6 +1,5 @@
 "use client";
 
-import { FlowAnalyticsPanel } from "@/components/charts/flow-analytics-panel";
 import { AsyncPanel } from "@/components/ui/async-panel";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -68,7 +67,7 @@ export default function MoneyFlowPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Money flow"
-        subtitle="Filter charts by account or category"
+        subtitle="How income moves through your bank and card accounts"
       />
 
       <Card className="border-success/20 bg-success/10">
@@ -104,8 +103,6 @@ export default function MoneyFlowPage() {
           footerAmount={flow.creditCards.totalCharges}
         />
       </section>
-
-      <FlowAnalyticsPanel />
     </div>
       ) : null}
     </AsyncPanel>

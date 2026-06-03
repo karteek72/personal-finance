@@ -16,3 +16,8 @@ export function calendarYearDateRange(year = new Date().getFullYear()): {
 } {
   return { from: `${year}-01-01`, to: `${year}-12-31` };
 }
+
+/** Human label for the rolling Plaid history window on the dashboard. */
+export function plaidHistoryPeriodLabel(): string {
+  return "Last 24 months";
+}

@@ -7,7 +7,10 @@ import { KpiCard } from "@/components/ui/kpi-card";
 import { AsyncPanel } from "@/components/ui/async-panel";
 import { useAlerts } from "@/hooks/use-alerts";
 import { useSummary } from "@/hooks/use-summary";
-import { plaidHistoryDateRange } from "@/lib/date-ranges";
+import {
+  plaidHistoryDateRange,
+  plaidHistoryPeriodLabel,
+} from "@/lib/date-ranges";
 import { formatMoney } from "@/lib/format-money";
 
 function getGreeting(): string {
@@ -67,7 +70,9 @@ function DashboardContent({
         style={{ background: "var(--gradient-hero)" }}
       >
         <p className="text-sm font-medium opacity-90">{getGreeting()} 👋</p>
-        <p className="mt-1 text-sm opacity-80">Your net savings this year</p>
+        <p className="mt-1 text-sm opacity-80">
+          Net savings · {plaidHistoryPeriodLabel()}
+        </p>
         <p
           className="mt-2 text-4xl font-extrabold tracking-tight md:text-5xl"
           data-money
@@ -98,7 +103,7 @@ function DashboardContent({
           </div>
           <div className="rounded-[var(--radius-sm)] bg-white/15 px-3 py-2 backdrop-blur-sm">
             <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
-              Avg / mo
+              Avg spend / mo
             </p>
             <p className="mt-0.5 text-sm font-bold tabular-nums" data-money>
               {formatMoney(summary.avgMonthlySpend)}

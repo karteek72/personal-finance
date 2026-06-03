@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
+import { countMonthsInclusive } from "../lib/date-range.js";
 import { accounts, transactions } from "../db/schema.js";
 import { getMemberMapForAccounts } from "./household-store.js";
 
@@ -199,11 +200,12 @@ export async function getSummary(
       : sql`TRUE`;
 
   const spendRows = await db.execute<{ total: string }>(sql`
-    SELECT COALESCE(SUM(amount::numeric), 0)::text AS total
+    SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
     WHERE ${userFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
+      AND pending = false
       AND ${dateFilter}
   `);
 
@@ -213,6 +215,7 @@ export async function getSummary(
     WHERE ${userFilter}
       AND transaction_type = 'income'
       AND is_transfer = false
+      AND pending = false
       AND ${dateFilter}
   `);
 
@@ -221,6 +224,7 @@ export async function getSummary(
     FROM transactions
     WHERE ${userFilter}
       AND is_transfer = true
+      AND pending = false
       AND ${dateFilter}
   `);
 
@@ -228,14 +232,15 @@ export async function getSummary(
     name: string;
     amount: string;
   }>(sql`
-    SELECT category AS name, SUM(amount::numeric)::text AS amount
+    SELECT category AS name, SUM(ABS(amount::numeric))::text AS amount
     FROM transactions
     WHERE ${userFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
+      AND pending = false
       AND ${dateFilter}
     GROUP BY category
-    ORDER BY SUM(amount::numeric) DESC
+    ORDER BY SUM(ABS(amount::numeric)) DESC
     LIMIT 1
   `);
 
@@ -246,14 +251,19 @@ export async function getSummary(
   const spentNum = Number.parseFloat(totalSpent);
   const net = incomeNum - spentNum;
 
+  const monthsInPeriod =
+    from && to ? countMonthsInclusive(from, to) : 1;
+  const avgMonthlySpend = (spentNum / monthsInPeriod).toFixed(2);
+
   return {
     totalSpent,
     income,
     netSavings: net.toFixed(2),
-    avgMonthlySpend: totalSpent,
+    avgMonthlySpend,
     topCategory: topCategoryRows[0] ?? { name: "None", amount: "0.00" },
     ccPaymentsExcluded,
     savingsRate: incomeNum > 0 ? net / incomeNum : 0,
+    monthsInPeriod,
   };
 }
 
@@ -441,7 +451,7 @@ function buildChartFilters(params: ChartDataParams) {
     params.userIds.length === 1
       ? sql`t.user_id = ${params.userIds[0]!}`
       : sql`t.user_id IN (${sql.join(params.userIds.map((id) => sql`${id}`), sql`, `)})`;
-  const parts = [userFilter];
+  const parts = [userFilter, sql`t.pending = false`];
   if (params.from && params.to) {
     parts.push(sql`t.date >= ${params.from} AND t.date <= ${params.to}`);
   }
@@ -478,12 +488,12 @@ export async function getChartData(params: ChartDataParams) {
   }>(sql`
     SELECT
       to_char(date_trunc('month', t.date), 'YYYY-MM') AS month,
-      COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' AND NOT t.is_transfer THEN t.amount::numeric ELSE 0 END), 0)::text AS expenses,
+      COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' AND NOT t.is_transfer THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS expenses,
       COALESCE(SUM(CASE WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS income,
       COALESCE(SUM(
         CASE
           WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric)
-          WHEN t.transaction_type = 'expense' AND NOT t.is_transfer THEN -t.amount::numeric
+          WHEN t.transaction_type = 'expense' AND NOT t.is_transfer THEN -ABS(t.amount::numeric)
           ELSE 0
         END
       ), 0)::text AS net
@@ -494,13 +504,13 @@ export async function getChartData(params: ChartDataParams) {
   `);
 
   const categoryRows = await db.execute<{ name: string; amount: string }>(sql`
-    SELECT t.category AS name, SUM(t.amount::numeric)::text AS amount
+    SELECT t.category AS name, SUM(ABS(t.amount::numeric))::text AS amount
     FROM transactions t
     WHERE ${whereClause}
       AND t.transaction_type = 'expense'
       AND NOT t.is_transfer
     GROUP BY t.category
-    ORDER BY SUM(t.amount::numeric) DESC
+    ORDER BY SUM(ABS(t.amount::numeric)) DESC
   `);
 
   const categoryTotal = categoryRows.reduce(
@@ -513,14 +523,14 @@ export async function getChartData(params: ChartDataParams) {
     name: string;
     amount: string;
   }>(sql`
-    SELECT a.id, a.name, SUM(t.amount::numeric)::text AS amount
+    SELECT a.id, a.name, SUM(ABS(t.amount::numeric))::text AS amount
     FROM transactions t
     JOIN accounts a ON a.id = t.account_id
     WHERE ${whereClause}
       AND t.transaction_type = 'expense'
       AND NOT t.is_transfer
     GROUP BY a.id, a.name
-    ORDER BY SUM(t.amount::numeric) DESC
+    ORDER BY SUM(ABS(t.amount::numeric)) DESC
   `);
 
   const accountTotal = accountRows.reduce(
@@ -538,7 +548,7 @@ export async function getChartData(params: ChartDataParams) {
       hm.id,
       hm.display_name AS name,
       hm.avatar_color AS color,
-      COALESCE(SUM(t.amount::numeric), 0)::text AS amount
+      COALESCE(SUM(ABS(t.amount::numeric)), 0)::text AS amount
     FROM transactions t
     JOIN household_account_assignments haa ON haa.account_id = t.account_id
     JOIN household_members hm ON hm.id = haa.member_id
@@ -546,7 +556,7 @@ export async function getChartData(params: ChartDataParams) {
       AND t.transaction_type = 'expense'
       AND NOT t.is_transfer
     GROUP BY hm.id, hm.display_name, hm.avatar_color
-    ORDER BY SUM(t.amount::numeric) DESC
+    ORDER BY SUM(ABS(t.amount::numeric)) DESC
   `);
 
   const memberTotal = memberRows.reduce(
@@ -562,7 +572,7 @@ export async function getChartData(params: ChartDataParams) {
     SELECT
       t.category AS name,
       to_char(date_trunc('month', t.date), 'YYYY-MM') AS month,
-      SUM(t.amount::numeric)::text AS amount
+      SUM(ABS(t.amount::numeric))::text AS amount
     FROM transactions t
     WHERE ${whereClause}
       AND t.transaction_type = 'expense'

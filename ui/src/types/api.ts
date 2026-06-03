@@ -71,6 +71,8 @@ export interface TransactionSummary {
   topCategory: { name: string; amount: string };
   ccPaymentsExcluded: string;
   savingsRate: number;
+  /** Calendar months in the summary date range (for avg/month). */
+  monthsInPeriod?: number;
 }
 
 export interface FlowLine {
