@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build (if needed) and start the SpendFlow Podman stack.
+# Start the SpendFlow Podman stack (images must exist — run build.sh first, or pass --build).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,11 +8,15 @@ source "${SCRIPT_DIR}/lib.sh"
 
 spendflow_require_cmd podman
 
-BUILD=1
+BUILD=0
 EXTRA_ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --no-build) BUILD=0; shift ;;
+    --build) BUILD=1; shift ;;
+    --no-build)
+      echo "warn: --no-build is the default; use --build to rebuild images" >&2
+      shift
+      ;;
     *) EXTRA_ARGS+=("$1"); shift ;;
   esac
 done
@@ -39,10 +43,7 @@ spendflow_ensure_podman
 
 echo "==> Starting stack on ${SPENDFLOW_HOST}:${SPENDFLOW_UI_PORT} (UI) and :${SPENDFLOW_API_PORT} (API)"
 
-UP_ARGS=(up -d --remove-orphans)
-if [[ "${BUILD}" -eq 0 ]]; then
-  UP_ARGS+=(--no-build)
-fi
+UP_ARGS=(up -d --remove-orphans --no-build)
 if ((${#EXTRA_ARGS[@]})); then
   spendflow_compose "${UP_ARGS[@]}" "${EXTRA_ARGS[@]}"
 else

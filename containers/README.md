@@ -14,6 +14,7 @@ cp containers/env.example containers/.env
 # Or symlink: ln -sf ../.env containers/.env
 
 # 3. Build and start
+./scripts/podman/build.sh
 ./scripts/podman/deploy.sh
 ```
 
@@ -40,10 +41,10 @@ The UI image is built with `NEXT_PUBLIC_API_URL` pointing at the **public API** 
 | `./scripts/podman/dev.sh` | **Local dev** — Postgres + Redis containers + API/UI on host with logs |
 | `./scripts/podman/dev-down.sh` | Stop dev API/UI (and Postgres/Redis unless `--keep-db`) |
 | `./scripts/podman/dev-logs.sh` | Follow `logs/dev/*.log` or Postgres/Redis container logs |
-| `./scripts/podman/deploy.sh` | **Production-style** — build + full stack in containers |
+| `./scripts/podman/deploy.sh` | **Production-style** — start full stack in containers (uses existing images) |
+| `./scripts/podman/deploy.sh --build` | Rebuild images, then start stack |
 | `./scripts/podman/verify.sh` | Check config, images, and HTTP health (after deploy) |
 | `./scripts/podman/build.sh` | Build API (Node) + UI (static `out/` in **nginx:alpine**) |
-| `./scripts/podman/deploy.sh --no-build` | Restart without rebuild |
 | `./scripts/podman/down.sh` | Stop and remove containers |
 | `./scripts/podman/logs.sh` | Follow compose logs (container stack) |
 
@@ -175,7 +176,7 @@ The API container runs with `NODE_ENV=production`. An empty `ENCRYPTION_KEY=` in
    ENCRYPTION_KEY=<paste-the-value>
    ```
 
-3. Restart: `./scripts/podman/deploy.sh --no-build`
+3. Restart: `./scripts/podman/deploy.sh`
 
 `./scripts/podman/deploy.sh` also auto-generates `ENCRYPTION_KEY` when the line is missing or empty (see `spendflow_ensure_encryption_key` in `scripts/podman/lib.sh`).
 
@@ -194,5 +195,5 @@ podman exec -it spendflow-postgres psql -U spendflow -d spendflow -c '\dt'
 Rebuild UI after changing public URLs:
 
 ```bash
-./scripts/podman/build.sh && ./scripts/podman/deploy.sh --no-build
+./scripts/podman/build.sh && ./scripts/podman/deploy.sh
 ```
