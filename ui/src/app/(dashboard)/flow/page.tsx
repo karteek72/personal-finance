@@ -1,6 +1,6 @@
 "use client";
 
-import { FlowAnalyticsPanel } from "@/components/charts/flow-analytics-panel";
+import { AsyncPanel } from "@/components/ui/async-panel";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { useMoneyFlow } from "@/hooks/use-money-flow";
@@ -53,29 +53,21 @@ function FlowColumn({
 }
 
 export default function MoneyFlowPage() {
-  const { data: flow, isLoading, error } = useMoneyFlow();
-
-  if (isLoading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-text-muted">
-        Loading money flow…
-      </div>
-    );
-  }
-
-  if (error || !flow) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-danger">
-        {error instanceof Error ? error.message : "Failed to load money flow"}
-      </div>
-    );
-  }
+  const { data: flow, isLoading, isFetching, error } = useMoneyFlow();
 
   return (
+    <AsyncPanel
+      isLoading={isLoading}
+      isFetching={isFetching}
+      error={error}
+      loadingMessage="Loading money flow…"
+      errorMessage="Failed to load money flow"
+    >
+      {flow ? (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Money flow"
-        subtitle="Filter charts by account or category"
+        subtitle="How income moves through your bank and card accounts"
       />
 
       <Card className="border-success/20 bg-success/10">
@@ -111,8 +103,8 @@ export default function MoneyFlowPage() {
           footerAmount={flow.creditCards.totalCharges}
         />
       </section>
-
-      <FlowAnalyticsPanel />
     </div>
+      ) : null}
+    </AsyncPanel>
   );
 }

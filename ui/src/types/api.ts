@@ -16,6 +16,27 @@ export interface AuthRefreshResponse {
   refreshToken: string;
 }
 
+export interface AccountCreditLiability {
+  lastStatementBalance: string | null;
+  lastStatementIssueDate: string | null;
+  minimumPaymentAmount: string | null;
+  nextPaymentDueDate: string | null;
+  lastPaymentAmount: string | null;
+  lastPaymentDate: string | null;
+  isOverdue: boolean | null;
+  aprs: {
+    aprType: string;
+    aprPercentage: string;
+    balanceSubjectToApr: string | null;
+    interestChargeAmount: string | null;
+  }[];
+  purchaseApr: string | null;
+  estimatedMonthlyInterest: string | null;
+  statementVsCurrentDelta: string | null;
+  daysUntilDue: number | null;
+  syncedAt: string | null;
+}
+
 export interface Account {
   id: string;
   name: string;
@@ -34,6 +55,26 @@ export interface Account {
   memberId?: string | null;
   memberName?: string | null;
   memberColor?: string | null;
+  liability?: AccountCreditLiability | null;
+}
+
+export interface CreditCardDebtRow {
+  accountId: string;
+  name: string;
+  mask: string | null;
+  institutionName: string;
+  balanceCurrent: string;
+  liability: AccountCreditLiability | null;
+}
+
+export interface CreditDebtSummary {
+  totalCurrentBalance: string;
+  totalStatementBalance: string;
+  totalMinimumDue: string;
+  totalEstimatedMonthlyInterest: string;
+  overdueCount: number;
+  coverageLabel: string;
+  cards: CreditCardDebtRow[];
 }
 
 export interface Transaction {
@@ -46,12 +87,23 @@ export interface Transaction {
   amount: string;
   currencyCode: string;
   category: string;
+  subCategory: string | null;
   transactionType: "expense" | "income" | "transfer";
   isTransfer: boolean;
   pending: boolean;
   memberId?: string | null;
   memberName?: string | null;
   memberColor?: string | null;
+}
+
+export interface UpdateTransactionCategoryResponse {
+  transaction: {
+    id: string;
+    category: string;
+    subCategory: string | null;
+    merchantKey: string;
+  };
+  merchantTransactionsUpdated: number;
 }
 
 export interface TransactionSummary {
@@ -62,6 +114,10 @@ export interface TransactionSummary {
   topCategory: { name: string; amount: string };
   ccPaymentsExcluded: string;
   savingsRate: number;
+  transactionCount: number;
+  pendingCount: number;
+  /** Calendar months in the summary date range (for avg/month). */
+  monthsInPeriod?: number;
 }
 
 export interface FlowLine {
@@ -89,11 +145,18 @@ export interface Alert {
   dismissible: boolean;
 }
 
+export interface SubCategoryTotal {
+  name: string;
+  amount: string;
+  percentage: number;
+}
+
 export interface CategoryTotal {
   name: string;
   amount: string;
   percentage: number;
   deltaVsPriorMonth: number;
+  subcategories?: SubCategoryTotal[];
 }
 
 export interface CategoryTrend {
@@ -130,6 +193,7 @@ export interface PlaidSyncResponse {
   added: number;
   modified: number;
   removed: number;
+  message?: string;
 }
 
 export interface PlaidSyncAllResponse {
@@ -138,6 +202,8 @@ export interface PlaidSyncAllResponse {
   added: number;
   modified: number;
   removed: number;
+  message?: string;
+  failures?: { itemId: string; institutionName: string | null; message: string }[];
 }
 
 export interface PaginatedTransactions {
@@ -199,6 +265,7 @@ export interface ChartMemberSlice {
 export interface ChartDataResponse {
   monthly: ChartMonthlyPoint[];
   byCategory: ChartCategorySlice[];
+  bySubCategory: ChartCategorySlice[];
   byAccount: ChartAccountSlice[];
   byMember: ChartMemberSlice[];
   categoryTrends: CategoryTrend[];
@@ -220,6 +287,13 @@ export interface ChartDataFilters {
 
 export type HouseholdMemberRole = "owner" | "partner" | "child" | "other";
 
+export interface HouseholdMemberInvite {
+  id: string;
+  email: string;
+  expiresAt: string;
+  status: "pending" | "expired";
+}
+
 export interface HouseholdMember {
   id: string;
   displayName: string;
@@ -227,6 +301,7 @@ export interface HouseholdMember {
   avatarColor: string;
   userId: string | null;
   createdAt: string;
+  pendingInvite?: HouseholdMemberInvite | null;
 }
 
 export interface HouseholdAccountLink {
@@ -238,9 +313,12 @@ export interface HouseholdAccountLink {
   memberId: string | null;
   memberName: string | null;
   memberColor: string | null;
+  ownedByCurrentUser?: boolean;
+  ownerUserId?: string;
 }
 
 export interface HouseholdResponse {
+  accessRole: "owner" | "member";
   household: {
     id: string;
     name: string;
@@ -248,6 +326,29 @@ export interface HouseholdResponse {
   };
   members: HouseholdMember[];
   accounts: HouseholdAccountLink[];
+}
+
+export interface HouseholdInviteResponse {
+  invitationId: string;
+  inviteUrl: string;
+  expiresAt: string;
+  email: string;
+}
+
+export interface HouseholdInvitePreview {
+  householdName: string;
+  memberName: string;
+  memberRole: string;
+  email: string;
+  expiresAt: string;
+  status: "pending" | "expired" | "accepted";
+}
+
+export interface HouseholdInviteAcceptResponse {
+  householdId: string;
+  householdName: string;
+  memberId: string;
+  memberDisplayName: string;
 }
 
 export interface HouseholdMemberInsight {
@@ -275,6 +376,7 @@ export interface HouseholdInsightsResponse {
 export interface TransactionFilters {
   month?: string;
   category?: string;
+  subCategory?: string;
   accountId?: string;
   memberId?: string;
   scope?: "all" | "household" | "personal";

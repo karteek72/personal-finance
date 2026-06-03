@@ -21,6 +21,8 @@ const envSchema = z.object({
     z.string().url().optional(),
   ),
   APP_URL: z.string().url().default("http://localhost:4000"),
+  /** Base URL for household invite links (web app). */
+  UI_APP_URL: z.string().url().default("http://localhost:3002"),
   ENCRYPTION_KEY: z.string().optional(),
   DATABASE_URL: z
     .string()
@@ -47,5 +49,18 @@ export function loadEnv(): Env {
     );
     throw new Error("Failed to load environment variables");
   }
-  return parsed.data;
+
+  const env = parsed.data;
+  if (
+    env.NODE_ENV === "production" &&
+    !(process.env.ENCRYPTION_KEY ?? "").trim()
+  ) {
+    getRootLogger().fatal(
+      {},
+      "ENCRYPTION_KEY is required when NODE_ENV=production (set in containers/.env; generate with: openssl rand -hex 32)",
+    );
+    throw new Error("ENCRYPTION_KEY is required in production");
+  }
+
+  return env;
 }

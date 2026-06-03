@@ -1,7 +1,11 @@
 "use client";
 
-import { useTheme } from "@/hooks/use-theme";
+import { useIsFetching } from "@tanstack/react-query";
+
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { UserMenu } from "@/components/layout/user-menu";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useTheme } from "@/hooks/use-theme";
 
 interface TopBarProps {
   title: string;
@@ -43,24 +47,27 @@ function getGreeting(): string {
 
 export function TopBar({ title }: TopBarProps) {
   const { theme, toggleTheme } = useTheme();
-  const year = new Date().getFullYear();
+  const isFetching = useIsFetching() > 0;
 
   return (
     <header className="sticky top-0 z-20 px-4 pt-4 md:px-6 md:pt-6">
       <div className="flex items-center justify-between gap-4">
-        <div>
+        <div className="flex min-w-0 items-center gap-2">
+          {isFetching ? (
+            <LoadingSpinner size="sm" label="Updating data" className="shrink-0" />
+          ) : null}
+          <div className="min-w-0">
           <p className="text-xs font-medium text-text-muted md:hidden">
             {getGreeting()}
           </p>
           <h1 className="text-2xl font-bold tracking-tight text-text md:text-3xl">
             {title}
           </h1>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="hidden rounded-[var(--radius-pill)] bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary sm:inline">
-            {year}
-          </span>
+          <NotificationBell />
           <UserMenu />
           <button
             type="button"

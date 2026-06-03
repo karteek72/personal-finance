@@ -22,6 +22,8 @@ alwaysApply: false
 
 - Tailwind v4 + CSS tokens from `docs/design/design-system.md`.
 - Money values: JetBrains Mono + `tabular-nums`.
+- **Money display:** use `formatMoney()` — always 2 decimal places.
+- **Percentages:** use `formatPercent()` from `lib/money-format.ts` — always 2 decimal places.
 - No box shadows; flat surfaces with border/surface contrast.
 
 ## Types

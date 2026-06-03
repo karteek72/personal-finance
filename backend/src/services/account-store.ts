@@ -1,13 +1,20 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { accounts, transactions } from "../db/schema.js";
+import { resolveHouseholdContext } from "./household-access.js";
 
 export async function getAccount(accountId: string, userId: string) {
+  const ctx = await resolveHouseholdContext(userId);
   const db = getDb();
   const [account] = await db
     .select()
     .from(accounts)
-    .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
+    .where(
+      and(
+        eq(accounts.id, accountId),
+        inArray(accounts.userId, ctx.userIds),
+      ),
+    )
     .limit(1);
   return account ?? null;
 }

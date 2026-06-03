@@ -3,6 +3,8 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { loadEnv, type Env } from "./config/env.js";
 import { runMigrations } from "./db/migrate.js";
+import { backfillSubCategories } from "./services/backfill-subcategories.js";
+import { backfillInternalTransfers } from "./services/backfill-transfers.js";
 import { createRootLogger, getRootLogger } from "./lib/logger.js";
 import { errorHandlerPlugin } from "./plugins/error-handler.js";
 import { REQUEST_ID_HEADER, requestContextPlugin } from "./plugins/request-context.js";
@@ -10,7 +12,9 @@ import { authRoutes } from "./routes/auth.js";
 import { householdRoutes } from "./routes/households.js";
 import { healthRoutes } from "./routes/health.js";
 import { accountRoutes } from "./routes/accounts.js";
+import { liabilityRoutes } from "./routes/liabilities.js";
 import { plaidRoutes } from "./routes/plaid.js";
+import { plaidWebhookRoutes } from "./routes/webhooks-plaid.js";
 import {
   transactionRoutes,
   insightRoutes,
@@ -19,6 +23,11 @@ import {
 declare module "fastify" {
   interface FastifyInstance {
     config: { env: Env };
+  }
+
+  interface FastifyRequest {
+    /** Set by requireRequestUser for richer request/sync logs */
+    spendflowUser?: { id: string; email: string };
   }
 }
 
@@ -49,6 +58,8 @@ async function main(): Promise<void> {
   migrationLog.info("running database migrations");
   await runMigrations(env.DATABASE_URL);
   migrationLog.info("database migrations complete");
+  await backfillSubCategories();
+  await backfillInternalTransfers();
 
   const allowedOrigins = env.CORS_ORIGINS
     ? env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
@@ -76,7 +87,9 @@ async function main(): Promise<void> {
   await app.register(householdRoutes, { prefix: "/api/v1" });
   await app.register(healthRoutes, { prefix: "/api/v1" });
   await app.register(accountRoutes, { prefix: "/api/v1" });
+  await app.register(liabilityRoutes, { prefix: "/api/v1" });
   await app.register(plaidRoutes, { prefix: "/api/v1" });
+  await app.register(plaidWebhookRoutes, { prefix: "/api/v1" });
   await app.register(transactionRoutes, { prefix: "/api/v1" });
   await app.register(insightRoutes, { prefix: "/api/v1" });
 

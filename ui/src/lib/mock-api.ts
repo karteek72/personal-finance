@@ -10,6 +10,7 @@ import type {
   AlertsResponse,
   CategoriesResponse,
   ChartDataResponse,
+  CreditDebtSummary,
   HouseholdInsightsResponse,
   HouseholdMember,
   HouseholdResponse,
@@ -18,6 +19,7 @@ import type {
   TransactionFilters,
   TransactionSummary,
   TrendsResponse,
+  UpdateTransactionCategoryResponse,
 } from "@/types/api";
 
 const MOCK_DELAY_MS = 150;
@@ -51,6 +53,49 @@ export async function getSummary(
 ): Promise<TransactionSummary> {
   await delay();
   return summaryData as TransactionSummary;
+}
+
+function normalizeMerchantKey(
+  merchantName: string | null | undefined,
+  name: string,
+): string {
+  return (merchantName?.trim() || name.trim()).toLowerCase().replace(/\s+/g, " ");
+}
+
+export async function updateTransactionCategory(
+  transactionId: string,
+  category: string,
+  subCategory: string | null,
+  rememberForMerchant: boolean,
+): Promise<UpdateTransactionCategoryResponse> {
+  await delay();
+  const items = (transactionsData as PaginatedTransactions).items;
+  const txn = items.find((row) => row.id === transactionId);
+  if (!txn) {
+    throw new Error("Transaction not found");
+  }
+
+  const merchantKey = normalizeMerchantKey(txn.merchantName, txn.name);
+  let merchantTransactionsUpdated = 0;
+
+  if (rememberForMerchant) {
+    for (const row of items) {
+      if (normalizeMerchantKey(row.merchantName, row.name) === merchantKey) {
+        row.category = category;
+        row.subCategory = subCategory;
+        merchantTransactionsUpdated++;
+      }
+    }
+  } else {
+    txn.category = category;
+    txn.subCategory = subCategory;
+    merchantTransactionsUpdated = 1;
+  }
+
+  return {
+    transaction: { id: transactionId, category, subCategory, merchantKey },
+    merchantTransactionsUpdated,
+  };
 }
 
 export async function getTransactions(
@@ -146,6 +191,33 @@ export async function getTransactions(
 export async function getAccounts(): Promise<AccountsResponse> {
   await delay();
   return accountsData as AccountsResponse;
+}
+
+export async function getCreditDebtSummary(): Promise<CreditDebtSummary> {
+  await delay();
+  const data = accountsData as AccountsResponse;
+  const cards = data.accounts
+    .filter((account) => account.type === "credit")
+    .map((account) => ({
+      accountId: account.id,
+      name: account.name,
+      mask: account.mask,
+      institutionName: account.institutionName,
+      balanceCurrent: account.balanceCurrent,
+      liability: null,
+    }));
+
+  return {
+    totalCurrentBalance: cards
+      .reduce((sum, card) => sum + Number.parseFloat(card.balanceCurrent), 0)
+      .toFixed(2),
+    totalStatementBalance: "0.00",
+    totalMinimumDue: "0.00",
+    totalEstimatedMonthlyInterest: "0.00",
+    overdueCount: 0,
+    coverageLabel: "Mock mode — link cards with Liabilities enabled for statement data",
+    cards,
+  };
 }
 
 export async function deleteAccount(
@@ -346,6 +418,7 @@ export async function getChartData(params: {
   return {
     monthly,
     byCategory,
+    bySubCategory: [],
     byAccount,
     byMember: byCategory.map((slice, index) => ({
       id: `mock-member-${index}`,
@@ -364,6 +437,7 @@ export async function getChartData(params: {
 }
 
 const mockHouseholdState: HouseholdResponse = {
+  accessRole: "owner",
   household: {
     id: "mock-household",
     name: "My Family",
@@ -497,4 +571,59 @@ export async function assignAccountToMember(
       : account,
   );
   return { accountId, memberId };
+}
+
+export async function inviteHouseholdMember(
+  memberId: string,
+  email: string,
+) {
+  await delay();
+  const member = mockHouseholdState.members.find((row) => row.id === memberId);
+  if (!member) throw new Error("Member not found");
+  const inviteUrl = `http://localhost:3002/accept-invite?token=mock-invite-token`;
+  member.pendingInvite = {
+    id: "mock-invite",
+    email: email.trim().toLowerCase(),
+    expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+    status: "pending",
+  };
+  return {
+    invitationId: "mock-invite",
+    inviteUrl,
+    expiresAt: member.pendingInvite.expiresAt,
+    email: member.pendingInvite.email,
+  };
+}
+
+export async function revokeHouseholdInvite(memberId: string) {
+  await delay();
+  const member = mockHouseholdState.members.find((row) => row.id === memberId);
+  if (member) member.pendingInvite = null;
+  return { status: "revoked" };
+}
+
+export async function previewHouseholdInvite(token: string) {
+  await delay();
+  void token;
+  return {
+    householdName: mockHouseholdState.household.name,
+    memberName: "Partner",
+    memberRole: "partner",
+    email: "partner@example.com",
+    expiresAt: new Date(Date.now() + 86400000).toISOString(),
+    status: "pending" as const,
+  };
+}
+
+export async function acceptHouseholdInvite(token: string) {
+  await delay();
+  void token;
+  const partner = mockHouseholdState.members.find((m) => m.role === "partner");
+  if (partner) partner.userId = "mock-partner-user";
+  return {
+    householdId: mockHouseholdState.household.id,
+    householdName: mockHouseholdState.household.name,
+    memberId: partner?.id ?? "mock-member-partner",
+    memberDisplayName: partner?.displayName ?? "Partner",
+  };
 }

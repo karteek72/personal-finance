@@ -2,14 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
-
-function yearToDateRange(): { from: string; to: string } {
-  const year = new Date().getFullYear();
-  return { from: `${year}-01-01`, to: `${year}-12-31` };
-}
+import { plaidHistoryDateRange } from "@/lib/date-ranges";
 
 export function useMoneyFlow(from?: string, to?: string) {
-  const range = yearToDateRange();
+  const range = plaidHistoryDateRange();
   const fromDate = from ?? range.from;
   const toDate = to ?? range.to;
 

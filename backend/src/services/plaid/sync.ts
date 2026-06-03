@@ -1,13 +1,34 @@
-import { CountryCode } from "plaid";
+import { CountryCode, type Transaction as PlaidTransaction } from "plaid";
 import { eq } from "drizzle-orm";
 import type { Env } from "../../config/env.js";
 import { getDb } from "../../db/client.js";
-import { accounts, plaidItems, transactions } from "../../db/schema.js";
+import { accounts, plaidItems, users } from "../../db/schema.js";
 import { AppError } from "../../lib/errors.js";
+import {
+  createOperationTimer,
+  logOperation,
+  logOperationError,
+  logOperationWarn,
+} from "../../lib/operation-log.js";
 import { createLogger } from "../../lib/logger.js";
 import { getPlaidClient } from "./client.js";
 import { decryptPlaidToken } from "./crypto.js";
+import {
+  applyMerchantCategoryRule,
+  getMerchantCategoryRulesMap,
+  type CategoryRule,
+} from "../category-rules.js";
+import { inferClassification } from "../infer-subcategory.js";
+import { resolveInternalTransfer } from "../transfer-classification.js";
+import { ensureAccountsAssignedToOwner } from "../household-store.js";
 import { mapPlaidTransaction } from "./map-transaction.js";
+import { syncCreditCardLiabilities } from "./sync-liabilities.js";
+import {
+  deletePlaidTransactionsByExternalIds,
+  PLAID_TXN_BATCH_SIZE,
+  upsertPlaidTransactionBatch,
+  type PlaidTransactionInsert,
+} from "./upsert-transactions.js";
 
 const log = createLogger("plaid.sync");
 
@@ -18,6 +39,13 @@ export interface SyncResult {
   added: number;
   modified: number;
   removed: number;
+  liabilitiesUpdated: number;
+}
+
+export interface PlaidSyncOptions {
+  operationId?: string;
+  trigger?: string;
+  requestId?: string;
 }
 
 async function resolveInstitutionName(
@@ -44,12 +72,74 @@ async function resolveInstitutionName(
   }
 }
 
+function mapTxnToRow(
+  userId: string,
+  accountId: string,
+  txn: PlaidTransaction,
+  accountType: "depository" | "credit",
+  categoryRules: Map<string, CategoryRule>,
+): PlaidTransactionInsert {
+  const mapped = mapPlaidTransaction(txn, accountType);
+  const inferred = inferClassification(
+    mapped.category,
+    mapped.merchantName,
+    mapped.name,
+  );
+  const { category, subCategory } = applyMerchantCategoryRule(
+    categoryRules,
+    mapped.merchantName,
+    mapped.name,
+    inferred.category,
+    inferred.subCategory,
+  );
+
+  const resolved = resolveInternalTransfer({
+    category,
+    subCategory,
+    name: mapped.name,
+    merchantName: mapped.merchantName,
+    pfcDetailed: txn.personal_finance_category?.detailed ?? null,
+  });
+
+  return {
+    userId,
+    accountId,
+    externalId: mapped.externalId,
+    date: mapped.date,
+    name: mapped.name,
+    merchantName: mapped.merchantName,
+    amount: mapped.amount,
+    category: resolved?.category ?? category,
+    subCategory: resolved?.subCategory ?? subCategory,
+    transactionType: resolved?.transactionType ?? mapped.transactionType,
+    isTransfer: resolved?.isTransfer ?? mapped.isTransfer,
+    pending: mapped.pending,
+    source: "plaid",
+  };
+}
+
+async function flushTransactionBatch(
+  db: ReturnType<typeof getDb>,
+  batch: PlaidTransactionInsert[],
+): Promise<void> {
+  for (let i = 0; i < batch.length; i += PLAID_TXN_BATCH_SIZE) {
+    await upsertPlaidTransactionBatch(
+      db,
+      batch.slice(i, i + PLAID_TXN_BATCH_SIZE),
+    );
+  }
+}
+
 export async function syncPlaidItem(
   itemDbId: string,
   env: Env,
+  options: PlaidSyncOptions = {},
 ): Promise<SyncResult> {
-  log.info({ itemDbId }, "plaid sync started");
+  const operationId = options.operationId ?? crypto.randomUUID();
+  const trigger = options.trigger ?? "manual";
+  const elapsed = createOperationTimer();
   const db = getDb();
+
   const [item] = await db
     .select()
     .from(plaidItems)
@@ -57,14 +147,66 @@ export async function syncPlaidItem(
     .limit(1);
 
   if (!item) {
-    log.warn({ itemDbId }, "plaid item not found");
+    logOperationWarn(
+      log,
+      "failed",
+      "Plaid item not found — sync aborted",
+      { operation: "plaid.sync_item", operationId, itemDbId, trigger },
+    );
     throw AppError.notFound("Plaid item not found");
   }
 
-  const accessToken = decryptPlaidToken(item.accessTokenEncrypted, env);
+  const [userRow] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, item.userId))
+    .limit(1);
+
+  const baseContext = {
+    operation: "plaid.sync_item" as const,
+    operationId,
+    trigger,
+    requestId: options.requestId,
+    userId: item.userId,
+    userEmail: userRow?.email ?? null,
+    itemDbId,
+    plaidItemId: item.plaidItemId,
+    hadCursor: Boolean(item.cursor),
+  };
+
+  logOperation(log, "started", "Plaid item sync started", {
+    ...baseContext,
+    lastSyncedAt: item.lastSyncedAt?.toISOString() ?? null,
+    institutionName: item.institutionName,
+  });
+
+  let accessToken: string;
+  try {
+    accessToken = decryptPlaidToken(item.accessTokenEncrypted, env);
+    logOperation(log, "token_decrypted", "Plaid access token decrypted", baseContext);
+  } catch (error) {
+    logOperationError(
+      log,
+      "failed",
+      "Failed to decrypt Plaid access token — sync aborted",
+      baseContext,
+      error,
+    );
+    throw AppError.plaidSyncError(
+      "Could not decrypt stored Plaid credentials. Re-link the account or check ENCRYPTION_KEY.",
+      error,
+    );
+  }
+
   const client = getPlaidClient(env);
   const { institutionId, institutionName } =
     await resolveInstitutionName(accessToken, env);
+
+  logOperation(log, "institution_resolved", "Plaid institution resolved", {
+    ...baseContext,
+    institutionName,
+    institutionId,
+  });
 
   await db
     .update(plaidItems)
@@ -80,6 +222,13 @@ export async function syncPlaidItem(
   });
 
   const accountIdByPlaidId = new Map<string, string>();
+  const accountSummaries: {
+    accountId: string;
+    plaidAccountId: string;
+    name: string;
+    mask: string;
+    type: string;
+  }[] = [];
 
   for (const plaidAccount of accountsResponse.data.accounts) {
     const mask = plaidAccount.mask ?? "0000";
@@ -112,6 +261,13 @@ export async function syncPlaidItem(
         })
         .where(eq(accounts.id, existing[0].id));
       accountIdByPlaidId.set(plaidAccount.account_id, existing[0].id);
+      accountSummaries.push({
+        accountId: existing[0].id,
+        plaidAccountId: plaidAccount.account_id,
+        name: plaidAccount.name,
+        mask,
+        type: plaidAccount.type,
+      });
       continue;
     }
 
@@ -137,120 +293,130 @@ export async function syncPlaidItem(
       .returning();
 
     accountIdByPlaidId.set(plaidAccount.account_id, inserted!.id);
+    accountSummaries.push({
+      accountId: inserted!.id,
+      plaidAccountId: plaidAccount.account_id,
+      name: plaidAccount.name,
+      mask,
+      type: plaidAccount.type,
+    });
   }
+
+  logOperation(log, "accounts_synced", "Plaid accounts loaded and balances updated", {
+    ...baseContext,
+    institutionName,
+    accountsSynced: accountSummaries.length,
+    accounts: accountSummaries,
+  });
+
+  await ensureAccountsAssignedToOwner(
+    item.userId,
+    [...accountIdByPlaidId.values()],
+  );
+
+  const liabilitySync = await syncCreditCardLiabilities(
+    accessToken,
+    accountIdByPlaidId,
+    env,
+  );
+
+  if (liabilitySync.creditCardsUpdated > 0) {
+    logOperation(log, "liabilities_synced", "Plaid credit card liabilities updated", {
+      ...baseContext,
+      creditCardsUpdated: liabilitySync.creditCardsUpdated,
+    });
+  }
+
+  const categoryRules = await getMerchantCategoryRulesMap(item.userId);
+
+  const accountTypeByPlaidId = new Map(
+    accountsResponse.data.accounts.map((account) => [
+      account.account_id,
+      account.type as "depository" | "credit",
+    ]),
+  );
 
   let cursor = item.cursor ?? undefined;
   let added = 0;
   let modified = 0;
   let removed = 0;
   let hasMore = true;
+  let page = 0;
 
   while (hasMore) {
+    page += 1;
+    logOperation(log, "transactions_page", "Fetching transaction page from Plaid", {
+      ...baseContext,
+      institutionName,
+      page,
+      cursorPresent: Boolean(cursor),
+    });
+
     const syncResponse = await client.transactionsSync({
       access_token: accessToken,
       cursor,
     });
 
-    const accountTypeByPlaidId = new Map(
-      accountsResponse.data.accounts.map((account) => [
-        account.account_id,
-        account.type as "depository" | "credit",
-      ]),
-    );
+    const upsertBatch: PlaidTransactionInsert[] = [];
 
     for (const txn of syncResponse.data.added) {
       const accountId = accountIdByPlaidId.get(txn.account_id);
       if (!accountId) continue;
 
-      const mapped = mapPlaidTransaction(
-        txn,
-        accountTypeByPlaidId.get(txn.account_id) ?? "depository",
-      );
-
-      await db
-        .insert(transactions)
-        .values({
-          userId: item.userId,
+      upsertBatch.push(
+        mapTxnToRow(
+          item.userId,
           accountId,
-          externalId: mapped.externalId,
-          date: mapped.date,
-          name: mapped.name,
-          merchantName: mapped.merchantName,
-          amount: mapped.amount,
-          category: mapped.category,
-          transactionType: mapped.transactionType,
-          isTransfer: mapped.isTransfer,
-          pending: mapped.pending,
-          source: "plaid",
-        })
-        .onConflictDoUpdate({
-          target: [transactions.accountId, transactions.externalId],
-          set: {
-            date: mapped.date,
-            name: mapped.name,
-            merchantName: mapped.merchantName,
-            amount: mapped.amount,
-            category: mapped.category,
-            transactionType: mapped.transactionType,
-            isTransfer: mapped.isTransfer,
-            pending: mapped.pending,
-            source: "plaid",
-          },
-        });
-      added++;
+          txn,
+          accountTypeByPlaidId.get(txn.account_id) ?? "depository",
+          categoryRules,
+        ),
+      );
     }
+    await flushTransactionBatch(db, upsertBatch);
+    added += upsertBatch.length;
 
+    const modifiedBatch: PlaidTransactionInsert[] = [];
     for (const txn of syncResponse.data.modified) {
       const accountId = accountIdByPlaidId.get(txn.account_id);
       if (!accountId) continue;
 
-      const mapped = mapPlaidTransaction(
-        txn,
-        accountTypeByPlaidId.get(txn.account_id) ?? "depository",
-      );
-
-      await db
-        .insert(transactions)
-        .values({
-          userId: item.userId,
+      modifiedBatch.push(
+        mapTxnToRow(
+          item.userId,
           accountId,
-          externalId: mapped.externalId,
-          date: mapped.date,
-          name: mapped.name,
-          merchantName: mapped.merchantName,
-          amount: mapped.amount,
-          category: mapped.category,
-          transactionType: mapped.transactionType,
-          isTransfer: mapped.isTransfer,
-          pending: mapped.pending,
-          source: "plaid",
-        })
-        .onConflictDoUpdate({
-          target: [transactions.accountId, transactions.externalId],
-          set: {
-            date: mapped.date,
-            name: mapped.name,
-            merchantName: mapped.merchantName,
-            amount: mapped.amount,
-            category: mapped.category,
-            transactionType: mapped.transactionType,
-            isTransfer: mapped.isTransfer,
-            pending: mapped.pending,
-            source: "plaid",
-          },
-        });
-      modified++;
+          txn,
+          accountTypeByPlaidId.get(txn.account_id) ?? "depository",
+          categoryRules,
+        ),
+      );
     }
+    await flushTransactionBatch(db, modifiedBatch);
+    modified += modifiedBatch.length;
 
-    for (const removedTxn of syncResponse.data.removed) {
-      await db
-        .delete(transactions)
-        .where(eq(transactions.externalId, `plaid-${removedTxn.transaction_id}`));
-      removed++;
-    }
+    const removedExternalIds = syncResponse.data.removed.map(
+      (removedTxn) => `plaid-${removedTxn.transaction_id}`,
+    );
+    removed += await deletePlaidTransactionsByExternalIds(
+      db,
+      removedExternalIds,
+    );
 
     cursor = syncResponse.data.next_cursor;
     hasMore = syncResponse.data.has_more;
+
+    logOperation(log, "transactions_page", "Transaction page applied to database", {
+      ...baseContext,
+      institutionName,
+      page,
+      pageAdded: upsertBatch.length,
+      pageModified: modifiedBatch.length,
+      pageRemoved: removedExternalIds.length,
+      totalAdded: added,
+      totalModified: modified,
+      totalRemoved: removed,
+      hasMore,
+    });
   }
 
   await db
@@ -270,7 +436,19 @@ export async function syncPlaidItem(
     added,
     modified,
     removed,
+    liabilitiesUpdated: liabilitySync.creditCardsUpdated,
   };
-  log.info({ itemDbId, ...result }, "plaid sync completed");
+
+  logOperation(log, "completed", "Plaid item sync completed successfully", {
+    ...baseContext,
+    institutionName,
+    accountsSynced: result.accountsSynced,
+    added: result.added,
+    modified: result.modified,
+    removed: result.removed,
+    transactionPages: page,
+    durationMs: elapsed(),
+  });
+
   return result;
 }

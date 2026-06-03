@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  jsonb,
   numeric,
   pgTable,
   text,
@@ -75,6 +76,32 @@ export const accounts = pgTable(
   ],
 );
 
+export const creditCardLiabilities = pgTable("credit_card_liabilities", {
+  accountId: uuid("account_id")
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: "cascade" }),
+  lastStatementBalance: numeric("last_statement_balance", {
+    precision: 12,
+    scale: 2,
+  }),
+  lastStatementIssueDate: date("last_statement_issue_date"),
+  minimumPaymentAmount: numeric("minimum_payment_amount", {
+    precision: 12,
+    scale: 2,
+  }),
+  nextPaymentDueDate: date("next_payment_due_date"),
+  lastPaymentAmount: numeric("last_payment_amount", {
+    precision: 12,
+    scale: 2,
+  }),
+  lastPaymentDate: date("last_payment_date"),
+  isOverdue: boolean("is_overdue"),
+  aprs: jsonb("aprs").notNull().default([]),
+  syncedAt: timestamp("synced_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const transactions = pgTable(
   "transactions",
   {
@@ -92,6 +119,7 @@ export const transactions = pgTable(
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
     currencyCode: text("currency_code").notNull().default("USD"),
     category: text("category").notNull().default("Uncategorized"),
+    subCategory: text("sub_category"),
     transactionType: text("transaction_type").notNull(), // expense | income | transfer
     isTransfer: boolean("is_transfer").notNull().default(false),
     pending: boolean("pending").notNull().default(false),
@@ -150,3 +178,48 @@ export const householdAccountAssignments = pgTable(
       .defaultNow(),
   },
 );
+
+export const merchantCategoryRules = pgTable(
+  "merchant_category_rules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    merchantKey: text("merchant_key").notNull(),
+    category: text("category").notNull(),
+    subCategory: text("sub_category"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("merchant_category_rules_user_merchant_idx").on(
+      table.userId,
+      table.merchantKey,
+    ),
+  ],
+);
+
+export const householdInvitations = pgTable("household_invitations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  householdId: uuid("household_id")
+    .notNull()
+    .references(() => households.id, { onDelete: "cascade" }),
+  memberId: uuid("member_id")
+    .notNull()
+    .references(() => householdMembers.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  token: text("token").notNull().unique(),
+  invitedByUserId: uuid("invited_by_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

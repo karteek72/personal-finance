@@ -47,3 +47,5 @@ backend/drizzle/meta/_journal.json.bak
 Statements/
 
 .cursor/
+
+certs/

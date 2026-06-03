@@ -1,5 +1,12 @@
+"use client";
+
 import clsx from "clsx";
 
+import {
+  isSpendCategory,
+  resolveSubCategories,
+  SPEND_CATEGORIES,
+} from "@/lib/categories";
 import { getCategoryColor } from "@/lib/category-colors";
 
 interface TransactionRowProps {
@@ -12,11 +19,14 @@ interface TransactionRowProps {
   amount: string;
   currencyCode: string;
   category: string;
+  subCategory?: string | null;
   transactionType: "expense" | "income" | "transfer";
   isTransfer: boolean;
   pending: boolean;
   memberName?: string | null;
   memberColor?: string | null;
+  onCategoryChange?: (category: string, subCategory: string | null) => void;
+  categoryUpdating?: boolean;
 }
 
 function formatAmount(amount: string, currencyCode: string): string {
@@ -28,6 +38,8 @@ function formatAmount(amount: string, currencyCode: string): string {
   return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency: currencyCode,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(Math.abs(numeric));
 }
 
@@ -49,6 +61,9 @@ const typeStyles = {
   transfer: "text-primary",
 } as const;
 
+const selectClassName =
+  "max-w-[10.5rem] truncate rounded-[var(--radius-sm)] border-0 bg-bg py-0.5 pl-1 pr-6 text-xs font-medium text-text outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50";
+
 export function TransactionRow({
   date,
   name,
@@ -56,12 +71,15 @@ export function TransactionRow({
   amount,
   currencyCode,
   category,
+  subCategory = null,
   accountMask,
   transactionType,
   isTransfer,
   pending,
   memberName,
   memberColor,
+  onCategoryChange,
+  categoryUpdating = false,
 }: TransactionRowProps) {
   const displayName = merchantName ?? name;
   const isHighlightedTransfer = isTransfer || transactionType === "transfer";
@@ -69,6 +87,30 @@ export function TransactionRow({
   const categoryColor = getCategoryColor(category);
   const prefix =
     transactionType === "income" ? "+" : transactionType === "expense" ? "−" : "";
+  const canEditCategory = Boolean(onCategoryChange) && !isHighlightedTransfer;
+
+  const categoryValue = isSpendCategory(category) ? category : "Uncategorized";
+  const subOptions = resolveSubCategories(categoryValue);
+  const subValue =
+    subCategory && subOptions.includes(subCategory) ? subCategory : "";
+
+  function handleCategoryChange(nextCategory: string) {
+    if (!onCategoryChange) return;
+    const nextSubs = resolveSubCategories(nextCategory);
+    const keptSub =
+      subCategory && nextSubs.includes(subCategory) ? subCategory : null;
+    if (nextCategory === category && keptSub === subCategory) return;
+    onCategoryChange(nextCategory, keptSub);
+  }
+
+  function handleSubCategoryChange(nextSub: string) {
+    if (!onCategoryChange) return;
+    const normalized = nextSub || null;
+    if (category === categoryValue && normalized === (subCategory ?? null)) {
+      return;
+    }
+    onCategoryChange(categoryValue, normalized);
+  }
 
   return (
     <div
@@ -104,12 +146,54 @@ export function TransactionRow({
             </span>
           ) : null}
         </div>
-        <p className="mt-0.5 truncate text-xs text-text-muted">
-          {category}
-          {accountMask ? ` · ••${accountMask}` : ""}
-          {" · "}
-          {formatDate(date)}
-        </p>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
+          {canEditCategory ? (
+            <>
+              <select
+                value={categoryValue}
+                disabled={categoryUpdating}
+                onChange={(event) => handleCategoryChange(event.target.value)}
+                onClick={(event) => event.stopPropagation()}
+                title="Category — saved for this merchant going forward"
+                aria-label={`Category for ${displayName}`}
+                className={selectClassName}
+              >
+                {SPEND_CATEGORIES.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              {subOptions.length > 0 ? (
+                <select
+                  value={subValue}
+                  disabled={categoryUpdating}
+                  onChange={(event) =>
+                    handleSubCategoryChange(event.target.value)
+                  }
+                  onClick={(event) => event.stopPropagation()}
+                  title="Subcategory — saved for this merchant going forward"
+                  aria-label={`Subcategory for ${displayName}`}
+                  className={selectClassName}
+                >
+                  <option value="">— Subcategory —</option>
+                  {subOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </>
+          ) : (
+            <span>
+              {category}
+              {subCategory ? ` · ${subCategory}` : ""}
+            </span>
+          )}
+          {accountMask ? <span>· ••{accountMask}</span> : null}
+          <span>· {formatDate(date)}</span>
+        </div>
       </div>
 
       <div className="shrink-0 text-right">

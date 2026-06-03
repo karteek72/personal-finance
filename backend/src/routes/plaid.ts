@@ -8,6 +8,7 @@ import {
   parseCountryCodes,
   parsePlaidProducts,
 } from "../services/plaid/client.js";
+import { Products } from "plaid";
 import {
   deletePlaidItem,
   exchangeAndSync,
@@ -43,14 +44,19 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
 
     const user = await requireRequestUser(request, app.config.env);
     const client = getPlaidClient(app.config.env);
+    const products = parsePlaidProducts(app.config.env.PLAID_PRODUCTS);
     const linkTokenRequest: Parameters<typeof client.linkTokenCreate>[0] = {
       user: { client_user_id: user.id },
       client_name: "SpendFlow",
-      products: parsePlaidProducts(app.config.env.PLAID_PRODUCTS),
+      products,
       country_codes: parseCountryCodes(app.config.env.PLAID_COUNTRY_CODES),
       language: "en",
       webhook: `${app.config.env.APP_URL}/api/v1/webhooks/plaid`,
     };
+
+    if (products.includes(Products.Transactions)) {
+      linkTokenRequest.transactions = { days_requested: 730 };
+    }
 
     const redirectUri = resolvePlaidRedirectUri(app.config.env);
     if (redirectUri) {
@@ -123,14 +129,51 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
     return { items };
   });
 
-  app.post("/plaid/sync", async (request) => {
+  app.post("/plaid/sync", async (request, reply) => {
     const user = await requireRequestUser(request, app.config.env);
-    try {
-      return await syncAllPlaidItems(user.id, app.config.env);
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw AppError.plaidSyncError("Unable to sync Plaid accounts", error);
-    }
+    const env = app.config.env;
+    const operationId = request.id;
+
+    request.log.info(
+      {
+        operation: "plaid.sync_all",
+        operationId,
+        stage: "queued",
+        userId: user.id,
+        userEmail: user.email,
+        trigger: "api_refresh_all",
+      },
+      "Plaid refresh-all accepted — background sync queued",
+    );
+
+    void syncAllPlaidItems(user.id, env, {
+      operationId,
+      trigger: "api_refresh_all",
+      requestId: request.id,
+      userEmail: user.email,
+    }).catch((error: unknown) => {
+      request.log.error(
+        {
+          err: error,
+          operation: "plaid.sync_all",
+          operationId,
+          userId: user.id,
+          userEmail: user.email,
+          stage: "failed",
+        },
+        "Plaid refresh-all background sync failed",
+      );
+    });
+
+    return reply.status(202).send({
+      status: "started",
+      itemsSynced: 0,
+      added: 0,
+      modified: 0,
+      removed: 0,
+      message:
+        "Sync started in the background. Balances and transactions will update shortly.",
+    });
   });
 
   app.post("/plaid/items/:itemId/sync", async (request) => {
@@ -145,8 +188,27 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
       throw AppError.notFound("Plaid item not found");
     }
 
+    request.log.info(
+      {
+        operation: "plaid.sync_item",
+        operationId: request.id,
+        stage: "started",
+        userId: user.id,
+        userEmail: user.email,
+        itemDbId: item.id,
+        plaidItemId: item.plaidItemId,
+        institutionName: item.institutionName,
+        trigger: "api_item_sync",
+      },
+      "Plaid single-item sync started (synchronous)",
+    );
+
     try {
-      const syncResult = await syncPlaidItem(item.id, app.config.env);
+      const syncResult = await syncPlaidItem(item.id, app.config.env, {
+        operationId: request.id,
+        trigger: "api_item_sync",
+        requestId: request.id,
+      });
       return { status: "completed", ...syncResult };
     } catch (error) {
       if (error instanceof AppError) throw error;

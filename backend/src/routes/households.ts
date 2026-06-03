@@ -12,6 +12,12 @@ import {
   updateHouseholdMember,
   updateHouseholdName,
 } from "../services/household-store.js";
+import {
+  acceptHouseholdInvitation,
+  createHouseholdInvitation,
+  getInvitationPreview,
+  revokeHouseholdInvitation,
+} from "../services/household-invitations.js";
 
 const createMemberSchema = z.object({
   displayName: z.string().min(1).max(80),
@@ -29,6 +35,14 @@ const updateHouseholdSchema = z.object({
 
 const assignAccountSchema = z.object({
   memberId: z.string().uuid(),
+});
+
+const inviteMemberSchema = z.object({
+  email: z.string().email(),
+});
+
+const acceptInviteSchema = z.object({
+  token: z.string().min(16),
 });
 
 export const householdRoutes: FastifyPluginAsync = async (app) => {
@@ -78,6 +92,43 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
       throw AppError.notFound("Member not found or cannot delete owner");
     }
     return { status: "deleted", memberId };
+  });
+
+  app.post("/household/members/:memberId/invite", async (request) => {
+    const { memberId } = request.params as { memberId: string };
+    const body = parseBody(inviteMemberSchema, request.body, "Valid email is required");
+    const user = await requireRequestUser(request, app.config.env);
+    return createHouseholdInvitation(
+      user.id,
+      memberId,
+      body.email,
+      app.config.env,
+    );
+  });
+
+  app.delete("/household/members/:memberId/invite", async (request) => {
+    const { memberId } = request.params as { memberId: string };
+    const user = await requireRequestUser(request, app.config.env);
+    const revoked = await revokeHouseholdInvitation(user.id, memberId);
+    return { status: revoked ? "revoked" : "none" };
+  });
+
+  app.get("/household/invites/preview", async (request) => {
+    const query = request.query as { token?: string };
+    if (!query.token?.trim()) {
+      throw AppError.validation("token query parameter is required");
+    }
+    const preview = await getInvitationPreview(query.token.trim());
+    if (!preview) {
+      throw AppError.notFound("Invitation not found");
+    }
+    return preview;
+  });
+
+  app.post("/household/invites/accept", async (request) => {
+    const body = parseBody(acceptInviteSchema, request.body, "token is required");
+    const user = await requireRequestUser(request, app.config.env);
+    return acceptHouseholdInvitation(user.id, body.token);
   });
 
   app.put("/household/accounts/:accountId/assign", async (request) => {

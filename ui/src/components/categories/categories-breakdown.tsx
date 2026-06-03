@@ -1,20 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { CategoryRow } from "@/components/categories/category-row";
-import { TransactionRow } from "@/components/transactions/transaction-row";
+import { TransactionList } from "@/components/transactions/transaction-list";
 import { Card } from "@/components/ui/card";
-import { useTransactions } from "@/hooks/use-transactions";
-import { getCategoryColor } from "@/lib/category-colors";
+import { getCategoryColor, getSubCategoryColor } from "@/lib/category-colors";
 import { formatMoney } from "@/lib/format-money";
+import { formatPercent } from "@/lib/money-format";
 import type { CategoryTotal } from "@/types/api";
 
 interface CategoriesBreakdownProps {
   categories: CategoryTotal[];
   selectedCategory?: string | null;
+  selectedSubCategory?: string | null;
   onSelectCategory?: (category: string | null) => void;
+  onSelectSubCategory?: (subCategory: string | null) => void;
 }
 
 function formatDeltaPercent(delta: number): string {
@@ -25,12 +27,24 @@ function formatDeltaPercent(delta: number): string {
 export function CategoriesBreakdown({
   categories,
   selectedCategory: controlledCategory,
+  selectedSubCategory: controlledSubCategory,
   onSelectCategory,
+  onSelectSubCategory,
 }: CategoriesBreakdownProps) {
   const [internalCategory, setInternalCategory] = useState<string | null>(null);
+  const [internalSubCategory, setInternalSubCategory] = useState<string | null>(
+    null,
+  );
+
   const selectedCategory = controlledCategory ?? internalCategory;
+  const selectedSubCategory = controlledSubCategory ?? internalSubCategory;
 
   function setSelectedCategory(category: string | null) {
+    if (onSelectSubCategory) {
+      onSelectSubCategory(null);
+    } else {
+      setInternalSubCategory(null);
+    }
     if (onSelectCategory) {
       onSelectCategory(category);
     } else {
@@ -38,11 +52,33 @@ export function CategoriesBreakdown({
     }
   }
 
-  const { data, isLoading, error } = useTransactions({
-    category: selectedCategory ?? undefined,
-    limit: 25,
-    sort: "date_desc",
-  });
+  function handleSubCategoryClick(sub: string) {
+    const next = selectedSubCategory === sub ? null : sub;
+    if (onSelectSubCategory) {
+      onSelectSubCategory(next);
+    } else {
+      setInternalSubCategory(next);
+    }
+  }
+
+  const activeCategoryData = useMemo(
+    () => categories.find((c) => c.name === selectedCategory) ?? null,
+    [categories, selectedCategory],
+  );
+
+  const subcategories = activeCategoryData?.subcategories ?? [];
+
+  const transactionFilters = useMemo(
+    () =>
+      selectedCategory
+        ? {
+            category: selectedCategory,
+            ...(selectedSubCategory ? { subCategory: selectedSubCategory } : {}),
+            sort: "date_desc" as const,
+          }
+        : {},
+    [selectedCategory, selectedSubCategory],
+  );
 
   return (
     <section aria-label="Category usage" className="flex flex-col gap-4">
@@ -60,10 +96,11 @@ export function CategoriesBreakdown({
                 width: `${category.percentage}%`,
                 backgroundColor: getCategoryColor(category.name),
               }}
-              title={`${category.name}: ${category.percentage.toFixed(1)}%`}
+              title={`${category.name}: ${formatPercent(category.percentage)}`}
             />
           ))}
         </div>
+
         <ul className="space-y-1 p-2">
           {categories.map((category) => (
             <li key={category.name}>
@@ -87,48 +124,108 @@ export function CategoriesBreakdown({
 
       {selectedCategory ? (
         <Card padding="none" className="overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+            <div>
+              <h3 className="text-sm font-bold text-text">{selectedCategory}</h3>
+              <p className="text-xs text-text-muted">
+                {formatMoney(activeCategoryData?.amount ?? "0")} total
+                {subcategories.length > 0
+                  ? ` · ${subcategories.length} subcategor${subcategories.length === 1 ? "y" : "ies"}`
+                  : " · subcategories loading…"}
+              </p>
+            </div>
+            {selectedSubCategory ? (
+              <button
+                type="button"
+                onClick={() =>
+                  onSelectSubCategory
+                    ? onSelectSubCategory(null)
+                    : setInternalSubCategory(null)
+                }
+                className="rounded-[var(--radius-pill)] border border-border/60 px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:bg-border/40"
+              >
+                Clear subcategory filter
+              </button>
+            ) : null}
+          </div>
+
+          {subcategories.length > 0 ? (
+            <>
+              <div
+                className="flex h-1.5 w-full"
+                role="img"
+                aria-label={`Subcategory breakdown for ${selectedCategory}`}
+              >
+                {subcategories.map((sub, i) => (
+                  <div
+                    key={sub.name}
+                    className="h-full transition-all"
+                    style={{
+                      width: `${sub.percentage}%`,
+                      backgroundColor: getSubCategoryColor(selectedCategory, i),
+                    }}
+                    title={`${sub.name}: ${formatPercent(sub.percentage)}`}
+                  />
+                ))}
+              </div>
+
+              <ul className="space-y-0.5 p-2">
+                {subcategories.map((sub, i) => (
+                  <li key={sub.name}>
+                    <CategoryRow
+                      name={sub.name}
+                      percentage={sub.percentage}
+                      amount={formatMoney(sub.amount)}
+                      barColor={getSubCategoryColor(selectedCategory, i)}
+                      selected={selectedSubCategory === sub.name}
+                      onClick={() => handleSubCategoryClick(sub.name)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="px-4 py-6 text-center text-sm text-text-muted">
+              No subcategory breakdown yet for this category.
+            </p>
+          )}
+        </Card>
+      ) : null}
+
+      {selectedCategory ? (
+        <Card padding="none" className="overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-4">
             <div>
               <h3 className="text-base font-bold text-text">
-                {selectedCategory}
+                {selectedSubCategory
+                  ? `${selectedCategory} · ${selectedSubCategory}`
+                  : selectedCategory}
               </h3>
               <p className="text-sm text-text-muted">
-                Tap a category to explore · tap again to close
+                {selectedSubCategory
+                  ? `Showing only ${selectedSubCategory} transactions`
+                  : "All transactions in this category · tap a subcategory above to filter"}
               </p>
             </div>
             <Link
-              href={`/transactions?category=${encodeURIComponent(selectedCategory)}`}
+              href={`/transactions?category=${encodeURIComponent(selectedCategory)}${selectedSubCategory ? `&subCategory=${encodeURIComponent(selectedSubCategory)}` : ""}`}
               className="rounded-[var(--radius-pill)] bg-primary-soft px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
             >
-              See all →
+              See all in Activity →
             </Link>
           </div>
 
-          {isLoading ? (
-            <p className="px-4 py-12 text-center text-sm text-text-muted">
-              Loading…
-            </p>
-          ) : null}
-
-          {error ? (
-            <p className="px-4 py-12 text-center text-sm text-danger">
-              Couldn't load transactions.
-            </p>
-          ) : null}
-
-          {!isLoading && !error && data?.items.length === 0 ? (
-            <p className="px-4 py-12 text-center text-sm text-text-muted">
-              No transactions in this category yet.
-            </p>
-          ) : null}
-
-          {!isLoading && !error && data && data.items.length > 0 ? (
-            <div className="divide-y divide-border/60">
-              {data.items.map((transaction) => (
-                <TransactionRow key={transaction.id} {...transaction} />
-              ))}
-            </div>
-          ) : null}
+          <TransactionList
+            key={`${selectedCategory}::${selectedSubCategory ?? ""}`}
+            filters={transactionFilters}
+            pageSize={50}
+            emptyMessage={
+              selectedSubCategory
+                ? `No transactions in ${selectedSubCategory} yet.`
+                : `No transactions in ${selectedCategory} yet.`
+            }
+            loadingMessage={`Loading ${selectedSubCategory ?? selectedCategory}…`}
+          />
         </Card>
       ) : null}
     </section>

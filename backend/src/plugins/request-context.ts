@@ -19,6 +19,8 @@ export const requestContextPlugin: FastifyPluginAsync = async (app) => {
         statusCode: reply.statusCode,
         responseTime: reply.elapsedTime,
         requestId: request.id,
+        userId: request.spendflowUser?.id,
+        userEmail: request.spendflowUser?.email,
       },
       "request completed",
     );

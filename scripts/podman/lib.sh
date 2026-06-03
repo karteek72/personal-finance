@@ -162,6 +162,27 @@ spendflow_ensure_jwt_secret() {
   echo "warn: generated JWT_SECRET in ${env_file}" >&2
 }
 
+# Plaid access tokens are encrypted at rest; production containers set NODE_ENV=production.
+spendflow_ensure_encryption_key() {
+  if [[ -n "${ENCRYPTION_KEY:-}" ]]; then
+    return 0
+  fi
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "error: ENCRYPTION_KEY missing. Set in containers/.env or install openssl." >&2
+    return 1
+  fi
+  ENCRYPTION_KEY="$(openssl rand -hex 32)"
+  export ENCRYPTION_KEY
+  local env_file="${SPENDFLOW_CONTAINERS_DIR}/.env"
+  touch "${env_file}"
+  if grep -qE '^[[:space:]]*ENCRYPTION_KEY=' "${env_file}" 2>/dev/null; then
+    sed -i "s/^[[:space:]]*ENCRYPTION_KEY=.*/ENCRYPTION_KEY=${ENCRYPTION_KEY}/" "${env_file}"
+  else
+    echo "ENCRYPTION_KEY=${ENCRYPTION_KEY}" >>"${env_file}"
+  fi
+  echo "warn: generated ENCRYPTION_KEY in ${env_file} (required for Plaid in production containers)" >&2
+}
+
 spendflow_use_lan_build_urls() {
   [[ "${SPENDFLOW_BUILD_TARGET:-lan}" != "public" ]]
 }

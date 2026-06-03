@@ -1,23 +1,20 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import Link from "next/link";
 
 import { PlaidLinkButton } from "@/components/plaid/plaid-link-button";
+import { AsyncPanel } from "@/components/ui/async-panel";
 import { Card } from "@/components/ui/card";
 import { IconButton, SyncIcon, TrashIcon } from "@/components/ui/icon-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAccounts } from "@/hooks/use-accounts";
+import { useBackgroundSyncHelpers } from "@/hooks/use-background-sync";
 import { api } from "@/lib/api-client";
+import { notifications } from "@/lib/notifications";
 import { formatMoney } from "@/lib/format-money";
-
-function invalidateFinancialQueries(
-  queryClient: ReturnType<typeof useQueryClient>,
-) {
-  void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-  void queryClient.invalidateQueries({ queryKey: ["transactions"] });
-  void queryClient.invalidateQueries({ queryKey: ["categories"] });
-}
 
 const CARD_GRADIENTS = [
   "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
@@ -27,34 +24,15 @@ const CARD_GRADIENTS = [
   "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)",
 ];
 
-function StatusToast({
-  message,
-  variant,
-}: {
-  message: string;
-  variant: "success" | "error";
-}) {
-  return (
-    <p
-      className={`rounded-[var(--radius-card)] px-4 py-3 text-sm font-medium card-shadow ${
-        variant === "success"
-          ? "bg-success/10 text-success"
-          : "bg-danger/10 text-danger"
-      }`}
-    >
-      {message}
-    </p>
-  );
-}
-
 export function AccountsView() {
   const queryClient = useQueryClient();
-  const { data, isLoading, error, refetch } = useAccounts();
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { data, isLoading, isFetching, error, refetch } = useAccounts();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+
+  const refetchAccounts = useCallback(() => refetch(), [refetch]);
+  const syncHelpers = useBackgroundSyncHelpers(refetchAccounts);
 
   const accounts = data?.accounts ?? [];
   const hasPlaidAccounts = accounts.some((account) => account.source === "plaid");
@@ -64,9 +42,13 @@ export function AccountsView() {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type !== "spendflow:plaid-oauth-success") return;
 
-      setErrorMessage(null);
-      setStatusMessage("Bank linked — you're all set ✓");
-      invalidateFinancialQueries(queryClient);
+      notifications.push(
+        "success",
+        "Bank linked",
+        "Your account is connected. Transactions will sync shortly.",
+        "plaid-link",
+      );
+      syncHelpers.invalidateFinancialQueries();
       void refetch();
     }
 
@@ -75,28 +57,45 @@ export function AccountsView() {
   }, [queryClient, refetch]);
 
   function handleConnected() {
-    setErrorMessage(null);
-    setStatusMessage("Syncing your latest transactions…");
-    invalidateFinancialQueries(queryClient);
+    notifications.push(
+      "progress",
+      "Connecting account",
+      "Syncing your latest transactions…",
+      "plaid-link",
+    );
+    syncHelpers.invalidateFinancialQueries();
     void refetch().then(() => {
-      setStatusMessage("Account connected and synced ✓");
+      notifications.push(
+        "success",
+        "Account connected",
+        "Your bank is linked and transactions are syncing.",
+        "plaid-link",
+      );
     });
   }
 
   async function handleSyncAll() {
-    setErrorMessage(null);
-    setStatusMessage(null);
     setSyncingAll(true);
+    const taskId = syncHelpers.startPlaidSyncAllTask();
 
     try {
       const result = await api.syncAllPlaid();
-      setStatusMessage(
-        `Updated — ${result.added} new, ${result.modified} changed`,
+      syncHelpers.invalidateFinancialQueries();
+
+      if (result.status === "started") {
+        await syncHelpers.pollPlaidSyncBackground(taskId);
+        return;
+      }
+
+      syncHelpers.completePlaidSyncImmediate(
+        taskId,
+        result.added,
+        result.modified,
       );
-      invalidateFinancialQueries(queryClient);
       await refetch();
     } catch (err) {
-      setErrorMessage(
+      syncHelpers.failPlaidSync(
+        taskId,
         err instanceof Error ? err.message : "Sync failed — try again",
       );
     } finally {
@@ -105,19 +104,27 @@ export function AccountsView() {
   }
 
   async function handleSyncAccount(accountId: string, accountName: string) {
-    setErrorMessage(null);
-    setStatusMessage(null);
     setSyncingId(accountId);
+    const taskId = syncHelpers.startPlaidSyncAccountTask(accountName);
 
     try {
       const result = await api.syncAccount(accountId);
-      setStatusMessage(
-        `${accountName} — ${result.added} new transactions`,
+      syncHelpers.invalidateFinancialQueries();
+
+      if (result.status === "started") {
+        await syncHelpers.pollPlaidSyncBackground(taskId);
+        return;
+      }
+
+      syncHelpers.completePlaidSyncImmediate(
+        taskId,
+        result.added,
+        result.modified,
       );
-      invalidateFinancialQueries(queryClient);
       await refetch();
     } catch (err) {
-      setErrorMessage(
+      syncHelpers.failPlaidSync(
+        taskId,
         err instanceof Error ? err.message : "Sync failed — try again",
       );
     } finally {
@@ -136,20 +143,24 @@ export function AccountsView() {
     );
     if (!confirmed) return;
 
-    setErrorMessage(null);
-    setStatusMessage(null);
     setDeletingId(accountId);
 
     try {
       const result = await api.deleteAccount(accountId);
-      setStatusMessage(
-        `Removed ${result.name} (${result.transactionsDeleted} transactions)`,
+      notifications.push(
+        "success",
+        "Account removed",
+        `Removed ${result.name} (${result.transactionsDeleted} transactions).`,
+        "system",
       );
-      invalidateFinancialQueries(queryClient);
+      syncHelpers.invalidateFinancialQueries();
       await refetch();
     } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "Couldn't delete account",
+      notifications.push(
+        "error",
+        "Could not remove account",
+        err instanceof Error ? err.message : "Please try again.",
+        "system",
       );
     } finally {
       setDeletingId(null);
@@ -163,6 +174,12 @@ export function AccountsView() {
         subtitle="Connect banks or manage imported statements"
         action={
           <>
+            <Link
+              href="/debt"
+              className="inline-flex items-center rounded-[var(--radius-pill)] bg-surface px-4 py-2.5 text-sm font-semibold text-text transition-opacity hover:opacity-80 card-shadow"
+            >
+              Credit & debt
+            </Link>
             {hasPlaidAccounts ? (
               <button
                 type="button"
@@ -178,30 +195,27 @@ export function AccountsView() {
               label="Add account"
               onSuccess={handleConnected}
               onError={(message) => {
-                setStatusMessage(null);
-                setErrorMessage(message);
+                notifications.push(
+                  "error",
+                  "Could not link account",
+                  message,
+                  "plaid-link",
+                );
               }}
             />
           </>
         }
       />
 
-      {statusMessage ? (
-        <StatusToast message={statusMessage} variant="success" />
-      ) : null}
-      {errorMessage ? (
-        <StatusToast message={errorMessage} variant="error" />
-      ) : null}
-
-      {isLoading ? (
-        <p className="text-sm text-text-muted">Loading your accounts…</p>
-      ) : null}
-
-      {error ? (
-        <p className="text-sm text-danger">Couldn't load accounts.</p>
-      ) : null}
-
-      {!isLoading && !error && accounts.length === 0 ? (
+      <AsyncPanel
+        isLoading={isLoading}
+        isFetching={isFetching}
+        error={error}
+        loadingMessage="Loading your accounts…"
+        errorMessage="Couldn't load accounts."
+        className="contents"
+      >
+      {accounts.length === 0 ? (
         <Card padding="lg" className="text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-soft text-2xl">
             💳
@@ -216,7 +230,7 @@ export function AccountsView() {
         </Card>
       ) : null}
 
-      {!isLoading && !error && accounts.length > 0 ? (
+      {accounts.length > 0 ? (
         <section
           aria-label="Connected accounts"
           className="grid gap-4 sm:grid-cols-2"
@@ -247,16 +261,14 @@ export function AccountsView() {
                       </p>
                     ) : null}
                   </div>
-                  <div className="flex shrink-0 items-center gap-0.5">
+                  <div className="flex shrink-0 gap-1">
                     {account.source === "plaid" ? (
                       <IconButton
                         label={`Sync ${account.name}`}
-                        variant="ghost"
-                        disabled={syncingId === account.id || syncingAll}
                         onClick={() =>
                           void handleSyncAccount(account.id, account.name)
                         }
-                        className="text-white/90 hover:bg-white/20 hover:text-white"
+                        disabled={syncingId === account.id}
                       >
                         <SyncIcon
                           className={
@@ -266,9 +278,7 @@ export function AccountsView() {
                       </IconButton>
                     ) : null}
                     <IconButton
-                      label={`Delete ${account.name}`}
-                      variant="ghost"
-                      disabled={deletingId === account.id}
+                      label={`Remove ${account.name}`}
                       onClick={() =>
                         void handleDeleteAccount(
                           account.id,
@@ -276,40 +286,52 @@ export function AccountsView() {
                           account.mask,
                         )
                       }
-                      className="text-white/90 hover:bg-white/20 hover:text-white"
+                      disabled={deletingId === account.id}
+                      variant="danger"
                     >
                       <TrashIcon />
                     </IconButton>
                   </div>
                 </div>
-
-                <p
-                  className="mt-6 text-3xl font-extrabold tracking-tight tabular-nums"
-                  data-money
-                >
+                <p className="mt-4 text-2xl font-bold tabular-nums" data-money>
                   {formatMoney(account.balanceCurrent)}
                 </p>
               </div>
-
-              <div className="flex items-center justify-between bg-surface px-5 py-3 text-xs">
-                <span
-                  className={`rounded-[var(--radius-pill)] px-2.5 py-1 font-semibold capitalize ${
-                    account.status === "active"
-                      ? "bg-success/15 text-success"
-                      : account.status === "reauth_required"
-                        ? "bg-warning/15 text-warning"
-                        : "bg-danger/15 text-danger"
-                  }`}
-                >
-                  {account.source === "plaid" ? "Live" : "Imported"}
-                </span>
-                <span className="text-text-muted">
-                  {account.lastSyncedAt
-                    ? new Date(account.lastSyncedAt).toLocaleDateString()
-                    : account.source === "import"
-                      ? "From statement"
-                      : "Not synced yet"}
-                </span>
+              <div className="flex flex-col gap-1 bg-surface px-4 py-3 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={`rounded-[var(--radius-pill)] px-2 py-0.5 font-semibold ${
+                      account.status === "active"
+                        ? "bg-success/15 text-success"
+                        : account.status === "reauth_required"
+                          ? "bg-warning/15 text-warning"
+                          : "bg-danger/15 text-danger"
+                    }`}
+                  >
+                    {account.source === "plaid" ? "Live" : "Imported"}
+                  </span>
+                  <span className="text-text-muted">
+                    {account.lastSyncedAt
+                      ? new Date(account.lastSyncedAt).toLocaleDateString()
+                      : account.source === "import"
+                        ? "From statement"
+                        : "Not synced yet"}
+                  </span>
+                </div>
+                {account.type === "credit" && account.liability ? (
+                  <p className="text-text-muted">
+                    Min due{" "}
+                    {account.liability.minimumPaymentAmount
+                      ? formatMoney(account.liability.minimumPaymentAmount)
+                      : "—"}
+                    {account.liability.nextPaymentDueDate
+                      ? ` · due ${new Date(`${account.liability.nextPaymentDueDate}T00:00:00`).toLocaleDateString()}`
+                      : ""}
+                    {account.liability.isOverdue ? (
+                      <span className="ml-1 font-semibold text-danger">· Overdue</span>
+                    ) : null}
+                  </p>
+                ) : null}
               </div>
             </article>
           ))}
@@ -321,6 +343,7 @@ export function AccountsView() {
           />
         </section>
       ) : null}
+      </AsyncPanel>
     </div>
   );
 }

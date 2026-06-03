@@ -48,6 +48,14 @@ HTTP status codes: `200` success, `201` created, `204` no content, `400` validat
 | DELETE | `/plaid/items/:itemId` | — | `204` |
 | POST | `/plaid/items/:itemId/sync` | — | `{ status: "queued" }` |
 
+### Liabilities (credit cards)
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/liabilities/summary` | `CreditDebtSummary` — statement balance, minimum due, due dates, APRs per card |
+
+Requires `PLAID_PRODUCTS=transactions,liabilities`. Existing items must be re-linked to grant the Liabilities product.
+
 **Webhook (Plaid → backend, not UI):**
 
 | Method | Path | Notes |
@@ -64,7 +72,8 @@ HTTP status codes: `200` success, `201` created, `204` no content, `400` validat
 | GET | `/transactions/summary` | `from`, `to` | `TransactionSummary` |
 | GET | `/transactions/by-category` | `from`, `to` | `{ categories: CategoryTotal[] }` |
 | GET | `/transactions/flow` | `from`, `to` | `MoneyFlowResponse` |
-| PATCH | `/transactions/:id/category` | `{ category }` | `{ transaction }` |
+| PATCH | `/transactions/:id/category` | `{ category, rememberForMerchant? }` | `{ transaction, merchantTransactionsUpdated }` |
+| GET | `/transactions/category-options` | — | `{ categories: string[] }` |
 | GET | `/transactions/export.csv` | same as list filters | `text/csv` stream |
 
 ---
@@ -166,6 +175,22 @@ interface Alert {
   dismissible: boolean;
 }
 ```
+
+---
+
+## Household & partner invites
+
+Multi-user households: owner invites partners by email; partner signs in with Google and accepts. Dashboard/transactions aggregate all linked members' data.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| GET | `/household` | Bearer | Returns `accessRole` (`owner` \| `member`), members, accounts |
+| POST | `/household/members/:memberId/invite` | Owner | Body `{ email }` → `{ inviteUrl, expiresAt, … }` |
+| DELETE | `/household/members/:memberId/invite` | Owner | Revoke pending invite |
+| GET | `/household/invites/preview?token=` | Public | Invite metadata before sign-in |
+| POST | `/household/invites/accept` | Bearer | Body `{ token }`; email must match signed-in user |
+
+Partners link banks on **Accounts** (their own Plaid items). Owner can still link banks and assign accounts on **Family**.
 
 ---
 

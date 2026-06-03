@@ -58,7 +58,7 @@ See [user-personas-and-scenarios.md](user-personas-and-scenarios.md) for target 
 - [ ] Dashboard: KPI cards, trend charts, donut category breakdown
 - [ ] Money Flow view (Income → Bank → CC)
 - [ ] Spending alerts (high category spend, subscription creep, low savings rate)
-- [ ] Transaction search, filter, manual re-categorization
+- [x] Transaction search, filter, manual re-categorization (with per-merchant memory)
 - [ ] CSV export
 - [ ] Dark/light mode
 - [ ] Mobile-responsive (375px+)
@@ -72,7 +72,7 @@ See [user-personas-and-scenarios.md](user-personas-and-scenarios.md) for target 
 - [ ] Recurring subscription detector
 - [ ] Net worth tracker
 - [ ] Tax export (Schedule C, 1099 category tagging)
-- [ ] Multi-user household mode
+- [x] Multi-user household mode (invites, partner sign-in, shared dashboard)
 
 ### iPhone app (post-web MVP)
 

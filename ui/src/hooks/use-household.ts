@@ -59,5 +59,14 @@ export function useHouseholdMutations() {
       await api.updateHouseholdName(name);
       invalidate();
     },
+    async inviteMember(memberId: string, email: string) {
+      const result = await api.inviteHouseholdMember(memberId, email);
+      invalidate();
+      return result;
+    },
+    async revokeInvite(memberId: string) {
+      await api.revokeHouseholdInvite(memberId);
+      invalidate();
+    },
   };
 }

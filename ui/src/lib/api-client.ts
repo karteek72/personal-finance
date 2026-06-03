@@ -8,8 +8,12 @@ import type {
   CategoriesResponse,
   ChartDataFilters,
   ChartDataResponse,
+  CreditDebtSummary,
   DeleteAccountResponse,
   HouseholdInsightsResponse,
+  HouseholdInviteAcceptResponse,
+  HouseholdInvitePreview,
+  HouseholdInviteResponse,
   HouseholdMember,
   HouseholdResponse,
   MoneyFlowResponse,
@@ -21,6 +25,7 @@ import type {
   TransactionFilters,
   TransactionSummary,
   TrendsResponse,
+  UpdateTransactionCategoryResponse,
 } from "@/types/api";
 
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== "false";
@@ -56,7 +61,7 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
 
-  if (!response.ok) {
+  if (!response.ok && response.status !== 202) {
     const body: unknown = await response.json().catch(() => null);
     const message =
       typeof body === "object" &&
@@ -111,6 +116,30 @@ export const api = {
     );
   },
 
+  updateTransactionCategory(
+    transactionId: string,
+    category: string,
+    subCategory: string | null = null,
+    rememberForMerchant = true,
+  ): Promise<UpdateTransactionCategoryResponse> {
+    if (USE_MOCKS) {
+      return mockApi.updateTransactionCategory(
+        transactionId,
+        category,
+        subCategory,
+        rememberForMerchant,
+      );
+    }
+    return fetchJson<UpdateTransactionCategoryResponse>(
+      `/transactions/${transactionId}/category`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category, subCategory, rememberForMerchant }),
+      },
+    );
+  },
+
   getTransactions(
     filters: TransactionFilters = {},
   ): Promise<PaginatedTransactions> {
@@ -121,6 +150,7 @@ export const api = {
       `/transactions${buildQuery({
         month: filters.month,
         category: filters.category,
+        subCategory: filters.subCategory,
         accountId: filters.accountId,
         q: filters.q,
         type: filters.type,
@@ -138,6 +168,13 @@ export const api = {
       return mockApi.getAccounts();
     }
     return fetchJson<AccountsResponse>("/accounts");
+  },
+
+  getCreditDebtSummary(): Promise<CreditDebtSummary> {
+    if (USE_MOCKS) {
+      return mockApi.getCreditDebtSummary();
+    }
+    return fetchJson<CreditDebtSummary>("/liabilities/summary");
   },
 
   deleteAccount(accountId: string): Promise<DeleteAccountResponse> {
@@ -290,6 +327,54 @@ export const api = {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ memberId }),
+    });
+  },
+
+  inviteHouseholdMember(
+    memberId: string,
+    email: string,
+  ): Promise<HouseholdInviteResponse> {
+    if (USE_MOCKS) {
+      return mockApi.inviteHouseholdMember(memberId, email);
+    }
+    return fetchJson<HouseholdInviteResponse>(
+      `/household/members/${memberId}/invite`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      },
+    );
+  },
+
+  revokeHouseholdInvite(memberId: string): Promise<{ status: string }> {
+    if (USE_MOCKS) {
+      return mockApi.revokeHouseholdInvite(memberId);
+    }
+    return fetchJson(`/household/members/${memberId}/invite`, {
+      method: "DELETE",
+    });
+  },
+
+  previewHouseholdInvite(token: string): Promise<HouseholdInvitePreview> {
+    if (USE_MOCKS) {
+      return mockApi.previewHouseholdInvite(token);
+    }
+    return fetchJson<HouseholdInvitePreview>(
+      `/household/invites/preview?token=${encodeURIComponent(token)}`,
+    );
+  },
+
+  acceptHouseholdInvite(
+    token: string,
+  ): Promise<HouseholdInviteAcceptResponse> {
+    if (USE_MOCKS) {
+      return mockApi.acceptHouseholdInvite(token);
+    }
+    return fetchJson<HouseholdInviteAcceptResponse>("/household/invites/accept", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
     });
   },
 

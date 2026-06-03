@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { useState } from "react";
 
+import { AsyncPanel } from "@/components/ui/async-panel";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -21,7 +22,7 @@ const ROLE_LABELS: Record<HouseholdMemberRole, string> = {
 };
 
 export function FamilyView() {
-  const { data, isLoading, error } = useHousehold();
+  const { data, isLoading, isFetching, error } = useHousehold();
   const { data: insights } = useHouseholdInsights();
   const mutations = useHouseholdMutations();
 
@@ -30,6 +31,8 @@ export function FamilyView() {
   const [householdName, setHouseholdName] = useState("");
   const [editingName, setEditingName] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState<Record<string, string>>({});
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
 
   const insightByMember = new Map(
     insights?.members.map((member) => [member.memberId, member]) ?? [],
@@ -65,6 +68,34 @@ export function FamilyView() {
     }
   }
 
+  async function handleInvite(memberId: string) {
+    const email = inviteEmail[memberId]?.trim();
+    if (!email) return;
+    setBusyId(`invite-${memberId}`);
+    setInviteMessage(null);
+    try {
+      const result = await mutations.inviteMember(memberId, email);
+      try {
+        await navigator.clipboard.writeText(result.inviteUrl);
+        setInviteMessage(`Invite link copied for ${result.email}`);
+      } catch {
+        setInviteMessage(`Invite created for ${result.email}. Copy the link from the server response if needed.`);
+      }
+      setInviteEmail((current) => ({ ...current, [memberId]: "" }));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleRevokeInvite(memberId: string) {
+    setBusyId(`revoke-${memberId}`);
+    try {
+      await mutations.revokeInvite(memberId);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function handleDeleteMember(memberId: string, role: HouseholdMemberRole) {
     if (role === "owner") return;
     const confirmed = window.confirm("Remove this family member? Their account links will be removed.");
@@ -77,20 +108,32 @@ export function FamilyView() {
     }
   }
 
-  if (isLoading) {
-    return <p className="text-sm text-text-muted">Loading family…</p>;
-  }
-
-  if (error || !data) {
-    return <p className="text-sm text-danger">Couldn't load family data.</p>;
-  }
+  const isOwner = data?.accessRole === "owner";
 
   return (
+    <AsyncPanel
+      isLoading={isLoading}
+      isFetching={isFetching}
+      error={error ?? (!data && !isLoading ? new Error("Couldn't load family data.") : null)}
+      loadingMessage="Loading family…"
+      errorMessage="Couldn't load family data."
+    >
+      {data ? (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Family"
-        subtitle="Assign cards and accounts to see who's spending what"
+        subtitle={
+          isOwner
+            ? "Invite partners to sign in and link their own accounts, or assign cards yourself"
+            : "View shared family spending and manage your linked accounts"
+        }
       />
+
+      {inviteMessage ? (
+        <p className="rounded-[var(--radius-sm)] bg-primary-soft/60 px-3 py-2 text-sm text-primary">
+          {inviteMessage}
+        </p>
+      ) : null}
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -118,16 +161,18 @@ export function FamilyView() {
                   {data.members.length} members · {data.accounts.length} accounts
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setHouseholdName(data.household.name);
-                  setEditingName(true);
-                }}
-                className="rounded-[var(--radius-pill)] bg-primary-soft px-4 py-2 text-xs font-semibold text-primary"
-              >
-                Rename
-              </button>
+              {isOwner ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHouseholdName(data.household.name);
+                    setEditingName(true);
+                  }}
+                  className="rounded-[var(--radius-pill)] bg-primary-soft px-4 py-2 text-xs font-semibold text-primary"
+                >
+                  Rename
+                </button>
+              ) : null}
             </>
           )}
         </div>
@@ -179,10 +224,13 @@ export function FamilyView() {
                   </div>
                   <div>
                     <h3 className="font-bold text-text">{member.displayName}</h3>
-                    <p className="text-xs text-text-muted">{ROLE_LABELS[member.role]}</p>
+                    <p className="text-xs text-text-muted">
+                      {ROLE_LABELS[member.role]}
+                      {member.userId ? " · Joined" : ""}
+                    </p>
                   </div>
                 </div>
-                {member.role !== "owner" ? (
+                {isOwner && member.role !== "owner" ? (
                   <button
                     type="button"
                     disabled={busyId === member.id}
@@ -243,11 +291,71 @@ export function FamilyView() {
                   No accounts assigned yet
                 </p>
               )}
+
+              {isOwner && member.role !== "owner" && !member.userId ? (
+                <div className="mt-3 border-t border-border/60 pt-3">
+                  {member.pendingInvite ? (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-xs text-text-muted">
+                        Invite pending for{" "}
+                        <span className="font-semibold text-text">
+                          {member.pendingInvite.email}
+                        </span>
+                        {member.pendingInvite.status === "expired"
+                          ? " (expired)"
+                          : ""}
+                      </p>
+                      <button
+                        type="button"
+                        disabled={busyId === `revoke-${member.id}`}
+                        onClick={() => void handleRevokeInvite(member.id)}
+                        className="self-start text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                      >
+                        Revoke invite
+                      </button>
+                    </div>
+                  ) : (
+                    <form
+                      className="flex flex-col gap-2"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void handleInvite(member.id);
+                      }}
+                    >
+                      <label className="text-xs font-semibold text-text-muted">
+                        Invite to sign in (Google email)
+                      </label>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <input
+                          type="email"
+                          value={inviteEmail[member.id] ?? ""}
+                          onChange={(event) =>
+                            setInviteEmail((current) => ({
+                              ...current,
+                              [member.id]: event.target.value,
+                            }))
+                          }
+                          placeholder="partner@gmail.com"
+                          className="flex-1 rounded-[var(--radius-sm)] border-0 bg-bg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                        <button
+                          type="submit"
+                          disabled={busyId === `invite-${member.id}`}
+                          className="rounded-[var(--radius-pill)] bg-primary px-4 py-2 text-xs font-semibold text-text-inverse disabled:opacity-50"
+                        >
+                          Copy invite link
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              ) : null}
             </Card>
           );
         })}
       </section>
 
+      {isOwner ? (
       <Card>
         <h3 className="text-sm font-bold text-text">Add family member</h3>
         <p className="mt-1 text-xs text-text-muted">
@@ -283,6 +391,7 @@ export function FamilyView() {
           </button>
         </form>
       </Card>
+      ) : null}
 
       <section aria-label="Account assignments">
         <h3 className="mb-3 text-sm font-bold text-text">Assign accounts</h3>
@@ -298,7 +407,10 @@ export function FamilyView() {
               </div>
               <select
                 value={account.memberId ?? ""}
-                disabled={busyId === account.accountId}
+                disabled={
+                  busyId === account.accountId ||
+                  (!isOwner && !account.ownedByCurrentUser)
+                }
                 onChange={(event) =>
                   void handleAssign(account.accountId, event.target.value)
                 }
@@ -332,5 +444,7 @@ export function FamilyView() {
         </Card>
       ) : null}
     </div>
+      ) : null}
+    </AsyncPanel>
   );
 }

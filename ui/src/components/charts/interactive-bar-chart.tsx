@@ -86,7 +86,7 @@ export function InteractiveBarChart({
                     label: (context) => {
                       const slice = sorted[context.dataIndex];
                       const value = context.parsed.x ?? 0;
-                      const pct = slice?.percentage.toFixed(1) ?? "0";
+                        const pct = slice?.percentage.toFixed(2) ?? "0.00";
                       return `${formatCurrency(value)} (${pct}%)`;
                     },
                   },
