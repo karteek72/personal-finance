@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { useCoach } from "@/hooks/use-features";
+
 type Message = { role: "user" | "coach"; text: string };
 
 const STARTER_MESSAGES: Message[] = [
@@ -11,7 +13,7 @@ const STARTER_MESSAGES: Message[] = [
   },
 ];
 
-const SAMPLE_QA: { q: string; a: string }[] = [
+const FALLBACK_QA: { q: string; a: string }[] = [
   {
     q: "How much did I spend on food delivery last month?",
     a: "Last month you spent **$312** on food delivery across 18 orders — DoorDash ($189), Uber Eats ($97), and Grubhub ($26). That's **+41% vs. your 3-month average of $221**. Your peak ordering days were Thursdays and Sundays. Want me to set a food delivery budget?",
@@ -26,17 +28,14 @@ const SAMPLE_QA: { q: string; a: string }[] = [
   },
 ];
 
-const CHIP_LABELS = [
-  "How much did I spend on food delivery last month?",
-  "Am I on track to hit my emergency fund goal?",
-  "What's my biggest wasted expense?",
-];
-
-const MONTHLY_NARRATIVE = `**May was your best month financially in 2026.** You spent $3,847 — $290 less than April. Dining out dropped 22% after your budget nudge mid-month. Your savings rate hit 21%, crossing the 20% threshold for the first time this year.
+const FALLBACK_NARRATIVE = `**May was your best month financially in 2026.** You spent $3,847 — $290 less than April. Dining out dropped 22% after your budget nudge mid-month. Your savings rate hit 21%, crossing the 20% threshold for the first time this year.
 
 Watch out for: Shopping crept up to $340 (13% over budget). You also have 3 subscriptions renewing in June totaling $48.97. Consider reviewing before the charges land.
 
 One win worth noting: you haven't touched your Japan fund since March, but your automatic $200 transfer kept running quietly. You're now 40% of the way there.`;
+
+const FALLBACK_FORECAST =
+  "Based on your patterns, you'll likely spend **$3,600–$3,950** in June. Big events: annual Adobe renewal ($660), Japan fund transfer ($200), and your typical summer dining uptick. Savings rate projected at **18–21%**.";
 
 function renderText(text: string) {
   return text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
@@ -48,6 +47,12 @@ export function CoachAssistant() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "narrative">("chat");
+  const { data } = useCoach();
+
+  const SAMPLE_QA = data?.qa.length ? data.qa : FALLBACK_QA;
+  const CHIP_LABELS = SAMPLE_QA.map((x) => x.q);
+  const MONTHLY_NARRATIVE = data?.narrative ?? FALLBACK_NARRATIVE;
+  const FORECAST = data?.forecast ?? FALLBACK_FORECAST;
 
   function handleChip(q: string) {
     const qa = SAMPLE_QA.find((x) => x.q === q);
@@ -183,9 +188,11 @@ export function CoachAssistant() {
                   </div>
                   <div className="rounded-[var(--radius-md)] border border-primary/20 bg-primary/5 p-4">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">30-day forecast</p>
-                    <p className="text-sm text-text">
-                      Based on your patterns, you&apos;ll likely spend <strong>$3,600–$3,950</strong> in June. Big events: annual Adobe renewal ($660), Japan fund transfer ($200), and your typical summer dining uptick. Savings rate projected at <strong>18–21%</strong>.
-                    </p>
+                    <p
+                      className="text-sm text-text"
+                      // Forecast text is from our own dataset (not user input); safe to format bold markers.
+                      dangerouslySetInnerHTML={{ __html: renderText(FORECAST) }}
+                    />
                   </div>
                 </div>
               )}

@@ -1,0 +1,28 @@
+{
+  "habits": [
+    {
+      "category": "Dining & Restaurants",
+      "emoji": "☕",
+      "label": "Coffee runs",
+      "monthlyAmount": "118.00"
+    },
+    {
+      "category": "Dining & Restaurants",
+      "emoji": "🍔",
+      "label": "Dining out & delivery",
+      "monthlyAmount": "540.00"
+    },
+    {
+      "category": "Transportation",
+      "emoji": "🚗",
+      "label": "Rideshare",
+      "monthlyAmount": "165.00"
+    },
+    {
+      "category": "Subscriptions & Software",
+      "emoji": "📺",
+      "label": "Subscriptions",
+      "monthlyAmount": "158.00"
+    }
+  ]
+}

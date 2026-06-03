@@ -5,21 +5,53 @@ import moneyFlowData from "@/mocks/money-flow.json";
 import summaryData from "@/mocks/summary.json";
 import transactionsData from "@/mocks/transactions.json";
 import trendsData from "@/mocks/trends.json";
+import netWorthData from "@/mocks/net-worth.json";
+import investmentsData from "@/mocks/investments.json";
+import budgetsData from "@/mocks/budgets.json";
+import recurringData from "@/mocks/recurring.json";
+import wellnessData from "@/mocks/wellness.json";
+import dnaData from "@/mocks/dna.json";
+import patternsData from "@/mocks/patterns.json";
+import behavioralData from "@/mocks/behavioral.json";
+import inflationData from "@/mocks/inflation.json";
+import resilienceData from "@/mocks/resilience.json";
+import fireData from "@/mocks/fire.json";
+import coachData from "@/mocks/coach.json";
+import wrappedData from "@/mocks/wrapped.json";
+import merchantsData from "@/mocks/merchants.json";
+import calendarData from "@/mocks/calendar.json";
+import forecastData from "@/mocks/forecast.json";
 import type {
   AccountsResponse,
   AlertsResponse,
+  BehavioralResponse,
+  BudgetsResponse,
+  CalendarResponse,
   CategoriesResponse,
   ChartDataResponse,
+  CoachResponse,
   CreditDebtSummary,
+  DnaResponse,
+  FireResponse,
+  ForecastResponse,
   HouseholdInsightsResponse,
   HouseholdMember,
   HouseholdResponse,
+  InflationResponse,
+  InvestmentsResponse,
+  MerchantsResponse,
   MoneyFlowResponse,
+  NetWorthResponse,
   PaginatedTransactions,
+  PatternsResponse,
+  RecurringResponse,
+  ResilienceResponse,
   TransactionFilters,
   TransactionSummary,
   TrendsResponse,
   UpdateTransactionCategoryResponse,
+  WellnessResponse,
+  WrappedResponse,
 } from "@/types/api";
 
 const MOCK_DELAY_MS = 150;
@@ -204,18 +236,31 @@ export async function getCreditDebtSummary(): Promise<CreditDebtSummary> {
       mask: account.mask,
       institutionName: account.institutionName,
       balanceCurrent: account.balanceCurrent,
-      liability: null,
+      liability: account.liability ?? null,
     }));
+
+  const num = (v: string | null | undefined): number =>
+    v ? Number.parseFloat(v) : 0;
+  const withLiability = cards.filter((c) => c.liability);
 
   return {
     totalCurrentBalance: cards
       .reduce((sum, card) => sum + Number.parseFloat(card.balanceCurrent), 0)
       .toFixed(2),
-    totalStatementBalance: "0.00",
-    totalMinimumDue: "0.00",
-    totalEstimatedMonthlyInterest: "0.00",
-    overdueCount: 0,
-    coverageLabel: "Mock mode — link cards with Liabilities enabled for statement data",
+    totalStatementBalance: cards
+      .reduce((s, c) => s + num(c.liability?.lastStatementBalance), 0)
+      .toFixed(2),
+    totalMinimumDue: cards
+      .reduce((s, c) => s + num(c.liability?.minimumPaymentAmount), 0)
+      .toFixed(2),
+    totalEstimatedMonthlyInterest: cards
+      .reduce((s, c) => s + num(c.liability?.estimatedMonthlyInterest), 0)
+      .toFixed(2),
+    overdueCount: cards.filter((c) => c.liability?.isOverdue).length,
+    coverageLabel:
+      withLiability.length === cards.length
+        ? `Statement data for all ${cards.length} cards`
+        : `Statement data for ${withLiability.length} of ${cards.length} cards`,
     cards,
   };
 }
@@ -626,4 +671,89 @@ export async function acceptHouseholdInvite(token: string) {
     memberId: partner?.id ?? "mock-member-partner",
     memberDisplayName: partner?.displayName ?? "Partner",
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Feature endpoints (demo dataset) — wealth, planning, insights,
+ * protect, coach & wrapped. These mirror the backend /api/v1 routes.
+ * ------------------------------------------------------------------ */
+
+export async function getNetWorth(): Promise<NetWorthResponse> {
+  await delay();
+  return netWorthData as NetWorthResponse;
+}
+
+export async function getInvestments(): Promise<InvestmentsResponse> {
+  await delay();
+  return investmentsData as InvestmentsResponse;
+}
+
+export async function getBudgets(): Promise<BudgetsResponse> {
+  await delay();
+  return budgetsData as BudgetsResponse;
+}
+
+export async function getRecurring(): Promise<RecurringResponse> {
+  await delay();
+  return recurringData as RecurringResponse;
+}
+
+export async function getFire(): Promise<FireResponse> {
+  await delay();
+  return fireData as FireResponse;
+}
+
+export async function getWellness(): Promise<WellnessResponse> {
+  await delay();
+  return wellnessData as WellnessResponse;
+}
+
+export async function getDna(): Promise<DnaResponse> {
+  await delay();
+  return dnaData as DnaResponse;
+}
+
+export async function getPatterns(): Promise<PatternsResponse> {
+  await delay();
+  return patternsData as PatternsResponse;
+}
+
+export async function getBehavioral(): Promise<BehavioralResponse> {
+  await delay();
+  return behavioralData as BehavioralResponse;
+}
+
+export async function getInflation(): Promise<InflationResponse> {
+  await delay();
+  return inflationData as InflationResponse;
+}
+
+export async function getResilience(): Promise<ResilienceResponse> {
+  await delay();
+  return resilienceData as ResilienceResponse;
+}
+
+export async function getCoach(): Promise<CoachResponse> {
+  await delay();
+  return coachData as CoachResponse;
+}
+
+export async function getWrapped(): Promise<WrappedResponse> {
+  await delay();
+  return wrappedData as WrappedResponse;
+}
+
+export async function getMerchants(): Promise<MerchantsResponse> {
+  await delay();
+  return merchantsData as MerchantsResponse;
+}
+
+export async function getCalendar(): Promise<CalendarResponse> {
+  await delay();
+  return calendarData as CalendarResponse;
+}
+
+export async function getForecast(): Promise<ForecastResponse> {
+  await delay();
+  return forecastData as ForecastResponse;
 }

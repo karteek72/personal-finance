@@ -1,94 +1,64 @@
 {
   "categories": [
     {
-      "name": "Home & Rent",
+      "name": "Housing & Home",
       "amount": "1850.00",
-      "percentage": 38.4,
-      "deltaVsPriorMonth": 0.0
-    },
-    {
-      "name": "Food & Groceries",
-      "amount": "642.34",
-      "percentage": 13.3,
-      "deltaVsPriorMonth": 2.1
+      "percentage": 35.88,
+      "deltaVsPriorMonth": 0
     },
     {
       "name": "Dining & Restaurants",
-      "amount": "487.50",
-      "percentage": 10.1,
-      "deltaVsPriorMonth": 18.0
+      "amount": "957.50",
+      "percentage": 18.57,
+      "deltaVsPriorMonth": 9.17
+    },
+    {
+      "name": "Food & Groceries",
+      "amount": "773.74",
+      "percentage": 15.01,
+      "deltaVsPriorMonth": 41.01
     },
     {
       "name": "Shopping & Retail",
-      "amount": "443.12",
-      "percentage": 9.2,
-      "deltaVsPriorMonth": -4.3
-    },
-    {
-      "name": "Transport & Gas",
-      "amount": "265.67",
-      "percentage": 5.5,
-      "deltaVsPriorMonth": 6.8
+      "amount": "682.50",
+      "percentage": 13.24,
+      "deltaVsPriorMonth": 30.34
     },
     {
       "name": "Utilities & Bills",
-      "amount": "218.45",
-      "percentage": 4.5,
-      "deltaVsPriorMonth": -1.2
+      "amount": "284.39",
+      "percentage": 5.52,
+      "deltaVsPriorMonth": -2.63
+    },
+    {
+      "name": "Transportation",
+      "amount": "229.45",
+      "percentage": 4.45,
+      "deltaVsPriorMonth": -43.94
+    },
+    {
+      "name": "Financial & Insurance",
+      "amount": "180.50",
+      "percentage": 3.5,
+      "deltaVsPriorMonth": 24.05
     },
     {
       "name": "Subscriptions & Software",
-      "amount": "187.43",
-      "percentage": 3.9,
-      "deltaVsPriorMonth": 12.5
+      "amount": "99.45",
+      "percentage": 1.93,
+      "deltaVsPriorMonth": 0
     },
     {
       "name": "Entertainment",
-      "amount": "176.89",
-      "percentage": 3.7,
-      "deltaVsPriorMonth": 22.4
-    },
-    {
-      "name": "Travel & Hotels",
-      "amount": "156.00",
-      "percentage": 3.2,
-      "deltaVsPriorMonth": -35.0
+      "amount": "73.54",
+      "percentage": 1.43,
+      "deltaVsPriorMonth": 17.81
     },
     {
       "name": "Health & Medical",
-      "amount": "109.00",
-      "percentage": 2.3,
-      "deltaVsPriorMonth": 0.0
-    },
-    {
-      "name": "Financial",
-      "amount": "125.00",
-      "percentage": 2.6,
-      "deltaVsPriorMonth": 5.0
-    },
-    {
-      "name": "Personal Care",
-      "amount": "87.25",
-      "percentage": 1.8,
-      "deltaVsPriorMonth": -8.5
-    },
-    {
-      "name": "Education",
-      "amount": "75.00",
-      "percentage": 1.6,
-      "deltaVsPriorMonth": 0.0
-    },
-    {
-      "name": "Income",
-      "amount": "0.00",
-      "percentage": 0.0,
-      "deltaVsPriorMonth": 0.0
-    },
-    {
-      "name": "Transfers (internal)",
-      "amount": "0.00",
-      "percentage": 0.0,
-      "deltaVsPriorMonth": 0.0
+      "amount": "24.99",
+      "percentage": 0.48,
+      "deltaVsPriorMonth": -65.55
     }
   ]
 }

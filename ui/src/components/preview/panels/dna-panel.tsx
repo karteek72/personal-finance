@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 
+import { useDna } from "@/hooks/use-features";
+
 const PREVIEW_BANNER = (
   <div className="mb-5 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
     <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
       <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
     </svg>
-    <span><strong>Preview</strong> — Spending DNA is a planned feature. Peer comparison is illustrative.</span>
+    <span><strong>Preview</strong> — Peer comparison benchmarks are illustrative.</span>
   </div>
 );
 
@@ -17,7 +19,7 @@ interface Axis {
   peers: number; // 0-100
 }
 
-const AXES: Axis[] = [
+const FALLBACK_AXES: Axis[] = [
   { label: "Dining", you: 82, peers: 48 },
   { label: "Travel", you: 64, peers: 38 },
   { label: "Shopping", you: 41, peers: 55 },
@@ -27,6 +29,10 @@ const AXES: Axis[] = [
   { label: "Wellness", you: 58, peers: 33 },
   { label: "Savings", you: 76, peers: 51 },
 ];
+
+const FALLBACK_ARCHETYPE = "The Experience Seeker";
+const FALLBACK_NARRATIVE =
+  "Your DNA skews heavily toward dining, travel and wellness — and you save more than most. Only 6% of peers in your income bracket share this pattern.";
 
 const SIZE = 260;
 const CENTER = SIZE / 2;
@@ -55,6 +61,11 @@ function axisPoint(i: number, n: number, factor: number) {
 
 export function DnaPanel() {
   const [showPeers, setShowPeers] = useState(true);
+  const { data } = useDna();
+
+  const AXES: Axis[] = data?.axes.length ? data.axes : FALLBACK_AXES;
+  const archetype = data?.archetype ?? FALLBACK_ARCHETYPE;
+  const narrative = data?.narrative ?? FALLBACK_NARRATIVE;
   const n = AXES.length;
 
   const distinctive = [...AXES]
@@ -69,10 +80,8 @@ export function DnaPanel() {
       {/* Hero */}
       <div className="rounded-[var(--radius-lg)] p-5" style={{ background: "var(--gradient-hero)" }}>
         <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Your spending fingerprint</p>
-        <p className="mt-1 text-3xl font-extrabold text-white">The Experience Seeker</p>
-        <p className="mt-1 text-sm text-white/70">
-          Your DNA skews heavily toward dining, travel and wellness — and you save more than most. Only <strong>6% of peers</strong> in your income bracket share this pattern.
-        </p>
+        <p className="mt-1 text-3xl font-extrabold text-white">{archetype}</p>
+        <p className="mt-1 text-sm text-white/70">{narrative}</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">

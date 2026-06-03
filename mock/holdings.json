@@ -1,0 +1,92 @@
+{
+  "holdings": [
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "securityId": "c0000000-0000-4000-8000-000000000001",
+      "ticker": "AAPL",
+      "quantity": "40",
+      "costBasis": "150.2000",
+      "institutionValue": "8496.00"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "securityId": "c0000000-0000-4000-8000-000000000005",
+      "ticker": "VOO",
+      "quantity": "15",
+      "costBasis": "381.4000",
+      "institutionValue": "7429.50"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "securityId": "c0000000-0000-4000-8000-000000000002",
+      "ticker": "MSFT",
+      "quantity": "12",
+      "costBasis": "301.0000",
+      "institutionValue": "5174.40"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "securityId": "c0000000-0000-4000-8000-000000000004",
+      "ticker": "TSLA",
+      "quantity": "10",
+      "costBasis": "241.5000",
+      "institutionValue": "1789.00"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "securityId": "c0000000-0000-4000-8000-000000000003",
+      "ticker": "AMZN",
+      "quantity": "8",
+      "costBasis": "131.2000",
+      "institutionValue": "1488.80"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901008",
+      "securityId": "c0000000-0000-4000-8000-000000000006",
+      "ticker": "VTI",
+      "quantity": "30",
+      "costBasis": "201.3000",
+      "institutionValue": "8061.00"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901008",
+      "securityId": "c0000000-0000-4000-8000-000000000007",
+      "ticker": "VXUS",
+      "quantity": "50",
+      "costBasis": "55.4000",
+      "institutionValue": "3105.00"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901009",
+      "securityId": "c0000000-0000-4000-8000-000000000008",
+      "ticker": "FXAIX",
+      "quantity": "120",
+      "costBasis": "141.0000",
+      "institutionValue": "22248.00"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901009",
+      "securityId": "c0000000-0000-4000-8000-000000000009",
+      "ticker": "VBTLX",
+      "quantity": "200",
+      "costBasis": "10.5000",
+      "institutionValue": "1956.00"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901010",
+      "securityId": "c0000000-0000-4000-8000-00000000000a",
+      "ticker": "BTC",
+      "quantity": "0.15",
+      "costBasis": "42100.0000",
+      "institutionValue": "10218.00"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901010",
+      "securityId": "c0000000-0000-4000-8000-00000000000b",
+      "ticker": "ETH",
+      "quantity": "1.2",
+      "costBasis": "2210.0000",
+      "institutionValue": "4094.40"
+    }
+  ]
+}

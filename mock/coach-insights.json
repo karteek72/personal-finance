@@ -1,0 +1,39 @@
+{
+  "insights": [
+    {
+      "kind": "narrative",
+      "periodMonth": "2026-05",
+      "question": null,
+      "answer": "May was your best month financially in 2026. You spent $3,847 (down 6% from April), saved 19% of your income, and your net worth crossed $85K. Watch dining — it's creeping up again.",
+      "sortOrder": 0
+    },
+    {
+      "kind": "qa",
+      "periodMonth": null,
+      "question": "How much did I spend on food delivery last month?",
+      "answer": "Last month you spent **$312** on food delivery across DoorDash and Uber Eats — about 38% more than your 6-month average.",
+      "sortOrder": 1
+    },
+    {
+      "kind": "qa",
+      "periodMonth": null,
+      "question": "Am I on track to hit my emergency fund goal?",
+      "answer": "Your emergency fund goal is $10,000 by December 2026. You're at **$6,420 (64.2%)** and saving ~$600/mo, so you're on pace.",
+      "sortOrder": 2
+    },
+    {
+      "kind": "qa",
+      "periodMonth": null,
+      "question": "What's my biggest wasted expense?",
+      "answer": "Your **Adobe Creative Cloud** subscription at $54.99/month is your largest rarely-used recurring charge — $660/year.",
+      "sortOrder": 3
+    },
+    {
+      "kind": "forecast",
+      "periodMonth": "2026-06",
+      "question": null,
+      "answer": "Expect to spend $3,600-$3,950 in June. Adobe annual renewal ($660) hits mid-month and your Japan fund auto-transfer is $200. Projected savings rate: 18-21%.",
+      "sortOrder": 4
+    }
+  ]
+}

@@ -69,17 +69,21 @@ ui/
     │           ├── wellness · dna · behavioral · merchants · patterns
     │           └── resilience · inflation · subscriptions · leaks
     ├── hooks/                    # use-accounts, use-credit-debt, use-summary, use-chart-data, use-theme, …
+    │   └── use-features.ts       # consolidated feature hooks: useNetWorth/useInvestments/useFire/useBudgets/
+    │                             #   useRecurring/useCalendar/useForecast/useWellness/useDna/usePatterns/
+    │                             #   useBehavioral/useMerchants/useInflation/useResilience/useCoach/useWrapped
     ├── lib/                      # api-client, mock-api, format-money, date-ranges, categories, notifications
+    ├── mocks/                    # generated demo JSON for NEXT_PUBLIC_USE_MOCKS (built by backend db:gen-mock)
     ├── providers/               # query-provider, auth-provider
     ├── stores/                  # zustand (view-mode, …)
     └── types/
-        └── api.ts                # Mirrors docs/design/api-contract.md
+        └── api.ts                # Mirrors docs/design/api-contract.md (incl. wealth/planning/insights/protect/coach/wrapped)
 ```
 
 ## Conventions
 
 - **Hub pages** compose feature panels via `preview/preview-hub.tsx`; each panel owns its own preview banner so live and mock tabs can mix.
-- **Preview vs live:** wire real data where cheap (`useAccounts`, `useCreditDebtSummary`); flag only still-mock sections with the amber preview banner. Net Worth & Investments use real balances; their trend/holdings detail stay flagged.
+- **Preview vs live:** every panel consumes a hook (`use-features.ts`) that resolves to the live API or, when `NEXT_PUBLIC_USE_MOCKS=true`, the generated demo dataset in `src/mocks/`. Keep the amber preview banner only where data is still illustrative (e.g. peer benchmarks, transaction-level tagging, what-if calculators).
 - **No duplicate information** — every metric has a single canonical home (e.g., credit statement/min-due lives on the account tile, not a separate page).
 - **Icon-first actions** — toolbar/action controls render as icon buttons with `title` + `aria-label` tooltips; keep text for data, headings, and primary empty-state CTAs.
 - **Server Components by default** — add `"use client"` only for interactivity (charts, Plaid Link, hubs, theme toggle).

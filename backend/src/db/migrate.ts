@@ -14,6 +14,7 @@ const MIGRATION_FILES = [
   "0005_merchant_category_rules.sql",
   "0006_subcategories.sql",
   "0007_credit_card_liabilities.sql",
+  "0008_feature_tables.sql",
 ];
 
 let migrationPromise: Promise<void> | null = null;

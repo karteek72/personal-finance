@@ -1,17 +1,19 @@
 "use client";
 
-const PREVIEW_BANNER = (
-  <div className="mb-5 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
-      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-    </svg>
-    <span><strong>Preview</strong> — Financial Wellness Score is a planned feature. Data shown is illustrative.</span>
-  </div>
-);
+import { useWellness } from "@/hooks/use-features";
 
-const SCORE = 72;
+interface Dimension {
+  name: string;
+  score: number;
+  weight: number;
+  description: string;
+  trend: string;
+}
 
-const DIMENSIONS = [
+const FALLBACK_SCORE = 72;
+const FALLBACK_DELTA = 4;
+
+const FALLBACK_DIMENSIONS: Dimension[] = [
   { name: "Savings Rate", score: 78, weight: 20, description: "You save 18% of income. Target: 20%+", trend: "up" },
   { name: "Debt Health", score: 61, weight: 20, description: "Credit utilization at 34%. Target: <30%", trend: "down" },
   { name: "Emergency Fund", score: 64, weight: 15, description: "6.4 months covered. Target: 6+ months", trend: "up" },
@@ -21,8 +23,14 @@ const DIMENSIONS = [
   { name: "Goal Pace", score: 88, weight: 5, description: "3/3 goals on track", trend: "up" },
 ];
 
-const HISTORY = [60, 63, 61, 65, 68, 67, 70, 72];
-const MONTHS = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
+const FALLBACK_HISTORY = [60, 63, 61, 65, 68, 67, 70, 72];
+const FALLBACK_MONTHS = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
+
+function shortMonth(month: string): string {
+  const m = Number.parseInt(month.split("-")[1] ?? "", 10);
+  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return Number.isFinite(m) && m >= 1 && m <= 12 ? (names[m - 1] as string) : month;
+}
 
 function scoreColor(s: number) {
   if (s >= 80) return "#22c55e";
@@ -54,11 +62,21 @@ function TrendIcon({ trend }: { trend: string }) {
 }
 
 export function WellnessPanel() {
-  const maxBar = Math.max(...HISTORY);
+  const { data } = useWellness();
+
+  const SCORE = data?.score ?? FALLBACK_SCORE;
+  const delta = data?.delta ?? FALLBACK_DELTA;
+  const dimensions: Dimension[] = data?.dimensions.length ? data.dimensions : FALLBACK_DIMENSIONS;
+  const history = data?.history.length
+    ? data.history.map((h) => h.score)
+    : FALLBACK_HISTORY;
+  const months = data?.history.length
+    ? data.history.map((h) => shortMonth(h.month))
+    : FALLBACK_MONTHS;
+  const maxBar = Math.max(...history);
 
   return (
     <div className="space-y-5">
-      {PREVIEW_BANNER}
 
       {/* Score hero */}
       <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-6">
@@ -93,8 +111,11 @@ export function WellnessPanel() {
           <div className="flex-1">
             <h2 className="text-xl font-bold text-text">Financial Wellness Score</h2>
             <p className="mt-1 text-sm text-text-muted">
-              Your score improved <strong className="text-success">+4 points</strong> since last month.
-              Top opportunity: reduce credit card utilization below 30%.
+              Your score {delta >= 0 ? "improved" : "dropped"}{" "}
+              <strong className={delta >= 0 ? "text-success" : "text-danger"}>
+                {delta >= 0 ? "+" : ""}{delta} point{Math.abs(delta) === 1 ? "" : "s"}
+              </strong>{" "}
+              since last month. Top opportunity: reduce credit card utilization below 30%.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">
@@ -115,16 +136,16 @@ export function WellnessPanel() {
       <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
         <p className="mb-3 text-sm font-semibold text-text">Score history — last 8 months</p>
         <div className="flex h-16 items-end gap-1.5">
-          {HISTORY.map((v, i) => (
+          {history.map((v, i) => (
             <div key={i} className="flex flex-1 flex-col items-center gap-1">
               <div
                 className="w-full rounded-[var(--radius-xs)] transition-all"
                 style={{
                   height: `${(v / maxBar) * 56}px`,
-                  background: i === HISTORY.length - 1 ? scoreColor(SCORE) : "var(--color-border)",
+                  background: i === history.length - 1 ? scoreColor(SCORE) : "var(--color-border)",
                 }}
               />
-              <span className="text-[9px] text-text-muted">{MONTHS[i]}</span>
+              <span className="text-[9px] text-text-muted">{months[i]}</span>
             </div>
           ))}
         </div>
@@ -135,7 +156,7 @@ export function WellnessPanel() {
         <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wide px-1">
           Score breakdown
         </h3>
-        {DIMENSIONS.map((d) => (
+        {dimensions.map((d) => (
           <div
             key={d.name}
             className="rounded-[var(--radius-md)] border border-border bg-surface p-4"

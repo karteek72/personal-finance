@@ -2,18 +2,9 @@
 
 import { useState } from "react";
 
-const PREVIEW_BANNER = (
-  <div
-    className="mb-5 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300"
-  >
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
-      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-    </svg>
-    <span><strong>Preview</strong> — Budgets & Goals is a planned feature. All data shown is illustrative.</span>
-  </div>
-);
+import { useBudgets } from "@/hooks/use-features";
 
-const BUDGETS = [
+const FALLBACK_BUDGETS = [
   { category: "Food & Dining", emoji: "🍔", spent: 487, limit: 600, color: "#f97316" },
   { category: "Transport", emoji: "🚗", spent: 210, limit: 250, color: "#3b82f6" },
   { category: "Shopping", emoji: "🛍️", spent: 340, limit: 300, color: "#ef4444" },
@@ -23,32 +14,14 @@ const BUDGETS = [
   { category: "Personal Care", emoji: "🧴", spent: 62, limit: 100, color: "#ec4899" },
 ];
 
-const GOALS = [
-  {
-    name: "Emergency Fund",
-    target: 10000,
-    current: 6420,
-    deadline: "Dec 2026",
-    color: "#22c55e",
-    emoji: "🛡️",
-  },
-  {
-    name: "Japan Trip",
-    target: 4500,
-    current: 1800,
-    deadline: "Aug 2026",
-    color: "#3b82f6",
-    emoji: "✈️",
-  },
-  {
-    name: "New MacBook",
-    target: 2500,
-    current: 2200,
-    deadline: "Jul 2026",
-    color: "#a855f7",
-    emoji: "💻",
-  },
+const FALLBACK_GOALS = [
+  { name: "Emergency Fund", target: 10000, current: 6420, deadline: "Dec 2026", color: "#22c55e", emoji: "🛡️" },
+  { name: "Japan Trip", target: 4500, current: 1800, deadline: "Aug 2026", color: "#3b82f6", emoji: "✈️" },
+  { name: "New MacBook", target: 2500, current: 2200, deadline: "Jul 2026", color: "#a855f7", emoji: "💻" },
 ];
+
+const DEFAULT_BUDGET_COLOR = "#3b82f6";
+const DEFAULT_GOAL_COLOR = "#22c55e";
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
@@ -56,13 +29,36 @@ function formatMoney(n: number) {
 
 export function BudgetsPanel() {
   const [activeTab, setActiveTab] = useState<"budgets" | "goals">("budgets");
-  const totalBudget = BUDGETS.reduce((s, b) => s + b.limit, 0);
-  const totalSpent = BUDGETS.reduce((s, b) => s + b.spent, 0);
-  const safeToSpend = 47; // mock daily safe-to-spend
+  const { data } = useBudgets();
+
+  const budgets = data
+    ? data.budgets.map((b) => ({
+        category: b.category,
+        emoji: b.emoji ?? "💸",
+        spent: Number.parseFloat(b.spent),
+        limit: Number.parseFloat(b.limit),
+        color: b.color ?? DEFAULT_BUDGET_COLOR,
+      }))
+    : FALLBACK_BUDGETS;
+
+  const goals = data
+    ? data.goals.map((g) => ({
+        name: g.name,
+        emoji: g.emoji ?? "🎯",
+        target: Number.parseFloat(g.target),
+        current: Number.parseFloat(g.current),
+        deadline: g.deadline ?? "—",
+        color: g.color ?? DEFAULT_GOAL_COLOR,
+      }))
+    : FALLBACK_GOALS;
+
+  const totalBudget = budgets.reduce((s, b) => s + b.limit, 0);
+  const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
+  const safeToSpend = data ? Number.parseFloat(data.safeToSpend) : 47;
+  const daysRemaining = data?.daysRemaining ?? 27;
 
   return (
     <div className="space-y-5">
-      {PREVIEW_BANNER}
 
       {/* Hero: Safe-to-Spend */}
       <div
@@ -71,7 +67,7 @@ export function BudgetsPanel() {
       >
         <div className="relative z-10">
           <p className="text-sm font-medium text-white/70">Safe to spend today</p>
-          <p className="mt-1 text-5xl font-extrabold tracking-tight text-white">${safeToSpend}</p>
+          <p className="mt-1 text-5xl font-extrabold tracking-tight text-white">{formatMoney(safeToSpend)}</p>
           <p className="mt-1.5 text-sm text-white/70">
             After bills, goals & commitments — resets Friday
           </p>
@@ -86,7 +82,7 @@ export function BudgetsPanel() {
             </div>
             <div>
               <p className="text-xs text-white/60">Days remaining</p>
-              <p className="text-base font-bold text-white">27</p>
+              <p className="text-base font-bold text-white">{daysRemaining}</p>
             </div>
           </div>
         </div>
@@ -111,7 +107,7 @@ export function BudgetsPanel() {
 
       {activeTab === "budgets" && (
         <div className="space-y-3">
-          {BUDGETS.map((b) => {
+          {budgets.map((b) => {
             const pct = Math.min((b.spent / b.limit) * 100, 100);
             const over = b.spent > b.limit;
             return (
@@ -163,7 +159,7 @@ export function BudgetsPanel() {
 
       {activeTab === "goals" && (
         <div className="space-y-3">
-          {GOALS.map((g) => {
+          {goals.map((g) => {
             const pct = Math.min((g.current / g.target) * 100, 100);
             return (
               <div

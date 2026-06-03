@@ -1,31 +1,85 @@
 {
   "items": [
     {
-      "id": "00000000-0000-4000-8000-000000000020",
+      "id": "00000000-0000-4000-8000-000000000021",
+      "plaidItemId": "mock-plaid-item-bofa",
+      "accessToken": "access-sandbox-mock-bofa",
+      "institutionId": "ins_bofa",
+      "institutionName": "Bank of America",
+      "accountIds": [
+        "a1b2c3d4-e5f6-4789-a012-345678901001"
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000022",
+      "plaidItemId": "mock-plaid-item-ally",
+      "accessToken": "access-sandbox-mock-ally",
+      "institutionId": "ins_ally",
+      "institutionName": "Ally Bank",
+      "accountIds": [
+        "a1b2c3d4-e5f6-4789-a012-345678901002"
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000023",
       "plaidItemId": "mock-plaid-item-chase",
       "accessToken": "access-sandbox-mock-chase",
       "institutionId": "ins_chase",
       "institutionName": "Chase",
       "accountIds": [
-        "a1b2c3d4-e5f6-4789-a012-345678901001",
         "a1b2c3d4-e5f6-4789-a012-345678901004"
       ]
     },
     {
-      "id": "00000000-0000-4000-8000-000000000021",
+      "id": "00000000-0000-4000-8000-000000000024",
       "plaidItemId": "mock-plaid-item-amex",
       "accessToken": "access-sandbox-mock-amex",
       "institutionId": "ins_amex",
       "institutionName": "American Express",
-      "accountIds": ["a1b2c3d4-e5f6-4789-a012-345678901002"]
+      "accountIds": [
+        "a1b2c3d4-e5f6-4789-a012-345678901005"
+      ]
     },
     {
-      "id": "00000000-0000-4000-8000-000000000022",
+      "id": "00000000-0000-4000-8000-000000000025",
       "plaidItemId": "mock-plaid-item-citi",
       "accessToken": "access-sandbox-mock-citi",
       "institutionId": "ins_citi",
-      "institutionName": "Citibank",
-      "accountIds": ["a1b2c3d4-e5f6-4789-a012-345678901003"]
+      "institutionName": "Citi",
+      "accountIds": [
+        "a1b2c3d4-e5f6-4789-a012-345678901006"
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000026",
+      "plaidItemId": "mock-plaid-item-fidelity",
+      "accessToken": "access-sandbox-mock-fidelity",
+      "institutionId": "ins_fidelity",
+      "institutionName": "Fidelity",
+      "accountIds": [
+        "a1b2c3d4-e5f6-4789-a012-345678901007",
+        "a1b2c3d4-e5f6-4789-a012-345678901011"
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000027",
+      "plaidItemId": "mock-plaid-item-vanguard",
+      "accessToken": "access-sandbox-mock-vanguard",
+      "institutionId": "ins_vanguard",
+      "institutionName": "Vanguard",
+      "accountIds": [
+        "a1b2c3d4-e5f6-4789-a012-345678901008"
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000028",
+      "plaidItemId": "mock-plaid-item-coinbase",
+      "accessToken": "access-sandbox-mock-coinbase",
+      "institutionId": "ins_coinbase",
+      "institutionName": "Coinbase",
+      "accountIds": [
+        "a1b2c3d4-e5f6-4789-a012-345678901010"
+      ]
     }
   ]
 }

@@ -1,15 +1,8 @@
 "use client";
 
-const PREVIEW_BANNER = (
-  <div className="mb-4 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
-      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-    </svg>
-    <span><strong>Preview</strong> — Spending patterns are a planned feature. Data shown is illustrative.</span>
-  </div>
-);
+import { usePatterns } from "@/hooks/use-features";
 
-const DAY_OF_WEEK = [
+const FALLBACK_DAY_OF_WEEK = [
   { day: "Mon", value: 42 },
   { day: "Tue", value: 38 },
   { day: "Wed", value: 51 },
@@ -19,7 +12,7 @@ const DAY_OF_WEEK = [
   { day: "Sun", value: 112 },
 ];
 
-const PATTERNS = [
+const FALLBACK_PATTERNS = [
   { label: "Weekend spending", value: "+43%", description: "You spend 43% more on Saturdays and Sundays vs. weekdays", severity: "warning" },
   { label: "Post-payday splurge", value: "+67%", description: "In the 3 days after your paycheck, spending spikes 67%", severity: "warning" },
   { label: "Late-night orders", value: "$189/mo", description: "38% of your food delivery orders happen between 10pm–2am", severity: "neutral" },
@@ -27,18 +20,23 @@ const PATTERNS = [
 ];
 
 export function PatternsPanel() {
-  const maxDay = Math.max(...DAY_OF_WEEK.map((d) => d.value));
+  const { data } = usePatterns();
+
+  const dayOfWeek = data?.dayOfWeek.length
+    ? data.dayOfWeek.map((d) => ({ day: d.day, value: Number.parseFloat(d.value) }))
+    : FALLBACK_DAY_OF_WEEK;
+  const patterns = data?.patterns.length ? data.patterns : FALLBACK_PATTERNS;
+  const maxDay = Math.max(...dayOfWeek.map((d) => d.value));
 
   return (
     <div className="space-y-5">
-      {PREVIEW_BANNER}
 
       {/* Day-of-week spending */}
       <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
         <p className="text-sm font-semibold text-text">Average spend by day of week</p>
         <p className="text-xs text-text-muted">When your money tends to move</p>
         <div className="mt-4 flex h-32 items-end gap-2">
-          {DAY_OF_WEEK.map((d) => {
+          {dayOfWeek.map((d) => {
             const heightPct = (d.value / maxDay) * 100;
             const isWeekend = d.day === "Sat" || d.day === "Sun";
             return (
@@ -61,7 +59,7 @@ export function PatternsPanel() {
       {/* Detected patterns */}
       <div className="space-y-2">
         <p className="px-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Spending patterns detected</p>
-        {PATTERNS.map((p) => (
+        {patterns.map((p) => (
           <div key={p.label} className="flex items-start gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-3.5">
             <div className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${p.severity === "warning" ? "bg-warning/10 text-warning" : "bg-border text-text-muted"}`}>
               {p.value}

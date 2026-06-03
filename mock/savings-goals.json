@@ -1,0 +1,28 @@
+{
+  "goals": [
+    {
+      "name": "Emergency Fund",
+      "targetAmount": "10000.00",
+      "currentAmount": "6420.00",
+      "deadline": "2026-12-31",
+      "emoji": "🛡️",
+      "color": "#22C55E"
+    },
+    {
+      "name": "Japan Trip",
+      "targetAmount": "4500.00",
+      "currentAmount": "1800.00",
+      "deadline": "2026-08-31",
+      "emoji": "✈️",
+      "color": "#14B8A6"
+    },
+    {
+      "name": "New Car Fund",
+      "targetAmount": "12000.00",
+      "currentAmount": "4200.00",
+      "deadline": "2027-06-30",
+      "emoji": "🚙",
+      "color": "#6366F1"
+    }
+  ]
+}

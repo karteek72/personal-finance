@@ -3,9 +3,10 @@
 import Link from "next/link";
 
 import { useAccounts } from "@/hooks/use-accounts";
+import { useNetWorth } from "@/hooks/use-features";
 import type { Account } from "@/types/api";
 
-const TREND = [
+const FALLBACK_TREND = [
   { month: "Oct", value: 62000 },
   { month: "Nov", value: 64200 },
   { month: "Dec", value: 63800 },
@@ -15,6 +16,17 @@ const TREND = [
   { month: "Apr", value: 74800 },
   { month: "May", value: 76460 },
 ];
+
+function monthLabel(month: string): string {
+  // month is "YYYY-MM"; render a short label like "May"
+  const parts = month.split("-");
+  const m = Number.parseInt(parts[1] ?? "", 10);
+  const names = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  return Number.isFinite(m) && m >= 1 && m <= 12 ? (names[m - 1] as string) : month;
+}
 
 function fmt(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
@@ -32,7 +44,16 @@ const TYPE_LABEL: Record<Account["type"], string> = {
 
 export function NetWorthPanel() {
   const { data, isLoading } = useAccounts();
+  const { data: netWorthData } = useNetWorth();
   const accounts = data?.accounts ?? [];
+
+  const trendData = netWorthData?.trend?.length
+    ? netWorthData.trend.map((t) => ({
+        month: monthLabel(t.month),
+        value: Number.parseFloat(t.netWorth),
+      }))
+    : FALLBACK_TREND;
+  const hasRealTrend = Boolean(netWorthData?.trend?.length);
 
   if (isLoading) {
     return (
@@ -75,8 +96,8 @@ export function NetWorthPanel() {
     { type: "investment" as const, accounts: investment, total: invested, color: "#3b82f6" },
   ].filter((g) => g.accounts.length > 0);
 
-  const minVal = Math.min(...TREND.map((h) => h.value));
-  const maxVal = Math.max(...TREND.map((h) => h.value));
+  const minVal = Math.min(...trendData.map((h) => h.value));
+  const maxVal = Math.max(...trendData.map((h) => h.value));
   const range = maxVal - minVal;
 
   return (
@@ -101,20 +122,22 @@ export function NetWorthPanel() {
         </div>
       </div>
 
-      {/* Trend chart (illustrative — no historical net-worth series yet) */}
+      {/* Trend chart — real net-worth snapshots when available */}
       <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm font-semibold text-text">Net worth trend</p>
-          <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
-            Illustrative
-          </span>
+          {!hasRealTrend && (
+            <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+              Illustrative
+            </span>
+          )}
         </div>
         <div className="flex h-24 items-end gap-2">
-          {TREND.map((h, i) => {
+          {trendData.map((h, i) => {
             const heightPct = range === 0 ? 50 : ((h.value - minVal) / range) * 80 + 10;
-            const isLatest = i === TREND.length - 1;
+            const isLatest = i === trendData.length - 1;
             return (
-              <div key={h.month} className="flex flex-1 flex-col items-center gap-1">
+              <div key={`${h.month}-${i}`} className="flex flex-1 flex-col items-center gap-1">
                 <div
                   className="w-full rounded-t-[var(--radius-xs)] transition-all"
                   style={{ height: `${heightPct}px`, background: isLatest ? "var(--color-primary)" : "var(--color-border)" }}
@@ -124,9 +147,11 @@ export function NetWorthPanel() {
             );
           })}
         </div>
-        <p className="mt-2 text-[11px] text-text-muted">
-          Historical net-worth tracking starts once enough synced balance snapshots accumulate.
-        </p>
+        {!hasRealTrend && (
+          <p className="mt-2 text-[11px] text-text-muted">
+            Historical net-worth tracking starts once enough synced balance snapshots accumulate.
+          </p>
+        )}
       </div>
 
       {/* Assets */}

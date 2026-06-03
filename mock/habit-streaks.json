@@ -1,0 +1,22 @@
+{
+  "streaks": [
+    {
+      "label": "Under dining budget",
+      "currentDays": 12,
+      "maxDays": 21,
+      "color": "#F97316"
+    },
+    {
+      "label": "No overdrafts",
+      "currentDays": 34,
+      "maxDays": 60,
+      "color": "#22C55E"
+    },
+    {
+      "label": "Daily check-in",
+      "currentDays": 8,
+      "maxDays": 14,
+      "color": "#3B82F6"
+    }
+  ]
+}

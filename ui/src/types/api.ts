@@ -373,6 +373,265 @@ export interface HouseholdInsightsResponse {
   period: { from: string; to: string };
 }
 
+/* ------------------------------------------------------------------ *
+ * Wealth, planning, insights, protect, coach & wrapped
+ * (feature endpoints backed by the demo dataset)
+ * ------------------------------------------------------------------ */
+
+export interface NetWorthResponse {
+  current: { netWorth: string; totalAssets: string; totalLiabilities: string };
+  trend: { month: string; netWorth: string }[];
+}
+
+export interface InvestmentHolding {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  assetType: string;
+  quantity: number;
+  costBasis: string;
+  currentPrice: string;
+  value: string;
+  gainLoss: string;
+  gainLossPercent: number;
+}
+
+export interface InvestmentsResponse {
+  portfolioValue: string;
+  totalCostBasis: string;
+  totalGainLoss: string;
+  totalGainLossPercent: number;
+  accounts: {
+    accountId: string;
+    name: string;
+    institutionName: string;
+    subtype: string | null;
+    value: string;
+  }[];
+  holdings: InvestmentHolding[];
+  behavioralAlerts: { type: string; title: string; desc: string }[];
+}
+
+export interface BudgetsResponse {
+  periodMonth: string;
+  safeToSpend: string;
+  daysRemaining: number;
+  budgets: {
+    category: string;
+    emoji: string | null;
+    color: string | null;
+    spent: string;
+    limit: string;
+  }[];
+  goals: {
+    name: string;
+    emoji: string | null;
+    color: string | null;
+    target: string;
+    current: string;
+    deadline: string | null;
+  }[];
+}
+
+export interface RecurringItem {
+  merchantName: string;
+  category: string;
+  kind: string;
+  amount: string;
+  cadence: string;
+  nextChargeDate: string | null;
+  lastChargeDate: string | null;
+  previousAmount: string | null;
+  priceChanged: boolean;
+  status: string;
+  brandColor: string | null;
+}
+
+export interface RecurringResponse {
+  monthlyTotal: string;
+  annualTotal: string;
+  activeCount: number;
+  priceChanges: number;
+  subscriptions: RecurringItem[];
+  bills: RecurringItem[];
+  leaks: {
+    fees: {
+      id: string;
+      label: string;
+      source: string;
+      count: number;
+      total: string;
+      fixable: boolean;
+    }[];
+    habits: { id: string; emoji: string | null; label: string; monthly: string }[];
+  };
+}
+
+export interface FireResponse {
+  currentAge: number;
+  currentNetWorth: string;
+  monthlySpend: string;
+  monthlyInvest: string;
+  withdrawalRate: number;
+  realReturn: number;
+}
+
+export interface WellnessResponse {
+  score: number;
+  delta: number;
+  history: { month: string; score: number }[];
+  dimensions: {
+    name: string;
+    score: number;
+    weight: number;
+    description: string;
+    trend: string;
+  }[];
+}
+
+export interface DnaResponse {
+  archetype: string;
+  narrative: string;
+  peerRarity: string | null;
+  axes: { label: string; you: number; peers: number }[];
+}
+
+export interface PatternsResponse {
+  dayOfWeek: { day: string; value: string }[];
+  patterns: {
+    label: string;
+    value: string;
+    description: string;
+    severity: string;
+  }[];
+}
+
+export interface BehavioralResponse {
+  archetype: string;
+  creep: { months: string[]; income: string[]; spending: string[] };
+  reasons: {
+    id: string;
+    emoji: string;
+    label: string;
+    color: string;
+    total: string;
+  }[];
+  taggedTransactions: {
+    id: string;
+    merchant: string;
+    amount: string;
+    date: string;
+    reasonId: string;
+  }[];
+  challenges: {
+    title: string;
+    goal: string;
+    progressPercent: number;
+    daysRemaining: number;
+    complete: boolean;
+    color: string | null;
+  }[];
+  streaks: {
+    label: string;
+    currentDays: number;
+    maxDays: number;
+    color: string | null;
+  }[];
+}
+
+export interface InflationResponse {
+  personalRate: number;
+  nationalCpi: number;
+  salaryRaise: number;
+  nominalSavingsRate: number;
+  realSavingsRate: number;
+  realRaise: number;
+  powerLoss: string;
+  salary: string;
+  breakEvenSalary: string;
+  targetSalary: string;
+  categories: {
+    name: string;
+    share: number;
+    inflation: number;
+    severity: string;
+  }[];
+}
+
+export interface ResilienceResponse {
+  liquidCash: string;
+  monthlyBurn: string;
+  runwayMonths: number;
+  immunityScore: number;
+  scenarios: {
+    id: string;
+    name: string;
+    emoji: string | null;
+    shockAmount: string;
+    shockType: string;
+    monthsCovered: number;
+    recommendedMonths: number;
+    detail: string | null;
+  }[];
+}
+
+export interface CoachResponse {
+  narrative: string;
+  forecast: string;
+  qa: { q: string; a: string }[];
+}
+
+export interface WrappedResponse {
+  year: number;
+  totalSpent: string;
+  transactionCount: number;
+  totalSaved: string;
+  savingsRate: number;
+  peerPercentile: string | null;
+  archetype: string | null;
+  topCategory: { name: string; amount: string };
+  personality: Record<string, number>;
+  moments: { label: string; value: string }[];
+  goals: { label: string; target: string; pct: number }[];
+}
+
+export interface MerchantsResponse {
+  merchants: {
+    name: string;
+    emoji: string;
+    visits: number;
+    total: string;
+    trend: number;
+    trail: number[];
+  }[];
+  income: { months: string[]; primary: number[]; side: number[] };
+  merchantCount: number;
+  incomeSources: number;
+}
+
+export interface CalendarResponse {
+  month: string;
+  events: { day: number; type: string; label: string; amount: string }[];
+  heat: { day: number; level: number }[];
+  totals: { income: string; bills: string };
+  safeToSpendToday: string;
+}
+
+export interface ForecastResponse {
+  days: {
+    date: string;
+    weekday: string;
+    weather: string;
+    projectedBalance: string;
+    note: string;
+  }[];
+  comfortFloor: string;
+  minBalance: string;
+  lowestDay: string;
+  nextClearDate: string;
+  recommendation: string;
+}
+
 export interface TransactionFilters {
   month?: string;
   category?: string;

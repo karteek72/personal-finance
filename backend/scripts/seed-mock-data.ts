@@ -13,15 +13,36 @@ import { closeDb, getDb } from "../src/db/client.js";
 import { runMigrations } from "../src/db/migrate.js";
 import {
   accounts,
+  budgets,
+  challenges,
+  coachInsights,
   creditCardLiabilities,
+  fireProfiles,
+  habitStreaks,
+  holdings,
   householdAccountAssignments,
   householdInvitations,
   householdMembers,
   households,
+  inflationCategories,
+  inflationProfiles,
+  investmentTransactions,
+  lifestyleHabits,
   merchantCategoryRules,
+  netWorthSnapshots,
   plaidItems,
+  recurringSeries,
+  resilienceProfiles,
+  resilienceScenarios,
+  savingsGoals,
+  securities,
+  spendingDna,
+  spendingPatterns,
+  transactionReasons,
   transactions,
   users,
+  wellnessScores,
+  wrappedSummaries,
 } from "../src/db/schema.js";
 import { encryptPlaidToken } from "../src/services/plaid/crypto.js";
 
@@ -47,7 +68,7 @@ interface SeedAccount {
   id: string;
   name: string;
   officialName: string | null;
-  type: "credit" | "depository";
+  type: "credit" | "depository" | "investment";
   subtype: string | null;
   mask: string;
   balanceCurrent: string;
@@ -74,15 +95,6 @@ interface SeedTransaction {
   pending: boolean;
 }
 
-interface MonthlySpendCategory {
-  category: string;
-  subCategory: string;
-  amounts: string[];
-  merchantName: string;
-  accountId: string;
-  transactionType?: "expense" | "income" | "transfer";
-}
-
 function readJson<T>(filename: string): T {
   const path = resolve(MOCK_ROOT, filename);
   return JSON.parse(readFileSync(path, "utf-8")) as T;
@@ -106,50 +118,6 @@ async function clearSeedUsers(emails: string[]): Promise<void> {
   const ids = seedUsers.map((row) => row.id);
   await db.delete(users).where(inArray(users.id, ids));
   console.log(`Cleared ${ids.length} existing seed user(s) and cascaded data.`);
-}
-
-function expandMonthlyTransactions(
-  prefix: string,
-  ownerUserId: string,
-  data: {
-    months: string[];
-    categories: MonthlySpendCategory[];
-  },
-): Array<typeof transactions.$inferInsert> {
-  const rows: Array<typeof transactions.$inferInsert> = [];
-  let seq = 0;
-
-  for (const categoryRow of data.categories) {
-    const txnType = categoryRow.transactionType ?? "expense";
-    const isTransfer = txnType === "transfer";
-
-    for (let i = 0; i < data.months.length; i++) {
-      const month = data.months[i]!;
-      const amount = categoryRow.amounts[i]!;
-      const day = txnType === "income" ? "01" : "15";
-      seq += 1;
-
-      rows.push({
-        id: undefined,
-        userId: ownerUserId,
-        accountId: categoryRow.accountId,
-        externalId: `${prefix}hist-${month}-${categoryRow.category}-${seq}`,
-        date: `${month}-${day}`,
-        name: categoryRow.merchantName,
-        merchantName: categoryRow.merchantName,
-        amount,
-        currencyCode: "USD",
-        category: categoryRow.category,
-        subCategory: categoryRow.subCategory,
-        transactionType: txnType,
-        isTransfer,
-        pending: false,
-        source: SEED_SOURCE,
-      });
-    }
-  }
-
-  return rows;
 }
 
 async function main(): Promise<void> {
@@ -278,16 +246,12 @@ async function main(): Promise<void> {
   console.log(`Accounts: ${accountsFile.accounts.length}`);
 
   const prefix = manifest.externalIdPrefix;
-  const mayFile = readJson<{ items: SeedTransaction[] }>(
-    manifest.files.transactionsMay,
+  const txnFile = readJson<{ items: SeedTransaction[] }>(
+    manifest.files.transactions,
   );
-  const monthlyFile = readJson<{
-    months: string[];
-    categories: MonthlySpendCategory[];
-  }>(manifest.files.monthlySpend);
 
-  const txnRows: Array<typeof transactions.$inferInsert> = [
-    ...mayFile.items.map((txn) => ({
+  const txnRows: Array<typeof transactions.$inferInsert> = txnFile.items.map(
+    (txn) => ({
       id: txn.id,
       userId: ownerUserId,
       accountId: txn.accountId,
@@ -303,9 +267,8 @@ async function main(): Promise<void> {
       isTransfer: txn.isTransfer,
       pending: txn.pending,
       source: SEED_SOURCE,
-    })),
-    ...expandMonthlyTransactions(prefix, ownerUserId, monthlyFile),
-  ];
+    }),
+  );
 
   const BATCH = 50;
   for (let i = 0; i < txnRows.length; i += BATCH) {
@@ -489,6 +452,523 @@ async function main(): Promise<void> {
   }
 
   console.log(`Household: ${householdFile.household.name}`);
+
+  /* ---------------- investments ---------------- */
+
+  const securitiesFile = readJson<{
+    securities: Array<{
+      id: string;
+      ticker: string;
+      name: string;
+      assetType: string;
+      sector: string | null;
+      currentPrice: string;
+      currencyCode: string;
+    }>;
+  }>(manifest.files.securities);
+
+  for (const sec of securitiesFile.securities) {
+    await db
+      .insert(securities)
+      .values({
+        id: sec.id,
+        ticker: sec.ticker,
+        name: sec.name,
+        assetType: sec.assetType,
+        sector: sec.sector,
+        currentPrice: sec.currentPrice,
+        currencyCode: sec.currencyCode,
+      })
+      .onConflictDoUpdate({
+        target: securities.ticker,
+        set: { currentPrice: sec.currentPrice, asOf: new Date() },
+      });
+  }
+  console.log(`Securities: ${securitiesFile.securities.length}`);
+
+  const holdingsFile = readJson<{
+    holdings: Array<{
+      accountId: string;
+      securityId: string;
+      quantity: string;
+      costBasis: string;
+      institutionValue: string | null;
+    }>;
+  }>(manifest.files.holdings);
+
+  for (const h of holdingsFile.holdings) {
+    await db
+      .insert(holdings)
+      .values({
+        userId: ownerUserId,
+        accountId: h.accountId,
+        securityId: h.securityId,
+        quantity: h.quantity,
+        costBasis: h.costBasis,
+        institutionValue: h.institutionValue,
+      })
+      .onConflictDoUpdate({
+        target: [holdings.accountId, holdings.securityId],
+        set: { quantity: h.quantity, institutionValue: h.institutionValue },
+      });
+  }
+  console.log(`Holdings: ${holdingsFile.holdings.length}`);
+
+  const investmentTxnFile = readJson<{
+    items: Array<{
+      id: string;
+      accountId: string;
+      securityId: string | null;
+      externalId: string;
+      date: string;
+      name: string;
+      type: string;
+      quantity: string | null;
+      price: string | null;
+      amount: string;
+      fees: string;
+    }>;
+  }>(manifest.files.investmentTransactions);
+
+  for (const t of investmentTxnFile.items) {
+    await db
+      .insert(investmentTransactions)
+      .values({
+        id: t.id,
+        userId: ownerUserId,
+        accountId: t.accountId,
+        securityId: t.securityId,
+        externalId: t.externalId,
+        date: t.date,
+        name: t.name,
+        type: t.type,
+        quantity: t.quantity,
+        price: t.price,
+        amount: t.amount,
+        fees: t.fees,
+      })
+      .onConflictDoUpdate({
+        target: [
+          investmentTransactions.accountId,
+          investmentTransactions.externalId,
+        ],
+        set: { amount: t.amount, quantity: t.quantity, price: t.price },
+      });
+  }
+  console.log(`Investment txns: ${investmentTxnFile.items.length}`);
+
+  /* ---------------- planning ---------------- */
+
+  const netWorthFile = readJson<{
+    snapshots: Array<{
+      month: string;
+      totalAssets: string;
+      totalLiabilities: string;
+      netWorth: string;
+      breakdown: unknown;
+    }>;
+  }>(manifest.files.netWorthSnapshots);
+  for (const s of netWorthFile.snapshots) {
+    await db
+      .insert(netWorthSnapshots)
+      .values({
+        userId: ownerUserId,
+        month: s.month,
+        totalAssets: s.totalAssets,
+        totalLiabilities: s.totalLiabilities,
+        netWorth: s.netWorth,
+        breakdown: s.breakdown,
+      })
+      .onConflictDoUpdate({
+        target: [netWorthSnapshots.userId, netWorthSnapshots.month],
+        set: { netWorth: s.netWorth, breakdown: s.breakdown },
+      });
+  }
+  console.log(`Net worth snapshots: ${netWorthFile.snapshots.length}`);
+
+  const budgetsFile = readJson<{
+    budgets: Array<{
+      category: string;
+      periodMonth: string;
+      limitAmount: string;
+      emoji: string | null;
+      color: string | null;
+    }>;
+  }>(manifest.files.budgets);
+  for (const b of budgetsFile.budgets) {
+    await db
+      .insert(budgets)
+      .values({
+        userId: ownerUserId,
+        category: b.category,
+        periodMonth: b.periodMonth,
+        limitAmount: b.limitAmount,
+        emoji: b.emoji,
+        color: b.color,
+      })
+      .onConflictDoUpdate({
+        target: [budgets.userId, budgets.category, budgets.periodMonth],
+        set: { limitAmount: b.limitAmount },
+      });
+  }
+  console.log(`Budgets: ${budgetsFile.budgets.length}`);
+
+  const goalsFile = readJson<{
+    goals: Array<{
+      name: string;
+      targetAmount: string;
+      currentAmount: string;
+      deadline: string | null;
+      emoji: string | null;
+      color: string | null;
+    }>;
+  }>(manifest.files.savingsGoals);
+  await db.delete(savingsGoals).where(eq(savingsGoals.userId, ownerUserId));
+  for (const g of goalsFile.goals) {
+    await db.insert(savingsGoals).values({
+      userId: ownerUserId,
+      name: g.name,
+      targetAmount: g.targetAmount,
+      currentAmount: g.currentAmount,
+      deadline: g.deadline,
+      emoji: g.emoji,
+      color: g.color,
+    });
+  }
+  console.log(`Savings goals: ${goalsFile.goals.length}`);
+
+  const recurringFile = readJson<{
+    series: Array<{
+      merchantName: string;
+      category: string;
+      kind: string;
+      amount: string;
+      cadence: string;
+      nextChargeDate: string | null;
+      lastChargeDate: string | null;
+      previousAmount: string | null;
+      priceChanged: boolean;
+      status: string;
+      brandColor: string | null;
+    }>;
+  }>(manifest.files.recurringSeries);
+  await db.delete(recurringSeries).where(eq(recurringSeries.userId, ownerUserId));
+  for (const r of recurringFile.series) {
+    await db.insert(recurringSeries).values({
+      userId: ownerUserId,
+      merchantName: r.merchantName,
+      category: r.category,
+      kind: r.kind,
+      amount: r.amount,
+      cadence: r.cadence,
+      nextChargeDate: r.nextChargeDate,
+      lastChargeDate: r.lastChargeDate,
+      previousAmount: r.previousAmount,
+      priceChanged: r.priceChanged,
+      status: r.status,
+      brandColor: r.brandColor,
+    });
+  }
+  console.log(`Recurring series: ${recurringFile.series.length}`);
+
+  const fireFile = readJson<{
+    currentAge: number;
+    currentNetWorth: string;
+    monthlySpend: string;
+    monthlyInvest: string;
+    withdrawalRate: number;
+    realReturn: number;
+  }>(manifest.files.fireProfile);
+  await db
+    .insert(fireProfiles)
+    .values({
+      userId: ownerUserId,
+      currentAge: fireFile.currentAge,
+      currentNetWorth: fireFile.currentNetWorth,
+      monthlySpend: fireFile.monthlySpend,
+      monthlyInvest: fireFile.monthlyInvest,
+      withdrawalRate: String(fireFile.withdrawalRate),
+      realReturn: String(fireFile.realReturn),
+    })
+    .onConflictDoUpdate({
+      target: fireProfiles.userId,
+      set: {
+        currentNetWorth: fireFile.currentNetWorth,
+        monthlySpend: fireFile.monthlySpend,
+        updatedAt: new Date(),
+      },
+    });
+
+  /* ---------------- insights ---------------- */
+
+  const wellnessFile = readJson<{
+    scores: Array<{ periodMonth: string; score: number; dimensions: unknown }>;
+  }>(manifest.files.wellnessScores);
+  for (const w of wellnessFile.scores) {
+    await db
+      .insert(wellnessScores)
+      .values({
+        userId: ownerUserId,
+        periodMonth: w.periodMonth,
+        score: w.score,
+        dimensions: w.dimensions,
+      })
+      .onConflictDoUpdate({
+        target: [wellnessScores.userId, wellnessScores.periodMonth],
+        set: { score: w.score, dimensions: w.dimensions },
+      });
+  }
+  console.log(`Wellness scores: ${wellnessFile.scores.length}`);
+
+  const dnaFile = readJson<{
+    archetype: string;
+    narrative: string;
+    peerRarity: string | null;
+    axes: unknown;
+  }>(manifest.files.spendingDna);
+  await db
+    .insert(spendingDna)
+    .values({
+      userId: ownerUserId,
+      archetype: dnaFile.archetype,
+      narrative: dnaFile.narrative,
+      peerRarity: dnaFile.peerRarity,
+      axes: dnaFile.axes,
+    })
+    .onConflictDoUpdate({
+      target: spendingDna.userId,
+      set: { archetype: dnaFile.archetype, axes: dnaFile.axes, updatedAt: new Date() },
+    });
+
+  const patternsFile = readJson<{
+    patterns: Array<{
+      kind: string;
+      label: string;
+      metric: string | null;
+      description: string | null;
+      severity: string | null;
+      sortOrder: number;
+    }>;
+  }>(manifest.files.spendingPatterns);
+  await db.delete(spendingPatterns).where(eq(spendingPatterns.userId, ownerUserId));
+  for (const p of patternsFile.patterns) {
+    await db.insert(spendingPatterns).values({ userId: ownerUserId, ...p });
+  }
+  console.log(`Spending patterns: ${patternsFile.patterns.length}`);
+
+  const reasonsFile = readJson<{
+    reasons: Array<{ transactionId: string; reasonId: string }>;
+  }>(manifest.files.transactionReasons);
+  for (const r of reasonsFile.reasons) {
+    await db
+      .insert(transactionReasons)
+      .values({
+        transactionId: r.transactionId,
+        userId: ownerUserId,
+        reasonId: r.reasonId,
+      })
+      .onConflictDoUpdate({
+        target: transactionReasons.transactionId,
+        set: { reasonId: r.reasonId },
+      });
+  }
+  console.log(`Transaction reasons: ${reasonsFile.reasons.length}`);
+
+  const challengesFile = readJson<{
+    challenges: Array<{
+      title: string;
+      goal: string;
+      progressPercent: number;
+      daysRemaining: number;
+      complete: boolean;
+      color: string | null;
+    }>;
+  }>(manifest.files.challenges);
+  await db.delete(challenges).where(eq(challenges.userId, ownerUserId));
+  for (const c of challengesFile.challenges) {
+    await db.insert(challenges).values({ userId: ownerUserId, ...c });
+  }
+
+  const streaksFile = readJson<{
+    streaks: Array<{
+      label: string;
+      currentDays: number;
+      maxDays: number;
+      color: string | null;
+    }>;
+  }>(manifest.files.habitStreaks);
+  await db.delete(habitStreaks).where(eq(habitStreaks.userId, ownerUserId));
+  for (const s of streaksFile.streaks) {
+    await db.insert(habitStreaks).values({ userId: ownerUserId, ...s });
+  }
+
+  const habitsFile = readJson<{
+    habits: Array<{
+      category: string;
+      emoji: string | null;
+      label: string;
+      monthlyAmount: string;
+    }>;
+  }>(manifest.files.lifestyleHabits);
+  await db.delete(lifestyleHabits).where(eq(lifestyleHabits.userId, ownerUserId));
+  for (const h of habitsFile.habits) {
+    await db.insert(lifestyleHabits).values({ userId: ownerUserId, ...h });
+  }
+
+  /* ---------------- protect ---------------- */
+
+  const inflProfileFile = readJson<{
+    personalRate: number;
+    nationalCpi: number;
+    salary: number;
+    raisePercent: number;
+    nominalSavingsRate: number;
+    powerLoss: number;
+    baseDate: string | null;
+  }>(manifest.files.inflationProfile);
+  await db
+    .insert(inflationProfiles)
+    .values({
+      userId: ownerUserId,
+      personalRate: String(inflProfileFile.personalRate),
+      nationalCpi: String(inflProfileFile.nationalCpi),
+      salary: String(inflProfileFile.salary),
+      raisePercent: String(inflProfileFile.raisePercent),
+      nominalSavingsRate: String(inflProfileFile.nominalSavingsRate),
+      powerLoss: String(inflProfileFile.powerLoss),
+      baseDate: inflProfileFile.baseDate,
+    })
+    .onConflictDoUpdate({
+      target: inflationProfiles.userId,
+      set: {
+        personalRate: String(inflProfileFile.personalRate),
+        updatedAt: new Date(),
+      },
+    });
+
+  const inflCatsFile = readJson<{
+    categories: Array<{
+      name: string;
+      share: number;
+      inflationRate: number;
+      severity: string;
+      sortOrder: number;
+    }>;
+  }>(manifest.files.inflationCategories);
+  await db
+    .delete(inflationCategories)
+    .where(eq(inflationCategories.userId, ownerUserId));
+  for (const c of inflCatsFile.categories) {
+    await db.insert(inflationCategories).values({
+      userId: ownerUserId,
+      name: c.name,
+      share: String(c.share),
+      inflationRate: String(c.inflationRate),
+      severity: c.severity,
+      sortOrder: c.sortOrder,
+    });
+  }
+  console.log(`Inflation categories: ${inflCatsFile.categories.length}`);
+
+  const resProfileFile = readJson<{ liquidCash: string; monthlyBurn: string }>(
+    manifest.files.resilienceProfile,
+  );
+  await db
+    .insert(resilienceProfiles)
+    .values({
+      userId: ownerUserId,
+      liquidCash: resProfileFile.liquidCash,
+      monthlyBurn: resProfileFile.monthlyBurn,
+    })
+    .onConflictDoUpdate({
+      target: resilienceProfiles.userId,
+      set: {
+        liquidCash: resProfileFile.liquidCash,
+        monthlyBurn: resProfileFile.monthlyBurn,
+        updatedAt: new Date(),
+      },
+    });
+
+  const resScenariosFile = readJson<{
+    scenarios: Array<{
+      name: string;
+      emoji: string | null;
+      shockAmount: string;
+      shockType: string;
+      recommendedMonths: number;
+      detail: string | null;
+      sortOrder: number;
+    }>;
+  }>(manifest.files.resilienceScenarios);
+  await db
+    .delete(resilienceScenarios)
+    .where(eq(resilienceScenarios.userId, ownerUserId));
+  for (const s of resScenariosFile.scenarios) {
+    await db.insert(resilienceScenarios).values({
+      userId: ownerUserId,
+      name: s.name,
+      emoji: s.emoji,
+      shockAmount: s.shockAmount,
+      shockType: s.shockType,
+      recommendedMonths: String(s.recommendedMonths),
+      detail: s.detail,
+      sortOrder: s.sortOrder,
+    });
+  }
+  console.log(`Resilience scenarios: ${resScenariosFile.scenarios.length}`);
+
+  /* ---------------- coach & wrapped ---------------- */
+
+  const coachFile = readJson<{
+    insights: Array<{
+      kind: string;
+      periodMonth: string | null;
+      question: string | null;
+      answer: string;
+      sortOrder: number;
+    }>;
+  }>(manifest.files.coachInsights);
+  await db.delete(coachInsights).where(eq(coachInsights.userId, ownerUserId));
+  for (const c of coachFile.insights) {
+    await db.insert(coachInsights).values({ userId: ownerUserId, ...c });
+  }
+
+  const wrappedFile = readJson<{
+    summaries: Array<{
+      year: number;
+      totalSpent: string;
+      transactionCount: number;
+      totalSaved: string;
+      savingsRate: number;
+      peerPercentile: string | null;
+      archetype: string | null;
+      topCategory: unknown;
+      personality: unknown;
+      moments: unknown;
+    }>;
+  }>(manifest.files.wrappedSummaries);
+  for (const w of wrappedFile.summaries) {
+    await db
+      .insert(wrappedSummaries)
+      .values({
+        userId: ownerUserId,
+        year: w.year,
+        totalSpent: w.totalSpent,
+        transactionCount: w.transactionCount,
+        totalSaved: w.totalSaved,
+        savingsRate: String(w.savingsRate),
+        peerPercentile: w.peerPercentile,
+        archetype: w.archetype,
+        topCategory: w.topCategory,
+        personality: w.personality,
+        moments: w.moments,
+      })
+      .onConflictDoUpdate({
+        target: [wrappedSummaries.userId, wrappedSummaries.year],
+        set: { totalSpent: w.totalSpent, moments: w.moments },
+      });
+  }
+  console.log(`Wrapped summaries: ${wrappedFile.summaries.length}`);
 
   const [countRow] = await db.execute<{ count: string }>(sql`
     SELECT COUNT(*)::text AS count FROM transactions WHERE user_id = ${ownerUserId}

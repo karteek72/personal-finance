@@ -2,44 +2,42 @@
 
 import { useState } from "react";
 
+import { useResilience } from "@/hooks/use-features";
+
 const PREVIEW_BANNER = (
   <div className="mb-5 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
     <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
       <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
     </svg>
-    <span><strong>Preview</strong> — Financial Immune System is a planned feature. Data shown is illustrative.</span>
+    <span><strong>Preview</strong> — Scenario modeling assumptions are illustrative.</span>
   </div>
 );
-
-// Day-Zero runway model
-const LIQUID_CASH = 21400;
-const MONTHLY_BURN = 5080;
-const RUNWAY_MONTHS = LIQUID_CASH / MONTHLY_BURN;
 
 interface Scenario {
   id: string;
   name: string;
   emoji: string;
   shock: number; // one-time or income loss magnitude in $
+  recurring: boolean;
   detail: string;
-  // How many months you survive this shock at current reserves
   monthsCovered: number;
   recommendedMonths: number;
 }
 
-const SCENARIOS: Scenario[] = [
-  { id: "job", name: "Job loss", emoji: "💼", shock: 5080, detail: "Income stops; you live off reserves at current burn rate.", monthsCovered: 4.2, recommendedMonths: 6 },
-  { id: "car", name: "$5K car repair", emoji: "🚗", shock: 5000, detail: "Sudden transmission failure, paid out of pocket.", monthsCovered: 99, recommendedMonths: 1 },
-  { id: "medical", name: "$8K medical bill", emoji: "🏥", shock: 8000, detail: "ER visit + deductible after insurance.", monthsCovered: 99, recommendedMonths: 1 },
-  { id: "rate", name: "Rate spike +2%", emoji: "📈", shock: 180, detail: "Variable debt payments rise $180/mo.", monthsCovered: 99, recommendedMonths: 1 },
-  { id: "rent", name: "Rent +15%", emoji: "🏠", shock: 278, detail: "Lease renewal adds $278/mo to fixed costs.", monthsCovered: 99, recommendedMonths: 1 },
+const FALLBACK_LIQUID_CASH = 21400;
+const FALLBACK_MONTHLY_BURN = 5080;
+
+const FALLBACK_SCENARIOS: Scenario[] = [
+  { id: "job", name: "Job loss", emoji: "💼", shock: 5080, recurring: true, detail: "Income stops; you live off reserves at current burn rate.", monthsCovered: 4.2, recommendedMonths: 6 },
+  { id: "car", name: "$5K car repair", emoji: "🚗", shock: 5000, recurring: false, detail: "Sudden transmission failure, paid out of pocket.", monthsCovered: 99, recommendedMonths: 1 },
+  { id: "medical", name: "$8K medical bill", emoji: "🏥", shock: 8000, recurring: false, detail: "ER visit + deductible after insurance.", monthsCovered: 99, recommendedMonths: 1 },
+  { id: "rate", name: "Rate spike +2%", emoji: "📈", shock: 180, recurring: true, detail: "Variable debt payments rise $180/mo.", monthsCovered: 99, recommendedMonths: 1 },
+  { id: "rent", name: "Rent +15%", emoji: "🏠", shock: 278, recurring: true, detail: "Lease renewal adds $278/mo to fixed costs.", monthsCovered: 99, recommendedMonths: 1 },
 ];
 
 function scenarioScore(s: Scenario): number {
-  if (s.id === "job") return Math.min(100, Math.round((s.monthsCovered / s.recommendedMonths) * 100));
-  // For one-time shocks, score = reserves vs. shock size
-  const ratio = LIQUID_CASH / s.shock;
-  return Math.min(100, Math.round((ratio / 3) * 100));
+  if (s.recommendedMonths <= 0) return 100;
+  return Math.min(100, Math.round((s.monthsCovered / s.recommendedMonths) * 100));
 }
 
 function scoreColor(s: number) {
@@ -55,9 +53,30 @@ function scoreVerdict(s: number) {
 }
 
 export function ResiliencePanel() {
-  const [active, setActive] = useState<string>("job");
-  const scenario = SCENARIOS.find((s) => s.id === active)!;
-  const overall = Math.round(SCENARIOS.reduce((sum, s) => sum + scenarioScore(s), 0) / SCENARIOS.length);
+  const { data } = useResilience();
+
+  const LIQUID_CASH = data ? Number.parseFloat(data.liquidCash) : FALLBACK_LIQUID_CASH;
+  const MONTHLY_BURN = data ? Number.parseFloat(data.monthlyBurn) : FALLBACK_MONTHLY_BURN;
+  const RUNWAY_MONTHS = data?.runwayMonths ?? LIQUID_CASH / MONTHLY_BURN;
+
+  const SCENARIOS: Scenario[] = data?.scenarios.length
+    ? data.scenarios.map((s) => ({
+        id: s.id,
+        name: s.name,
+        emoji: s.emoji ?? "⚠️",
+        shock: Number.parseFloat(s.shockAmount),
+        recurring: s.shockType !== "one_time",
+        detail: s.detail ?? "",
+        monthsCovered: s.monthsCovered,
+        recommendedMonths: s.recommendedMonths,
+      }))
+    : FALLBACK_SCENARIOS;
+
+  const [active, setActive] = useState<string>(SCENARIOS[0]?.id ?? "job");
+  const scenario = SCENARIOS.find((s) => s.id === active) ?? SCENARIOS[0]!;
+  const overall =
+    data?.immunityScore ??
+    Math.round(SCENARIOS.reduce((sum, s) => sum + scenarioScore(s), 0) / SCENARIOS.length);
 
   return (
     <div className="space-y-5">
@@ -70,7 +89,7 @@ export function ResiliencePanel() {
             <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Day-Zero runway</p>
             <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">{RUNWAY_MONTHS.toFixed(1)}<span className="text-2xl"> months</span></p>
             <p className="mt-1 text-sm text-white/70">
-              At your current burn of <strong>${MONTHLY_BURN.toLocaleString()}/mo</strong>, your ${LIQUID_CASH.toLocaleString()} in liquid cash lasts until <strong>mid-October 2026</strong> if income stopped today.
+              At your current burn of <strong>${MONTHLY_BURN.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo</strong>, your ${LIQUID_CASH.toLocaleString(undefined, { maximumFractionDigits: 0 })} in liquid cash lasts about <strong>{RUNWAY_MONTHS.toFixed(1)} months</strong> if income stopped today.
             </p>
           </div>
           <div className="flex flex-col items-center">
@@ -134,23 +153,21 @@ export function ResiliencePanel() {
             <div className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-text-muted">Shock size</span>
-                <span className="font-semibold text-text tabular-nums">${scenario.shock.toLocaleString()}{scenario.id === "job" || scenario.id === "rate" || scenario.id === "rent" ? "/mo" : ""}</span>
+                <span className="font-semibold text-text tabular-nums">${scenario.shock.toLocaleString(undefined, { maximumFractionDigits: 0 })}{scenario.recurring ? "/mo" : ""}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-text-muted">Liquid reserves</span>
-                <span className="font-semibold text-text tabular-nums">${LIQUID_CASH.toLocaleString()}</span>
+                <span className="font-semibold text-text tabular-nums">${LIQUID_CASH.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
               </div>
-              {scenario.id === "job" && (
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Survives for</span>
-                  <span className="font-semibold text-text tabular-nums">{scenario.monthsCovered} months (target {scenario.recommendedMonths})</span>
-                </div>
-              )}
+              <div className="flex justify-between">
+                <span className="text-text-muted">Survives for</span>
+                <span className="font-semibold text-text tabular-nums">{scenario.monthsCovered.toFixed(1)} months (target {scenario.recommendedMonths})</span>
+              </div>
             </div>
             <div className="mt-3 rounded-[var(--radius-sm)] bg-primary-soft/40 p-3 text-[13px] text-text">
               {scenarioScore(scenario) >= 80
                 ? "✅ You're well-prepared for this shock without touching investments or taking on debt."
-                : "⚠️ Building 1.8 more months of expenses ($9,100) into your emergency fund would close this gap."}
+                : `⚠️ Building ${Math.max(0, scenario.recommendedMonths - scenario.monthsCovered).toFixed(1)} more months of expenses (${(Math.max(0, scenario.recommendedMonths - scenario.monthsCovered) * MONTHLY_BURN).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 })}) into your emergency fund would close this gap.`}
             </div>
           </div>
         </div>

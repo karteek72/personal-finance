@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -223,3 +224,404 @@ export const householdInvitations = pgTable("household_invitations", {
     .notNull()
     .defaultNow(),
 });
+
+/* ------------------------------------------------------------------ *
+ * Investments & retirement (brokerage / 401k / IRA / crypto)
+ * ------------------------------------------------------------------ */
+
+export const securities = pgTable("securities", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ticker: text("ticker").notNull().unique(),
+  name: text("name").notNull(),
+  assetType: text("asset_type").notNull(), // equity | etf | mutual_fund | bond | crypto
+  sector: text("sector"),
+  currentPrice: numeric("current_price", { precision: 18, scale: 4 }).notNull(),
+  currencyCode: text("currency_code").notNull().default("USD"),
+  asOf: timestamp("as_of", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const holdings = pgTable(
+  "holdings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    securityId: uuid("security_id")
+      .notNull()
+      .references(() => securities.id, { onDelete: "cascade" }),
+    quantity: numeric("quantity", { precision: 20, scale: 8 }).notNull(),
+    costBasis: numeric("cost_basis", { precision: 18, scale: 4 }).notNull(), // per unit
+    institutionValue: numeric("institution_value", { precision: 14, scale: 2 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("holdings_account_security_idx").on(
+      table.accountId,
+      table.securityId,
+    ),
+  ],
+);
+
+export const investmentTransactions = pgTable(
+  "investment_transactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    securityId: uuid("security_id").references(() => securities.id, {
+      onDelete: "set null",
+    }),
+    externalId: text("external_id").notNull(),
+    date: date("date").notNull(),
+    name: text("name").notNull(),
+    type: text("type").notNull(), // buy | sell | dividend | contribution | fee
+    quantity: numeric("quantity", { precision: 20, scale: 8 }),
+    price: numeric("price", { precision: 18, scale: 4 }),
+    amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+    fees: numeric("fees", { precision: 12, scale: 2 }).notNull().default("0"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("investment_txn_account_external_id_idx").on(
+      table.accountId,
+      table.externalId,
+    ),
+  ],
+);
+
+/* ------------------------------------------------------------------ *
+ * Planning: net worth, budgets, goals, recurring, FIRE
+ * ------------------------------------------------------------------ */
+
+export const netWorthSnapshots = pgTable(
+  "net_worth_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    month: text("month").notNull(), // YYYY-MM
+    totalAssets: numeric("total_assets", { precision: 14, scale: 2 }).notNull(),
+    totalLiabilities: numeric("total_liabilities", {
+      precision: 14,
+      scale: 2,
+    }).notNull(),
+    netWorth: numeric("net_worth", { precision: 14, scale: 2 }).notNull(),
+    breakdown: jsonb("breakdown").notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("net_worth_user_month_idx").on(table.userId, table.month),
+  ],
+);
+
+export const budgets = pgTable(
+  "budgets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    category: text("category").notNull(),
+    periodMonth: text("period_month").notNull(), // YYYY-MM
+    limitAmount: numeric("limit_amount", { precision: 12, scale: 2 }).notNull(),
+    emoji: text("emoji"),
+    color: text("color"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("budgets_user_category_period_idx").on(
+      table.userId,
+      table.category,
+      table.periodMonth,
+    ),
+  ],
+);
+
+export const savingsGoals = pgTable("savings_goals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  targetAmount: numeric("target_amount", { precision: 12, scale: 2 }).notNull(),
+  currentAmount: numeric("current_amount", {
+    precision: 12,
+    scale: 2,
+  }).notNull(),
+  deadline: date("deadline"),
+  emoji: text("emoji"),
+  color: text("color"),
+  accountId: uuid("account_id").references(() => accounts.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const recurringSeries = pgTable("recurring_series", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  merchantName: text("merchant_name").notNull(),
+  category: text("category").notNull(),
+  kind: text("kind").notNull().default("subscription"), // subscription | bill | income
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  cadence: text("cadence").notNull().default("monthly"), // weekly | monthly | annual
+  nextChargeDate: date("next_charge_date"),
+  lastChargeDate: date("last_charge_date"),
+  previousAmount: numeric("previous_amount", { precision: 12, scale: 2 }),
+  priceChanged: boolean("price_changed").notNull().default(false),
+  status: text("status").notNull().default("active"), // active | cancelled
+  brandColor: text("brand_color"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const fireProfiles = pgTable("fire_profiles", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  currentAge: integer("current_age").notNull(),
+  currentNetWorth: numeric("current_net_worth", {
+    precision: 14,
+    scale: 2,
+  }).notNull(),
+  monthlySpend: numeric("monthly_spend", { precision: 12, scale: 2 }).notNull(),
+  monthlyInvest: numeric("monthly_invest", {
+    precision: 12,
+    scale: 2,
+  }).notNull(),
+  withdrawalRate: numeric("withdrawal_rate", { precision: 5, scale: 2 }).notNull(),
+  realReturn: numeric("real_return", { precision: 5, scale: 2 }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/* ------------------------------------------------------------------ *
+ * Insights & behavioral
+ * ------------------------------------------------------------------ */
+
+export const wellnessScores = pgTable(
+  "wellness_scores",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    periodMonth: text("period_month").notNull(), // YYYY-MM
+    score: integer("score").notNull(),
+    dimensions: jsonb("dimensions").notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("wellness_user_period_idx").on(
+      table.userId,
+      table.periodMonth,
+    ),
+  ],
+);
+
+export const spendingDna = pgTable("spending_dna", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  archetype: text("archetype").notNull(),
+  narrative: text("narrative").notNull(),
+  peerRarity: text("peer_rarity"),
+  axes: jsonb("axes").notNull().default([]),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const spendingPatterns = pgTable("spending_patterns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(), // pattern | day_of_week
+  label: text("label").notNull(),
+  metric: text("metric"),
+  description: text("description"),
+  severity: text("severity"), // warning | neutral | positive
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const transactionReasons = pgTable("transaction_reasons", {
+  transactionId: uuid("transaction_id")
+    .primaryKey()
+    .references(() => transactions.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  reasonId: text("reason_id").notNull(), // need | treat | social | bored | stress | impulse
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const challenges = pgTable("challenges", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  goal: text("goal").notNull(),
+  progressPercent: integer("progress_percent").notNull().default(0),
+  daysRemaining: integer("days_remaining").notNull().default(0),
+  complete: boolean("complete").notNull().default(false),
+  color: text("color"),
+});
+
+export const habitStreaks = pgTable("habit_streaks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  currentDays: integer("current_days").notNull().default(0),
+  maxDays: integer("max_days").notNull().default(0),
+  color: text("color"),
+});
+
+export const lifestyleHabits = pgTable("lifestyle_habits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  category: text("category").notNull(),
+  emoji: text("emoji"),
+  label: text("label").notNull(),
+  monthlyAmount: numeric("monthly_amount", {
+    precision: 12,
+    scale: 2,
+  }).notNull(),
+});
+
+/* ------------------------------------------------------------------ *
+ * Protect: inflation & resilience
+ * ------------------------------------------------------------------ */
+
+export const inflationProfiles = pgTable("inflation_profiles", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  personalRate: numeric("personal_rate", { precision: 5, scale: 2 }).notNull(),
+  nationalCpi: numeric("national_cpi", { precision: 5, scale: 2 }).notNull(),
+  salary: numeric("salary", { precision: 14, scale: 2 }).notNull(),
+  raisePercent: numeric("raise_percent", { precision: 5, scale: 2 }).notNull(),
+  nominalSavingsRate: numeric("nominal_savings_rate", {
+    precision: 5,
+    scale: 2,
+  }).notNull(),
+  powerLoss: numeric("power_loss", { precision: 14, scale: 2 }),
+  baseDate: date("base_date"),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const inflationCategories = pgTable("inflation_categories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  share: numeric("share", { precision: 5, scale: 2 }).notNull(),
+  inflationRate: numeric("inflation_rate", { precision: 5, scale: 2 }).notNull(),
+  severity: text("severity").notNull(), // high | medium | low
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const resilienceProfiles = pgTable("resilience_profiles", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  liquidCash: numeric("liquid_cash", { precision: 14, scale: 2 }).notNull(),
+  monthlyBurn: numeric("monthly_burn", { precision: 12, scale: 2 }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const resilienceScenarios = pgTable("resilience_scenarios", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  emoji: text("emoji"),
+  shockAmount: numeric("shock_amount", { precision: 12, scale: 2 }).notNull(),
+  shockType: text("shock_type").notNull().default("recurring"), // one_time | recurring
+  recommendedMonths: numeric("recommended_months", {
+    precision: 5,
+    scale: 1,
+  }).notNull(),
+  detail: text("detail"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/* ------------------------------------------------------------------ *
+ * Coach & Wrapped
+ * ------------------------------------------------------------------ */
+
+export const coachInsights = pgTable("coach_insights", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(), // narrative | qa | forecast
+  periodMonth: text("period_month"),
+  question: text("question"),
+  answer: text("answer").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const wrappedSummaries = pgTable(
+  "wrapped_summaries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    totalSpent: numeric("total_spent", { precision: 14, scale: 2 }).notNull(),
+    transactionCount: integer("transaction_count").notNull(),
+    totalSaved: numeric("total_saved", { precision: 14, scale: 2 }).notNull(),
+    savingsRate: numeric("savings_rate", { precision: 5, scale: 2 }).notNull(),
+    peerPercentile: text("peer_percentile"),
+    archetype: text("archetype"),
+    topCategory: jsonb("top_category").notNull().default({}),
+    personality: jsonb("personality").notNull().default({}),
+    moments: jsonb("moments").notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("wrapped_user_year_idx").on(table.userId, table.year),
+  ],
+);

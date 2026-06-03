@@ -4,17 +4,27 @@ import { useState } from "react";
 import Link from "next/link";
 
 import { useAccounts } from "@/hooks/use-accounts";
+import { useInvestments } from "@/hooks/use-features";
 
 const PREVIEW_BANNER = (
   <div className="mb-4 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
     <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
       <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
     </svg>
-    <span><strong>Preview</strong> — Holdings-level detail &amp; behavioral analysis are illustrative.</span>
+    <span><strong>Preview</strong> — Behavioral analysis below is illustrative.</span>
   </div>
 );
 
-const HOLDINGS = [
+interface Holding {
+  ticker: string;
+  name: string;
+  shares: number;
+  costBasis: number;
+  currentPrice: number;
+  sector: string;
+}
+
+const FALLBACK_HOLDINGS: Holding[] = [
   { ticker: "AAPL", name: "Apple Inc.", shares: 12, costBasis: 142, currentPrice: 211, sector: "Technology" },
   { ticker: "VOO", name: "Vanguard S&P 500", shares: 8, costBasis: 380, currentPrice: 498, sector: "ETF" },
   { ticker: "MSFT", name: "Microsoft Corp.", shares: 5, costBasis: 310, currentPrice: 421, sector: "Technology" },
@@ -23,7 +33,7 @@ const HOLDINGS = [
   { ticker: "BTC", name: "Bitcoin", shares: 0.12, costBasis: 38000, currentPrice: 69400, sector: "Crypto" },
 ];
 
-const BEHAVIORAL_ALERTS = [
+const FALLBACK_BEHAVIORAL_ALERTS = [
   {
     type: "warning",
     title: "Panic sell pattern detected",
@@ -52,9 +62,25 @@ function pct(cost: number, current: number) {
 export function InvestmentsPanel() {
   const [activeTab, setActiveTab] = useState<"portfolio" | "behavioral">("portfolio");
   const { data, isLoading } = useAccounts();
+  const { data: investments } = useInvestments();
 
   const investmentAccounts = (data?.accounts ?? []).filter((a) => a.type === "investment");
   const portfolioValue = investmentAccounts.reduce((s, a) => s + Number.parseFloat(a.balanceCurrent ?? "0"), 0);
+
+  const holdings: Holding[] = investments?.holdings.length
+    ? investments.holdings.map((h) => ({
+        ticker: h.ticker,
+        name: h.name,
+        shares: h.quantity,
+        costBasis: Number.parseFloat(h.costBasis),
+        currentPrice: Number.parseFloat(h.currentPrice),
+        sector: h.sector ?? h.assetType,
+      }))
+    : FALLBACK_HOLDINGS;
+
+  const behavioralAlerts = investments?.behavioralAlerts.length
+    ? investments.behavioralAlerts
+    : FALLBACK_BEHAVIORAL_ALERTS;
 
   return (
     <div className="space-y-5">
@@ -122,7 +148,7 @@ export function InvestmentsPanel() {
 
         {activeTab === "portfolio" && (
           <div className="space-y-2">
-            {HOLDINGS.map((h) => {
+            {holdings.map((h) => {
               const value = h.shares * h.currentPrice;
               const gain = h.currentPrice - h.costBasis;
               const gainP = pct(h.costBasis, h.currentPrice);
@@ -155,7 +181,7 @@ export function InvestmentsPanel() {
 
         {activeTab === "behavioral" && (
           <div className="space-y-3">
-            {BEHAVIORAL_ALERTS.map((alert, i) => (
+            {behavioralAlerts.map((alert, i) => (
               <div
                 key={i}
                 className={`rounded-[var(--radius-md)] border p-4 ${

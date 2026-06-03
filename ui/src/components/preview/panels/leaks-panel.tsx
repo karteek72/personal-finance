@@ -2,14 +2,7 @@
 
 import { useState } from "react";
 
-const PREVIEW_BANNER = (
-  <div className="mb-5 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
-      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-    </svg>
-    <span><strong>Preview</strong> — Money Leaks is a planned feature. Data shown is illustrative.</span>
-  </div>
-);
+import { useRecurring } from "@/hooks/use-features";
 
 interface Fee {
   id: string;
@@ -20,7 +13,7 @@ interface Fee {
   fixable: boolean;
 }
 
-const FEES: Fee[] = [
+const FALLBACK_FEES: Fee[] = [
   { id: "atm", label: "Out-of-network ATM fees", source: "Various ATMs", count: 14, total: 49.0, fixable: true },
   { id: "overdraft", label: "Overdraft fees", source: "Chase Checking", count: 3, total: 105.0, fixable: true },
   { id: "maint", label: "Account maintenance", source: "Chase Checking", count: 12, total: 144.0, fixable: true },
@@ -36,7 +29,7 @@ interface Habit {
   monthly: number;
 }
 
-const HABITS: Habit[] = [
+const FALLBACK_HABITS: Habit[] = [
   { id: "coffee", emoji: "☕", label: "Daily coffee shop", monthly: 132 },
   { id: "dining", emoji: "🍔", label: "Eating out / delivery", monthly: 540 },
   { id: "rideshare", emoji: "🚕", label: "Rideshare", monthly: 96 },
@@ -56,13 +49,33 @@ function fv(monthly: number, years: number, rate = 0.07): number {
 
 export function LeaksPanel() {
   const [tab, setTab] = useState<"fees" | "audit">("fees");
+  const { data } = useRecurring();
 
-  const feeTotal = FEES.reduce((s, f) => s + f.total, 0);
-  const recoverable = FEES.filter((f) => f.fixable).reduce((s, f) => s + f.total, 0);
+  const fees: Fee[] = data
+    ? data.leaks.fees.map((f) => ({
+        id: f.id,
+        label: f.label,
+        source: f.source,
+        count: f.count,
+        total: Number.parseFloat(f.total),
+        fixable: f.fixable,
+      }))
+    : FALLBACK_FEES;
+
+  const habits: Habit[] = data
+    ? data.leaks.habits.map((h) => ({
+        id: h.id,
+        emoji: h.emoji ?? "💸",
+        label: h.label,
+        monthly: Number.parseFloat(h.monthly),
+      }))
+    : FALLBACK_HABITS;
+
+  const feeTotal = fees.reduce((s, f) => s + f.total, 0);
+  const recoverable = fees.filter((f) => f.fixable).reduce((s, f) => s + f.total, 0);
 
   return (
     <div className="space-y-5">
-      {PREVIEW_BANNER}
 
       {/* Hero */}
       <div className="rounded-[var(--radius-lg)] p-5" style={{ background: "var(--gradient-hero)" }}>
@@ -93,7 +106,7 @@ export function LeaksPanel() {
 
       {tab === "fees" ? (
         <div className="space-y-2">
-          {FEES.map((f) => (
+          {fees.map((f) => (
             <div key={f.id} className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -126,7 +139,7 @@ export function LeaksPanel() {
           <p className="px-1 text-[11px] text-text-muted">
             The real cost of a habit isn&apos;t the monthly bill — it&apos;s what that money becomes if invested. Below: annual cost and 10-year opportunity cost at 7%.
           </p>
-          {HABITS.map((h) => (
+          {habits.map((h) => (
             <div key={h.id} className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm font-semibold text-text">{h.emoji} {h.label}</span>

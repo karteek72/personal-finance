@@ -1,0 +1,54 @@
+{
+  "year": 2025,
+  "totalSpent": "46486.67",
+  "transactionCount": 657,
+  "totalSaved": "13831.34",
+  "savingsRate": 22.93,
+  "peerPercentile": "Top 14%",
+  "archetype": "The Experience Seeker",
+  "topCategory": {
+    "name": "Dining & Restaurants",
+    "amount": "7399.20"
+  },
+  "personality": {
+    "restaurantVisits": 412,
+    "deliveryOrders": 78,
+    "coffeeRuns": 196,
+    "travelTrips": 3
+  },
+  "moments": [
+    {
+      "label": "Biggest purchase",
+      "value": "$1,299 at Best Buy"
+    },
+    {
+      "label": "Best savings month",
+      "value": "October"
+    },
+    {
+      "label": "Most frugal day",
+      "value": "47 no-spend days"
+    },
+    {
+      "label": "Forgotten subscription",
+      "value": "Disney+ unused 4 months"
+    }
+  ],
+  "goals": [
+    {
+      "label": "Emergency Fund",
+      "target": "10000.00",
+      "pct": 64.2
+    },
+    {
+      "label": "Japan Trip",
+      "target": "4500.00",
+      "pct": 40
+    },
+    {
+      "label": "New Car Fund",
+      "target": "12000.00",
+      "pct": 35
+    }
+  ]
+}

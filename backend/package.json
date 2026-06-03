@@ -12,6 +12,7 @@
     "db:migrate": "drizzle-kit migrate",
     "import:statements": "tsx scripts/import-statements.ts",
     "db:assign-legacy": "tsx scripts/assign-legacy-data.ts",
+    "db:gen-mock": "tsx scripts/generate-mock-dataset.ts",
     "db:seed": "tsx scripts/seed-mock-data.ts"
   },
   "dependencies": {

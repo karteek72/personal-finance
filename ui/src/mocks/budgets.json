@@ -1,0 +1,82 @@
+{
+  "periodMonth": "2026-05",
+  "safeToSpend": "47.00",
+  "daysRemaining": 27,
+  "budgets": [
+    {
+      "category": "Dining & Restaurants",
+      "emoji": "🍽️",
+      "color": "#F97316",
+      "limit": "650.00",
+      "spent": "957.50"
+    },
+    {
+      "category": "Food & Groceries",
+      "emoji": "🛒",
+      "color": "#3B82F6",
+      "limit": "600.00",
+      "spent": "773.74"
+    },
+    {
+      "category": "Transportation",
+      "emoji": "🚗",
+      "color": "#6B7280",
+      "limit": "300.00",
+      "spent": "229.45"
+    },
+    {
+      "category": "Shopping & Retail",
+      "emoji": "🛍️",
+      "color": "#22C55E",
+      "limit": "400.00",
+      "spent": "682.50"
+    },
+    {
+      "category": "Entertainment",
+      "emoji": "🎬",
+      "color": "#A855F7",
+      "limit": "150.00",
+      "spent": "73.54"
+    },
+    {
+      "category": "Subscriptions & Software",
+      "emoji": "📱",
+      "color": "#EF4444",
+      "limit": "180.00",
+      "spent": "99.45"
+    },
+    {
+      "category": "Health & Medical",
+      "emoji": "💊",
+      "color": "#EC4899",
+      "limit": "120.00",
+      "spent": "24.99"
+    }
+  ],
+  "goals": [
+    {
+      "name": "Emergency Fund",
+      "emoji": "🛡️",
+      "color": "#22C55E",
+      "target": "10000.00",
+      "current": "6420.00",
+      "deadline": "2026-12-31"
+    },
+    {
+      "name": "Japan Trip",
+      "emoji": "✈️",
+      "color": "#14B8A6",
+      "target": "4500.00",
+      "current": "1800.00",
+      "deadline": "2026-08-31"
+    },
+    {
+      "name": "New Car Fund",
+      "emoji": "🚙",
+      "color": "#6366F1",
+      "target": "12000.00",
+      "current": "4200.00",
+      "deadline": "2027-06-30"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "patterns": [
+    {
+      "kind": "day_of_week",
+      "label": "Sun",
+      "metric": "72.72",
+      "description": null,
+      "severity": null,
+      "sortOrder": 0
+    },
+    {
+      "kind": "day_of_week",
+      "label": "Mon",
+      "metric": "109.17",
+      "description": null,
+      "severity": null,
+      "sortOrder": 1
+    },
+    {
+      "kind": "day_of_week",
+      "label": "Tue",
+      "metric": "82.67",
+      "description": null,
+      "severity": null,
+      "sortOrder": 2
+    },
+    {
+      "kind": "day_of_week",
+      "label": "Wed",
+      "metric": "80.91",
+      "description": null,
+      "severity": null,
+      "sortOrder": 3
+    },
+    {
+      "kind": "day_of_week",
+      "label": "Thu",
+      "metric": "75.18",
+      "description": null,
+      "severity": null,
+      "sortOrder": 4
+    },
+    {
+      "kind": "day_of_week",
+      "label": "Fri",
+      "metric": "93.16",
+      "description": null,
+      "severity": null,
+      "sortOrder": 5
+    },
+    {
+      "kind": "day_of_week",
+      "label": "Sat",
+      "metric": "59.23",
+      "description": null,
+      "severity": null,
+      "sortOrder": 6
+    },
+    {
+      "kind": "pattern",
+      "label": "Weekend spending",
+      "metric": "+43%",
+      "description": "You spend 43% more on Saturdays and Sundays vs weekdays.",
+      "severity": "warning",
+      "sortOrder": 0
+    },
+    {
+      "kind": "pattern",
+      "label": "Post-payday splurge",
+      "metric": "+67%",
+      "description": "In the 3 days after each paycheck, spending spikes.",
+      "severity": "warning",
+      "sortOrder": 1
+    },
+    {
+      "kind": "pattern",
+      "label": "Late-night orders",
+      "metric": "$189/mo",
+      "description": "38% of delivery orders happen between 10pm-2am.",
+      "severity": "neutral",
+      "sortOrder": 2
+    },
+    {
+      "kind": "pattern",
+      "label": "Stress spending",
+      "metric": "+28%",
+      "description": "Dining and shopping rise on high-workload weeks.",
+      "severity": "neutral",
+      "sortOrder": 3
+    }
+  ]
+}

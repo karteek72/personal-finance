@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { useRecurring } from "@/hooks/use-features";
 
 const PREVIEW_BANNER = (
   <div className="mb-5 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
     <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
       <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
     </svg>
-    <span><strong>Preview</strong> — Financial Time Machine is a planned feature. Returns are illustrative, not advice.</span>
+    <span><strong>Preview</strong> — Hypothetical S&P 500 returns are illustrative, not advice.</span>
   </div>
 );
 
@@ -21,7 +23,11 @@ interface PastHabit {
   investedValue: number;
 }
 
-const HABITS: PastHabit[] = [
+const LOOKBACK_YEARS = 3;
+// Approx S&P 500 growth multiple over the lookback (illustrative)
+const INVEST_MULTIPLE = 1.45;
+
+const FALLBACK_HABITS: PastHabit[] = [
   { id: "dining", emoji: "🍔", category: "Restaurants & takeout", spent: 8400, yearsAgo: 3, investedValue: 12180 },
   { id: "rideshare", emoji: "🚕", category: "Rideshare & taxis", spent: 3120, yearsAgo: 3, investedValue: 4520 },
   { id: "subs", emoji: "📺", category: "Unused subscriptions", spent: 1860, yearsAgo: 3, investedValue: 2700 },
@@ -34,7 +40,34 @@ function money(n: number) {
 }
 
 export function TimeMachinePanel() {
-  const [selected, setSelected] = useState<string[]>(["dining", "impulse"]);
+  const { data } = useRecurring();
+
+  const HABITS: PastHabit[] = data?.leaks.habits.length
+    ? data.leaks.habits.map((h) => {
+        const spent = Number.parseFloat(h.monthly) * 12 * LOOKBACK_YEARS;
+        return {
+          id: h.id,
+          emoji: h.emoji ?? "💸",
+          category: h.label,
+          spent,
+          yearsAgo: LOOKBACK_YEARS,
+          investedValue: Math.round(spent * INVEST_MULTIPLE),
+        };
+      })
+    : FALLBACK_HABITS;
+
+  const [selected, setSelected] = useState<string[]>(
+    FALLBACK_HABITS.slice(0, 2).map((h) => h.id),
+  );
+
+  // Seed the selection from real habit ids once they load
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (data?.leaks.habits.length && !seeded.current) {
+      seeded.current = true;
+      setSelected(data.leaks.habits.slice(0, 2).map((h) => h.id));
+    }
+  }, [data]);
 
   const toggle = (id: string) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));

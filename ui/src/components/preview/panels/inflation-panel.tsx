@@ -1,15 +1,15 @@
 "use client";
 
-const PREVIEW_BANNER = (
-  <div className="mb-5 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
-      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-    </svg>
-    <span><strong>Preview</strong> — Inflation Intelligence is a planned feature. Data shown is illustrative.</span>
-  </div>
-);
+import { useInflation } from "@/hooks/use-features";
 
-const CATEGORIES = [
+interface InflationCategory {
+  name: string;
+  share: number;
+  inflation: number;
+  severity: string;
+}
+
+const FALLBACK_CATEGORIES: InflationCategory[] = [
   { name: "Healthcare", share: 8, inflation: 5.2, severity: "high" },
   { name: "Groceries", share: 14, inflation: 4.1, severity: "high" },
   { name: "Housing", share: 28, inflation: 3.8, severity: "medium" },
@@ -21,9 +21,9 @@ const CATEGORIES = [
   { name: "Utilities", share: 5, inflation: 4.8, severity: "high" },
 ];
 
-const PERSONAL_RATE = 3.8; // weighted personal inflation rate
-const NATIONAL_CPI = 3.1;
-const SALARY_RAISE = 3.0;
+const FALLBACK_PERSONAL_RATE = 3.8;
+const FALLBACK_NATIONAL_CPI = 3.1;
+const FALLBACK_SALARY_RAISE = 3.0;
 
 function severityColor(s: string) {
   if (s === "high") return "#ef4444";
@@ -31,12 +31,27 @@ function severityColor(s: string) {
   return "#22c55e";
 }
 
+function usd(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+}
+
 export function InflationPanel() {
-  const realSavingsRate = 5.2 - PERSONAL_RATE;
+  const { data } = useInflation();
+
+  const PERSONAL_RATE = data?.personalRate ?? FALLBACK_PERSONAL_RATE;
+  const NATIONAL_CPI = data?.nationalCpi ?? FALLBACK_NATIONAL_CPI;
+  const SALARY_RAISE = data?.salaryRaise ?? FALLBACK_SALARY_RAISE;
+  const realSavingsRate = data?.realSavingsRate ?? 5.2 - PERSONAL_RATE;
+  const realRaise = data?.realRaise ?? SALARY_RAISE - PERSONAL_RATE;
+  const powerLoss = data ? `−${usd(Number.parseFloat(data.powerLoss))}` : "−$1,240";
+  const salary = data ? Number.parseFloat(data.salary) : 80000;
+  const breakEvenSalary = data ? Number.parseFloat(data.breakEvenSalary) : 82720;
+  const targetSalary = data ? Number.parseFloat(data.targetSalary) : 84800;
+  const raiseNeeded = breakEvenSalary - salary;
+  const categories: InflationCategory[] = data?.categories.length ? data.categories : FALLBACK_CATEGORIES;
 
   return (
     <div className="space-y-5">
-      {PREVIEW_BANNER}
 
       {/* Personal inflation hero */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -54,8 +69,9 @@ export function InflationPanel() {
           <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
             <p className="text-xs text-text-muted">Your raise this year</p>
             <p className="mt-0.5 text-2xl font-extrabold text-text">{SALARY_RAISE}%</p>
-            <p className="mt-1 text-xs font-semibold text-danger">
-              Real raise: −0.8% (you took a pay cut)
+            <p className={`mt-1 text-xs font-semibold ${realRaise < 0 ? "text-danger" : "text-success"}`}>
+              Real raise: {realRaise >= 0 ? "+" : ""}{realRaise.toFixed(1)}%
+              {realRaise < 0 ? " (you took a pay cut)" : ""}
             </p>
           </div>
           <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
@@ -65,12 +81,12 @@ export function InflationPanel() {
           </div>
           <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
             <p className="text-xs text-text-muted">Purchasing power loss</p>
-            <p className="mt-0.5 text-2xl font-extrabold text-danger">−$1,240</p>
-            <p className="mt-1 text-xs text-text-muted">since Jan 2024 on $80K salary</p>
+            <p className="mt-0.5 text-2xl font-extrabold text-danger">{powerLoss}</p>
+            <p className="mt-1 text-xs text-text-muted">over the past year on a {usd(salary)} salary</p>
           </div>
           <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
             <p className="text-xs text-text-muted">Raise needed to break even</p>
-            <p className="mt-0.5 text-2xl font-extrabold text-text">$2,720</p>
+            <p className="mt-0.5 text-2xl font-extrabold text-text">{usd(raiseNeeded)}</p>
             <p className="mt-1 text-xs text-text-muted">at your personal inflation rate</p>
           </div>
         </div>
@@ -80,16 +96,20 @@ export function InflationPanel() {
       <div className="rounded-[var(--radius-md)] border border-primary/30 bg-primary/5 p-5">
         <div className="mb-2 flex items-center gap-2">
           <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-primary">
-            <path d="M10.75 10.818v2.614A3.13 3.13 0 0011.888 13c.482-.315.612-.648.612-.875 0-.229-.13-.562-.612-.875a3.13 3.13 0 00-1.138-.432zM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 00-.35.13c-.14.065-.27.143-.386.233-.377.292-.514.627-.514.909 0 .184.058.39.33.585z"/>
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-6a.75.75 0 01.75.75v.316a3.78 3.78 0 011.653.713c.426.33.744.74.925 1.2a.75.75 0 01-1.395.55 1.35 1.35 0 00-.447-.563 2.187 2.187 0 00-.736-.363V9.3c.698.093 1.383.32 1.959.696.787.514 1.29 1.27 1.29 2.13 0 .86-.504 1.616-1.29 2.13-.576.377-1.261.603-1.96.696v.299a.75.75 0 11-1.5 0v-.3c-.697-.092-1.382-.318-1.958-.695-.482-.315-.857-.717-1.048-1.184a.75.75 0 111.39-.556c.08.204.234.4.522.587.325.201.7.333 1.094.macOS V8.2a3.78 3.78 0 01-1.653-.713C6.454 7.341 6 6.845 6 6.25c0-.595.454-1.09.847-1.39A3.78 3.78 0 019.25 4.316V4a.75.75 0 01.75-.75z" clipRule="evenodd"/>
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-12.75a.75.75 0 00-1.5 0v.316a2.5 2.5 0 00-1.05.43C7.62 6.36 7.25 6.97 7.25 7.64c0 .67.37 1.28.95 1.66.43.28.99.46 1.55.57v2.2a1.6 1.6 0 01-.62-.3.75.75 0 00-.93 1.18c.42.33.97.55 1.55.64v.36a.75.75 0 001.5 0v-.37a2.5 2.5 0 001.05-.43c.58-.38.95-.99.95-1.66 0-.67-.37-1.28-.95-1.66-.43-.28-.99-.46-1.55-.57v-2.2c.23.06.44.16.62.3a.75.75 0 00.93-1.18 2.7 2.7 0 00-1.55-.64v-.36z" clipRule="evenodd"/>
           </svg>
           <p className="text-sm font-bold text-primary">Salary Negotiation Brief</p>
         </div>
         <div className="space-y-1 text-sm text-text">
           <p>Your personal inflation rate this year: <strong>{PERSONAL_RATE}%</strong></p>
-          <p>Your raise: <strong>{SALARY_RAISE}%</strong> — that is a <strong className="text-danger">−0.8% real pay cut</strong></p>
-          <p>To maintain purchasing power at $80K, you need: <strong className="text-primary">$82,720</strong></p>
-          <p>To actually advance financially: <strong className="text-primary">$84,800+</strong> (5%+ real raise)</p>
+          <p>
+            Your raise: <strong>{SALARY_RAISE}%</strong> — that is a{" "}
+            <strong className={realRaise < 0 ? "text-danger" : "text-success"}>
+              {realRaise >= 0 ? "+" : ""}{realRaise.toFixed(1)}% real {realRaise < 0 ? "pay cut" : "raise"}
+            </strong>
+          </p>
+          <p>To maintain purchasing power at {usd(salary)}, you need: <strong className="text-primary">{usd(breakEvenSalary)}</strong></p>
+          <p>To actually advance financially: <strong className="text-primary">{usd(targetSalary)}+</strong></p>
         </div>
         <button className="mt-3 rounded-[var(--radius-sm)] bg-primary px-3 py-1.5 text-xs font-semibold text-white">
           Export this brief as PDF
@@ -102,7 +122,7 @@ export function InflationPanel() {
           Category inflation heatmap — your spending × inflation rate
         </p>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-          {CATEGORIES.sort((a, b) => b.inflation - a.inflation).map((c) => (
+          {[...categories].sort((a, b) => b.inflation - a.inflation).map((c) => (
             <div
               key={c.name}
               className="rounded-[var(--radius-md)] border bg-surface p-3"

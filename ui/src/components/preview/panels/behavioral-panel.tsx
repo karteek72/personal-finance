@@ -2,30 +2,32 @@
 
 import { useMemo, useState } from "react";
 
+import { useBehavioral } from "@/hooks/use-features";
+
 const PREVIEW_BANNER = (
   <div className="mb-5 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
     <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
       <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
     </svg>
-    <span><strong>Preview</strong> — Behavioral Finance is a planned feature. Data shown is illustrative.</span>
+    <span><strong>Preview</strong> — Transaction tagging &amp; true-cost calculators are illustrative.</span>
   </div>
 );
 
-const CHALLENGES = [
-  { title: "Dining budget cut", goal: "Reduce dining by 20% this month", progress: 62, days: 18, color: "#f97316" },
-  { title: "No impulse over $50", goal: "Wait 24h before any purchase >$50", progress: 85, days: 6, color: "#22c55e" },
+const FALLBACK_CHALLENGES = [
+  { title: "Dining budget cut", goal: "Reduce dining by 20% this month", progress: 62, days: 18, color: "#f97316", complete: false },
+  { title: "No impulse over $50", goal: "Wait 24h before any purchase >$50", progress: 85, days: 6, color: "#22c55e", complete: false },
   { title: "Auto-savings streak", goal: "Automate $200 extra to savings", progress: 100, days: 0, color: "#a855f7", complete: true },
 ];
 
-const HABIT_STREAKS = [
+const FALLBACK_STREAKS = [
   { label: "Under budget", days: 12, max: 30, color: "#22c55e" },
   { label: "No food delivery", days: 5, max: 14, color: "#3b82f6" },
   { label: "Savings auto-transfer", days: 47, max: 60, color: "#a855f7" },
 ];
 
-const CREEP_MONTHS = ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
-const INCOME = [7200, 7200, 7600, 7600, 7600, 7600, 8100, 8100, 8100, 8100];
-const SPENDING = [4800, 4900, 5200, 5400, 5600, 5700, 6100, 6300, 6400, 6520];
+const FALLBACK_CREEP_MONTHS = ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
+const FALLBACK_INCOME = [7200, 7200, 7600, 7600, 7600, 7600, 8100, 8100, 8100, 8100];
+const FALLBACK_SPENDING = [4800, 4900, 5200, 5400, 5600, 5700, 6100, 6300, 6400, 6520];
 
 const REASONS = [
   { id: "need", emoji: "✅", label: "Needed it", color: "#22c55e" },
@@ -56,7 +58,7 @@ const INITIAL: Txn[] = [
   { id: "t6", merchant: "Sephora", amount: 84.5, date: "3 days ago", emoji: "💄", defaultReason: "treat" },
 ];
 
-const HISTORY: Record<ReasonId, number> = {
+const FALLBACK_HISTORY: Record<ReasonId, number> = {
   need: 1840,
   treat: 420,
   social: 610,
@@ -70,22 +72,60 @@ function money(n: number) {
 }
 
 export function BehavioralPanel() {
+  const { data } = useBehavioral();
   const [tags, setTags] = useState<Record<string, ReasonId>>(
     Object.fromEntries(INITIAL.filter((t) => t.defaultReason).map((t) => [t.id, t.defaultReason!])),
   );
 
   const setTag = (txnId: string, reason: ReasonId) => setTags((t) => ({ ...t, [txnId]: reason }));
 
-  const maxVal = Math.max(...INCOME, ...SPENDING);
-  const emotionalTotal = HISTORY.stress + HISTORY.bored + HISTORY.impulse;
-  const totalSpend = Object.values(HISTORY).reduce((a, b) => a + b, 0);
-  const emotionalPct = Math.round((emotionalTotal / totalSpend) * 100);
+  const archetype = data?.archetype ?? "The Foodie";
+  const creepMonths = data?.creep.months.length ? data.creep.months : FALLBACK_CREEP_MONTHS;
+  const income = data?.creep.income.length
+    ? data.creep.income.map((v) => Number.parseFloat(v))
+    : FALLBACK_INCOME;
+  const spending = data?.creep.spending.length
+    ? data.creep.spending.map((v) => Number.parseFloat(v))
+    : FALLBACK_SPENDING;
+
+  const reasonTotals: Record<string, number> = data?.reasons.length
+    ? Object.fromEntries(data.reasons.map((r) => [r.id, Number.parseFloat(r.total)]))
+    : FALLBACK_HISTORY;
+
+  const challenges = data?.challenges.length
+    ? data.challenges.map((c) => ({
+        title: c.title,
+        goal: c.goal,
+        progress: c.progressPercent,
+        days: c.daysRemaining,
+        color: c.color ?? "#3b82f6",
+        complete: c.complete,
+      }))
+    : FALLBACK_CHALLENGES;
+
+  const streaks = data?.streaks.length
+    ? data.streaks.map((s) => ({
+        label: s.label,
+        days: s.currentDays,
+        max: s.maxDays,
+        color: s.color ?? "#22c55e",
+      }))
+    : FALLBACK_STREAKS;
+
+  const maxVal = Math.max(...income, ...spending);
+  const emotionalTotal =
+    (reasonTotals.stress ?? 0) + (reasonTotals.bored ?? 0) + (reasonTotals.impulse ?? 0);
+  const totalSpend = Object.values(reasonTotals).reduce((a, b) => a + b, 0);
+  const emotionalPct = totalSpend > 0 ? Math.round((emotionalTotal / totalSpend) * 100) : 0;
 
   const breakdown = useMemo(
-    () => REASONS.map((r) => ({ ...r, total: HISTORY[r.id] })).sort((a, b) => b.total - a.total),
-    [],
+    () =>
+      REASONS.map((r) => ({ ...r, total: reasonTotals[r.id] ?? 0 })).sort(
+        (a, b) => b.total - a.total,
+      ),
+    [reasonTotals],
   );
-  const maxReason = Math.max(...breakdown.map((b) => b.total));
+  const maxReason = Math.max(...breakdown.map((b) => b.total), 1);
 
   return (
     <div className="space-y-5">
@@ -94,7 +134,7 @@ export function BehavioralPanel() {
       {/* Spending personality */}
       <div className="rounded-[var(--radius-lg)] p-5" style={{ background: "var(--gradient-hero)" }}>
         <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Your spending archetype</p>
-        <p className="mt-1 text-3xl font-extrabold text-white">The Foodie</p>
+        <p className="mt-1 text-3xl font-extrabold text-white">{archetype}</p>
         <p className="mt-1 text-sm text-white/70">
           Dining &amp; experiences drive 38% of your discretionary spend. You value memories over things. Cost: $14,200/yr — 11% above the median for your income bracket.
         </p>
@@ -115,9 +155,9 @@ export function BehavioralPanel() {
           <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">Creep detected</span>
         </div>
         <div className="mt-3 flex h-20 items-end gap-1">
-          {CREEP_MONTHS.map((m, i) => {
-            const incPct = ((INCOME[i] ?? 0) / maxVal) * 72;
-            const spndPct = ((SPENDING[i] ?? 0) / maxVal) * 72;
+          {creepMonths.map((m, i) => {
+            const incPct = ((income[i] ?? 0) / maxVal) * 72;
+            const spndPct = ((spending[i] ?? 0) / maxVal) * 72;
             return (
               <div key={m} className="flex flex-1 flex-col items-center justify-end gap-0.5">
                 <div className="relative flex w-full items-end justify-center" style={{ height: 72 }}>
@@ -224,7 +264,7 @@ export function BehavioralPanel() {
       <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
         <p className="mb-3 text-sm font-semibold text-text">Habit streaks</p>
         <div className="space-y-3">
-          {HABIT_STREAKS.map((s) => (
+          {streaks.map((s) => (
             <div key={s.label}>
               <div className="mb-1 flex justify-between text-xs">
                 <span className="font-medium text-text">{s.label}</span>
@@ -241,7 +281,7 @@ export function BehavioralPanel() {
       {/* 30-day challenges */}
       <div className="space-y-2">
         <p className="px-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Active challenges</p>
-        {CHALLENGES.map((c) => (
+        {challenges.map((c) => (
           <div key={c.title} className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
             <div className="flex items-center justify-between">
               <div>

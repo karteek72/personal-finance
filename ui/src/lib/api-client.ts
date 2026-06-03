@@ -5,27 +5,43 @@ import type {
   AuthSessionResponse,
   AccountsResponse,
   AlertsResponse,
+  BehavioralResponse,
+  BudgetsResponse,
+  CalendarResponse,
   CategoriesResponse,
   ChartDataFilters,
   ChartDataResponse,
+  CoachResponse,
   CreditDebtSummary,
   DeleteAccountResponse,
+  DnaResponse,
+  FireResponse,
+  ForecastResponse,
   HouseholdInsightsResponse,
   HouseholdInviteAcceptResponse,
   HouseholdInvitePreview,
   HouseholdInviteResponse,
   HouseholdMember,
   HouseholdResponse,
+  InflationResponse,
+  InvestmentsResponse,
+  MerchantsResponse,
   MoneyFlowResponse,
+  NetWorthResponse,
   PaginatedTransactions,
+  PatternsResponse,
   PlaidExchangeResponse,
   PlaidItemsResponse,
   PlaidSyncAllResponse,
   PlaidSyncResponse,
+  RecurringResponse,
+  ResilienceResponse,
   TransactionFilters,
   TransactionSummary,
   TrendsResponse,
   UpdateTransactionCategoryResponse,
+  WellnessResponse,
+  WrappedResponse,
 } from "@/types/api";
 
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== "false";
@@ -421,6 +437,86 @@ export const api = {
     return fetchJson<PlaidSyncResponse>(`/plaid/items/${itemId}/sync`, {
       method: "POST",
     });
+  },
+
+  getNetWorth(): Promise<NetWorthResponse> {
+    if (USE_MOCKS) return mockApi.getNetWorth();
+    return fetchJson<NetWorthResponse>("/wealth/net-worth");
+  },
+
+  getInvestments(): Promise<InvestmentsResponse> {
+    if (USE_MOCKS) return mockApi.getInvestments();
+    return fetchJson<InvestmentsResponse>("/wealth/investments");
+  },
+
+  getFire(): Promise<FireResponse> {
+    if (USE_MOCKS) return mockApi.getFire();
+    return fetchJson<FireResponse>("/wealth/fire");
+  },
+
+  getBudgets(): Promise<BudgetsResponse> {
+    if (USE_MOCKS) return mockApi.getBudgets();
+    return fetchJson<BudgetsResponse>("/planning/budgets");
+  },
+
+  getRecurring(): Promise<RecurringResponse> {
+    if (USE_MOCKS) return mockApi.getRecurring();
+    return fetchJson<RecurringResponse>("/planning/recurring");
+  },
+
+  getCalendar(): Promise<CalendarResponse> {
+    if (USE_MOCKS) return mockApi.getCalendar();
+    return fetchJson<CalendarResponse>("/planning/calendar");
+  },
+
+  getForecast(): Promise<ForecastResponse> {
+    if (USE_MOCKS) return mockApi.getForecast();
+    return fetchJson<ForecastResponse>("/planning/forecast");
+  },
+
+  getWellness(): Promise<WellnessResponse> {
+    if (USE_MOCKS) return mockApi.getWellness();
+    return fetchJson<WellnessResponse>("/insights/wellness");
+  },
+
+  getDna(): Promise<DnaResponse> {
+    if (USE_MOCKS) return mockApi.getDna();
+    return fetchJson<DnaResponse>("/insights/dna");
+  },
+
+  getPatterns(): Promise<PatternsResponse> {
+    if (USE_MOCKS) return mockApi.getPatterns();
+    return fetchJson<PatternsResponse>("/insights/patterns");
+  },
+
+  getBehavioral(): Promise<BehavioralResponse> {
+    if (USE_MOCKS) return mockApi.getBehavioral();
+    return fetchJson<BehavioralResponse>("/insights/behavioral");
+  },
+
+  getMerchants(): Promise<MerchantsResponse> {
+    if (USE_MOCKS) return mockApi.getMerchants();
+    return fetchJson<MerchantsResponse>("/insights/merchants");
+  },
+
+  getInflation(): Promise<InflationResponse> {
+    if (USE_MOCKS) return mockApi.getInflation();
+    return fetchJson<InflationResponse>("/protect/inflation");
+  },
+
+  getResilience(): Promise<ResilienceResponse> {
+    if (USE_MOCKS) return mockApi.getResilience();
+    return fetchJson<ResilienceResponse>("/protect/resilience");
+  },
+
+  getCoach(): Promise<CoachResponse> {
+    if (USE_MOCKS) return mockApi.getCoach();
+    return fetchJson<CoachResponse>("/coach/insights");
+  },
+
+  getWrapped(): Promise<WrappedResponse> {
+    if (USE_MOCKS) return mockApi.getWrapped();
+    return fetchJson<WrappedResponse>("/wrapped");
   },
 };
 

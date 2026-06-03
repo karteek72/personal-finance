@@ -2,16 +2,20 @@
 
 import { useState } from "react";
 
-const PREVIEW_BANNER = (
-  <div className="mb-5 flex items-center gap-2 rounded-[var(--radius-sm)] border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0">
-      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-    </svg>
-    <span><strong>Preview</strong> — Subscription Manager is a planned feature. Data shown is illustrative.</span>
-  </div>
-);
+import { useRecurring } from "@/hooks/use-features";
 
-const SUBS = [
+interface Sub {
+  name: string;
+  amount: number;
+  category: string;
+  nextDate: string;
+  logo: string;
+  color: string;
+  changed: boolean;
+  oldAmount: number;
+}
+
+const FALLBACK_SUBS: Sub[] = [
   { name: "Netflix", amount: 17.99, category: "Entertainment", nextDate: "Jun 12", logo: "N", color: "#e50914", changed: true, oldAmount: 15.99 },
   { name: "Spotify", amount: 11.99, category: "Entertainment", nextDate: "Jun 15", logo: "S", color: "#1db954", changed: false, oldAmount: 0 },
   { name: "Amazon Prime", amount: 14.99, category: "Shopping", nextDate: "Jun 22", logo: "A", color: "#ff9900", changed: false, oldAmount: 0 },
@@ -24,17 +28,37 @@ const SUBS = [
   { name: "Duolingo Plus", amount: 6.99, category: "Education", nextDate: "Jul 3", logo: "D", color: "#58cc02", changed: false, oldAmount: 0 },
 ];
 
+function shortDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export function SubscriptionsPanel() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const { data } = useRecurring();
 
-  const active = SUBS.filter((s) => !dismissed.has(s.name));
+  const subs: Sub[] = data
+    ? data.subscriptions.map((s) => ({
+        name: s.merchantName,
+        amount: Number.parseFloat(s.amount),
+        category: s.category,
+        nextDate: shortDate(s.nextChargeDate),
+        logo: s.merchantName.slice(0, 1).toUpperCase(),
+        color: s.brandColor ?? "#6366f1",
+        changed: s.priceChanged,
+        oldAmount: s.previousAmount ? Number.parseFloat(s.previousAmount) : 0,
+      }))
+    : FALLBACK_SUBS;
+
+  const active = subs.filter((s) => !dismissed.has(s.name));
   const monthly = active.reduce((sum, s) => sum + s.amount, 0);
   const annual = monthly * 12;
   const priceChanges = active.filter((s) => s.changed);
 
   return (
     <div className="space-y-5">
-      {PREVIEW_BANNER}
 
       {/* Summary strip */}
       <div className="grid grid-cols-3 gap-3">

@@ -1,0 +1,67 @@
+{
+  "categories": [
+    {
+      "name": "Housing & Home",
+      "share": 32,
+      "inflationRate": 3,
+      "severity": "medium",
+      "sortOrder": 0
+    },
+    {
+      "name": "Food & Groceries",
+      "share": 14,
+      "inflationRate": 3.8,
+      "severity": "high",
+      "sortOrder": 1
+    },
+    {
+      "name": "Dining & Restaurants",
+      "share": 12,
+      "inflationRate": 4.2,
+      "severity": "high",
+      "sortOrder": 2
+    },
+    {
+      "name": "Transportation",
+      "share": 9,
+      "inflationRate": 2.4,
+      "severity": "low",
+      "sortOrder": 3
+    },
+    {
+      "name": "Health & Medical",
+      "share": 8,
+      "inflationRate": 4.1,
+      "severity": "high",
+      "sortOrder": 4
+    },
+    {
+      "name": "Utilities & Bills",
+      "share": 8,
+      "inflationRate": 3.3,
+      "severity": "medium",
+      "sortOrder": 5
+    },
+    {
+      "name": "Subscriptions & Software",
+      "share": 6,
+      "inflationRate": 5,
+      "severity": "high",
+      "sortOrder": 6
+    },
+    {
+      "name": "Shopping & Retail",
+      "share": 7,
+      "inflationRate": 1.9,
+      "severity": "low",
+      "sortOrder": 7
+    },
+    {
+      "name": "Travel",
+      "share": 4,
+      "inflationRate": 2.7,
+      "severity": "low",
+      "sortOrder": 8
+    }
+  ]
+}

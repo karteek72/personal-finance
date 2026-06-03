@@ -1,0 +1,103 @@
+{
+  "securities": [
+    {
+      "id": "c0000000-0000-4000-8000-000000000001",
+      "ticker": "AAPL",
+      "name": "Apple Inc.",
+      "assetType": "equity",
+      "sector": "Technology",
+      "currentPrice": "212.4000",
+      "currencyCode": "USD"
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000002",
+      "ticker": "MSFT",
+      "name": "Microsoft Corp.",
+      "assetType": "equity",
+      "sector": "Technology",
+      "currentPrice": "431.2000",
+      "currencyCode": "USD"
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000003",
+      "ticker": "AMZN",
+      "name": "Amazon.com Inc.",
+      "assetType": "equity",
+      "sector": "Consumer Discretionary",
+      "currentPrice": "186.1000",
+      "currencyCode": "USD"
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000004",
+      "ticker": "TSLA",
+      "name": "Tesla Inc.",
+      "assetType": "equity",
+      "sector": "Consumer Discretionary",
+      "currentPrice": "178.9000",
+      "currencyCode": "USD"
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000005",
+      "ticker": "VOO",
+      "name": "Vanguard S&P 500 ETF",
+      "assetType": "etf",
+      "sector": "Diversified",
+      "currentPrice": "495.3000",
+      "currencyCode": "USD"
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000006",
+      "ticker": "VTI",
+      "name": "Vanguard Total Stock Market ETF",
+      "assetType": "etf",
+      "sector": "Diversified",
+      "currentPrice": "268.7000",
+      "currencyCode": "USD"
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000007",
+      "ticker": "VXUS",
+      "name": "Vanguard Total International ETF",
+      "assetType": "etf",
+      "sector": "Diversified",
+      "currentPrice": "62.1000",
+      "currencyCode": "USD"
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000008",
+      "ticker": "FXAIX",
+      "name": "Fidelity 500 Index Fund",
+      "assetType": "mutual_fund",
+      "sector": "Diversified",
+      "currentPrice": "185.4000",
+      "currencyCode": "USD"
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000009",
+      "ticker": "VBTLX",
+      "name": "Vanguard Total Bond Market",
+      "assetType": "mutual_fund",
+      "sector": "Fixed Income",
+      "currentPrice": "9.7800",
+      "currencyCode": "USD"
+    },
+    {
+      "id": "c0000000-0000-4000-8000-00000000000a",
+      "ticker": "BTC",
+      "name": "Bitcoin",
+      "assetType": "crypto",
+      "sector": "Crypto",
+      "currentPrice": "68120.0000",
+      "currencyCode": "USD"
+    },
+    {
+      "id": "c0000000-0000-4000-8000-00000000000b",
+      "ticker": "ETH",
+      "name": "Ethereum",
+      "assetType": "crypto",
+      "sector": "Crypto",
+      "currentPrice": "3412.0000",
+      "currencyCode": "USD"
+    }
+  ]
+}

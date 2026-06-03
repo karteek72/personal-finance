@@ -13,7 +13,17 @@
     {
       "merchantKey": "netflix",
       "category": "Subscriptions & Software",
-      "subCategory": "Streaming Video"
+      "subCategory": "Streaming"
+    },
+    {
+      "merchantKey": "shell",
+      "category": "Transportation",
+      "subCategory": "Gas"
+    },
+    {
+      "merchantKey": "starbucks",
+      "category": "Dining & Restaurants",
+      "subCategory": "Coffee Shops"
     }
   ]
 }
