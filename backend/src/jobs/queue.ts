@@ -17,6 +17,12 @@ export interface ImportBatchJobData {
   batchId: string;
 }
 
+function attachRedisErrorLogger(client: Redis, label: string): void {
+  client.on("error", (err: Error) => {
+    log.warn({ err, label }, "redis connection error");
+  });
+}
+
 let queue: Queue<PlaidSyncJobData> | null = null;
 let importBatchQueue: Queue<ImportBatchJobData> | null = null;
 let pingClient: Redis | null = null;
@@ -74,6 +80,7 @@ export async function pingRedis(
         maxRetriesPerRequest: null,
         lazyConnect: true,
       });
+      attachRedisErrorLogger(pingClient, "ping");
     }
 
     const result = await pingClient.ping();

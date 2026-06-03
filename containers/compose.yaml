@@ -148,7 +148,6 @@ services:
       GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
       GOOGLE_SECRET_KEY: ${GOOGLE_SECRET_KEY:-}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
 
   ui:
     image: localhost/spendflow-ui:latest

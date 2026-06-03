@@ -57,6 +57,9 @@ function getRateLimitRedis(env: Env): Redis {
       maxRetriesPerRequest: null,
       lazyConnect: true,
     });
+    rateLimitRedis.on("error", (err: Error) => {
+      log.warn({ err }, "rate limit redis connection error");
+    });
   }
   return rateLimitRedis;
 }

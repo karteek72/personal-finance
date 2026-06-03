@@ -235,18 +235,46 @@ spendflow_prepare_postgres() {
   if [[ "${SPENDFLOW_EXTERNAL_POSTGRES:-false}" == "true" ]]; then
     local host_port="${POSTGRES_HOST_PORT:-5433}"
     export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@host.containers.internal:${host_port}/${POSTGRES_DB:-spendflow}"
-    export REDIS_URL="${REDIS_URL:-redis://redis:6379}"
     echo "info: using external postgres at host.containers.internal:${host_port}" >&2
     return 0
   fi
   export SPENDFLOW_COMPOSE_PROFILE=bundled-db
   export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@postgres:5432/${POSTGRES_DB:-spendflow}"
-  export REDIS_URL="${REDIS_URL:-redis://redis:6379}"
+  spendflow_write_container_env_var DATABASE_URL "${DATABASE_URL}"
+}
+
+spendflow_write_container_env_var() {
+  local key="$1"
+  local value="$2"
+  local env_file="${SPENDFLOW_CONTAINERS_DIR}/.env"
+
+  touch "${env_file}"
+  if grep -qE "^[[:space:]]*${key}=" "${env_file}" 2>/dev/null; then
+    spendflow_sed_inplace "${env_file}" "s|^[[:space:]]*${key}=.*|${key}=${value}|"
+  else
+    echo "${key}=${value}" >>"${env_file}"
+  fi
+}
+
+# Container API/worker must reach Redis on spendflow-net — not localhost from dev .env.
+spendflow_prepare_redis() {
+  if [[ "${SPENDFLOW_EXTERNAL_REDIS:-false}" == "true" ]]; then
+    if [[ -z "${REDIS_URL:-}" ]]; then
+      echo "error: REDIS_URL required when SPENDFLOW_EXTERNAL_REDIS=true" >&2
+      exit 1
+    fi
+    return 0
+  fi
+
+  export REDIS_URL="redis://redis:6379"
+  spendflow_write_container_env_var REDIS_URL "${REDIS_URL}"
+  echo "info: container REDIS_URL=${REDIS_URL} (host bind port ${REDIS_HOST_PORT:-6380} is for local dev only)" >&2
 }
 
 # Values compose substitutes from the shell (see compose.yaml ${VAR} entries).
 spendflow_export_compose_runtime_env() {
   spendflow_prepare_postgres
+  spendflow_prepare_redis
   export DATABASE_URL REDIS_URL JWT_SECRET ENCRYPTION_KEY
   export CORS_ORIGINS NEXT_PUBLIC_API_URL NEXT_PUBLIC_APP_URL NEXT_PUBLIC_GOOGLE_CLIENT_ID
   export SPENDFLOW_HOST SPENDFLOW_UI_PORT SPENDFLOW_API_PORT
