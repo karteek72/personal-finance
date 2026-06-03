@@ -12,6 +12,7 @@ const MIGRATION_FILES = [
   "0003_google_auth.sql",
   "0004_household_invitations.sql",
   "0005_merchant_category_rules.sql",
+  "0006_subcategories.sql",
 ];
 
 let migrationPromise: Promise<void> | null = null;

@@ -1,8 +1,13 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { isValidCategory } from "../config/categories.js";
+import { isValidCategory, isValidSubCategory } from "../config/categories.js";
 import { getDb } from "../db/client.js";
 import { merchantCategoryRules, transactions } from "../db/schema.js";
 import { AppError } from "../lib/errors.js";
+
+export interface CategoryRule {
+  category: string;
+  subCategory: string | null;
+}
 
 /** Stable key for matching merchant rules across transactions. */
 export function normalizeMerchantKey(
@@ -15,50 +20,74 @@ export function normalizeMerchantKey(
 
 export async function getMerchantCategoryRulesMap(
   userId: string,
-): Promise<Map<string, string>> {
+): Promise<Map<string, CategoryRule>> {
   const db = getDb();
   const rows = await db
     .select({
       merchantKey: merchantCategoryRules.merchantKey,
       category: merchantCategoryRules.category,
+      subCategory: merchantCategoryRules.subCategory,
     })
     .from(merchantCategoryRules)
     .where(eq(merchantCategoryRules.userId, userId));
 
-  return new Map(rows.map((row) => [row.merchantKey, row.category]));
+  return new Map(
+    rows.map((row) => [
+      row.merchantKey,
+      { category: row.category, subCategory: row.subCategory ?? null },
+    ]),
+  );
 }
 
+/**
+ * Apply a merchant rule if one exists.
+ *
+ * When a rule exists but has no stored subCategory, the Plaid-derived
+ * subCategory is preserved IF the rule's category matches the default
+ * (i.e. the user didn't change the parent, only wanted to remember it).
+ */
 export function applyMerchantCategoryRule(
-  rules: Map<string, string>,
+  rules: Map<string, CategoryRule>,
   merchantName: string | null | undefined,
   name: string,
   defaultCategory: string,
-): string {
+  defaultSubCategory: string | null,
+): CategoryRule {
   const key = normalizeMerchantKey(merchantName, name);
-  return rules.get(key) ?? defaultCategory;
+  const rule = rules.get(key);
+  if (!rule) {
+    return { category: defaultCategory, subCategory: defaultSubCategory };
+  }
+  const subCategory =
+    rule.subCategory ??
+    (rule.category === defaultCategory ? defaultSubCategory : null);
+  return { category: rule.category, subCategory };
 }
 
 export async function upsertMerchantCategoryRule(
   userId: string,
   merchantKey: string,
   category: string,
+  subCategory: string | null,
 ): Promise<void> {
   if (!isValidCategory(category)) {
     throw AppError.validation(`Invalid category: ${category}`);
+  }
+  if (subCategory !== null && !isValidSubCategory(category, subCategory)) {
+    throw AppError.validation(
+      `Invalid subcategory "${subCategory}" for category "${category}"`,
+    );
   }
 
   const db = getDb();
   await db
     .insert(merchantCategoryRules)
-    .values({
-      userId,
-      merchantKey,
-      category,
-    })
+    .values({ userId, merchantKey, category, subCategory })
     .onConflictDoUpdate({
       target: [merchantCategoryRules.userId, merchantCategoryRules.merchantKey],
       set: {
         category,
+        subCategory,
         updatedAt: new Date(),
       },
     });
@@ -68,6 +97,7 @@ export async function applyCategoryToMatchingTransactions(
   userId: string,
   merchantKey: string,
   category: string,
+  subCategory: string | null,
 ): Promise<number> {
   const db = getDb();
   const rows = await db
@@ -91,7 +121,7 @@ export async function applyCategoryToMatchingTransactions(
 
   await db
     .update(transactions)
-    .set({ category })
+    .set({ category, subCategory })
     .where(inArray(transactions.id, ids));
 
   return ids.length;
@@ -101,17 +131,24 @@ export async function updateTransactionCategory(
   userId: string,
   transactionId: string,
   category: string,
+  subCategory: string | null,
   rememberForMerchant: boolean,
 ): Promise<{
   transaction: {
     id: string;
     category: string;
+    subCategory: string | null;
     merchantKey: string;
   };
   merchantTransactionsUpdated: number;
 }> {
   if (!isValidCategory(category)) {
     throw AppError.validation(`Invalid category: ${category}`);
+  }
+  if (subCategory !== null && !isValidSubCategory(category, subCategory)) {
+    throw AppError.validation(
+      `Invalid subcategory "${subCategory}" for category "${category}"`,
+    );
   }
 
   const db = getDb();
@@ -131,17 +168,18 @@ export async function updateTransactionCategory(
 
   await db
     .update(transactions)
-    .set({ category })
+    .set({ category, subCategory })
     .where(eq(transactions.id, transactionId));
 
   let merchantTransactionsUpdated = 0;
 
   if (rememberForMerchant) {
-    await upsertMerchantCategoryRule(userId, merchantKey, category);
+    await upsertMerchantCategoryRule(userId, merchantKey, category, subCategory);
     merchantTransactionsUpdated = await applyCategoryToMatchingTransactions(
       userId,
       merchantKey,
       category,
+      subCategory,
     );
   }
 
@@ -149,6 +187,7 @@ export async function updateTransactionCategory(
     transaction: {
       id: transactionId,
       category,
+      subCategory,
       merchantKey,
     },
     merchantTransactionsUpdated,

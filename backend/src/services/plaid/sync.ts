@@ -16,6 +16,7 @@ import { decryptPlaidToken } from "./crypto.js";
 import {
   applyMerchantCategoryRule,
   getMerchantCategoryRulesMap,
+  type CategoryRule,
 } from "../category-rules.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
 import { mapPlaidTransaction } from "./map-transaction.js";
@@ -72,14 +73,15 @@ function mapTxnToRow(
   accountId: string,
   txn: PlaidTransaction,
   accountType: "depository" | "credit",
-  categoryRules: Map<string, string>,
+  categoryRules: Map<string, CategoryRule>,
 ): PlaidTransactionInsert {
   const mapped = mapPlaidTransaction(txn, accountType);
-  const category = applyMerchantCategoryRule(
+  const { category, subCategory } = applyMerchantCategoryRule(
     categoryRules,
     mapped.merchantName,
     mapped.name,
     mapped.category,
+    mapped.subCategory,
   );
 
   return {
@@ -91,6 +93,7 @@ function mapTxnToRow(
     merchantName: mapped.merchantName,
     amount: mapped.amount,
     category,
+    subCategory,
     transactionType: mapped.transactionType,
     isTransfer: mapped.isTransfer,
     pending: mapped.pending,

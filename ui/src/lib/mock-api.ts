@@ -64,6 +64,7 @@ function normalizeMerchantKey(
 export async function updateTransactionCategory(
   transactionId: string,
   category: string,
+  subCategory: string | null,
   rememberForMerchant: boolean,
 ): Promise<UpdateTransactionCategoryResponse> {
   await delay();
@@ -89,7 +90,7 @@ export async function updateTransactionCategory(
   }
 
   return {
-    transaction: { id: transactionId, category, merchantKey },
+    transaction: { id: transactionId, category, subCategory, merchantKey },
     merchantTransactionsUpdated,
   };
 }

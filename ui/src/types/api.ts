@@ -46,6 +46,7 @@ export interface Transaction {
   amount: string;
   currencyCode: string;
   category: string;
+  subCategory: string | null;
   transactionType: "expense" | "income" | "transfer";
   isTransfer: boolean;
   pending: boolean;
@@ -58,6 +59,7 @@ export interface UpdateTransactionCategoryResponse {
   transaction: {
     id: string;
     category: string;
+    subCategory: string | null;
     merchantKey: string;
   };
   merchantTransactionsUpdated: number;

@@ -13,6 +13,7 @@ export type PlaidTransactionInsert = {
   merchantName: string | null;
   amount: string;
   category: string;
+  subCategory: string | null;
   transactionType: "expense" | "income" | "transfer";
   isTransfer: boolean;
   pending: boolean;
@@ -38,6 +39,7 @@ export async function upsertPlaidTransactionBatch(
         merchantName: sql`excluded.merchant_name`,
         amount: sql`excluded.amount`,
         category: sql`excluded.category`,
+        subCategory: sql`excluded.sub_category`,
         transactionType: sql`excluded.transaction_type`,
         isTransfer: sql`excluded.is_transfer`,
         pending: sql`excluded.pending`,

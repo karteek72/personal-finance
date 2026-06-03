@@ -68,6 +68,95 @@ function transactionOrderBy(sort: TransactionSort = "date_desc") {
   }
 }
 
+// ── Cursor helpers ────────────────────────────────────────────────────────────
+
+interface CursorPayload {
+  id: string;
+  date: string;
+  createdAt: string;
+  amount: string;
+  name: string;
+  category: string;
+}
+
+function encodeCursor(row: CursorPayload): string {
+  return Buffer.from(JSON.stringify(row)).toString("base64url");
+}
+
+function decodeCursor(cursor: string): CursorPayload | null {
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(cursor, "base64url").toString("utf-8"),
+    ) as unknown;
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "id" in parsed &&
+      "date" in parsed &&
+      "createdAt" in parsed
+    ) {
+      return parsed as CursorPayload;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Returns a SQL condition that selects only rows that come AFTER the cursor
+ * position for the given sort order (keyset pagination).
+ */
+function buildCursorCondition(
+  c: CursorPayload,
+  sort: TransactionSort = "date_desc",
+) {
+  switch (sort) {
+    case "date_asc":
+      return sql`(
+        ${transactions.date} > ${c.date}
+        OR (${transactions.date} = ${c.date} AND ${transactions.createdAt} > ${c.createdAt}::timestamptz)
+      )`;
+    case "amount_desc":
+      return sql`(
+        ${transactions.amount}::numeric < ${c.amount}::numeric
+        OR (${transactions.amount}::numeric = ${c.amount}::numeric AND ${transactions.date} < ${c.date})
+        OR (${transactions.amount}::numeric = ${c.amount}::numeric AND ${transactions.date} = ${c.date} AND ${transactions.id} < ${c.id})
+      )`;
+    case "amount_asc":
+      return sql`(
+        ${transactions.amount}::numeric > ${c.amount}::numeric
+        OR (${transactions.amount}::numeric = ${c.amount}::numeric AND ${transactions.date} < ${c.date})
+        OR (${transactions.amount}::numeric = ${c.amount}::numeric AND ${transactions.date} = ${c.date} AND ${transactions.id} < ${c.id})
+      )`;
+    case "name_asc":
+      return sql`(
+        ${transactions.name} > ${c.name}
+        OR (${transactions.name} = ${c.name} AND ${transactions.date} < ${c.date})
+        OR (${transactions.name} = ${c.name} AND ${transactions.date} = ${c.date} AND ${transactions.id} < ${c.id})
+      )`;
+    case "name_desc":
+      return sql`(
+        ${transactions.name} < ${c.name}
+        OR (${transactions.name} = ${c.name} AND ${transactions.date} < ${c.date})
+        OR (${transactions.name} = ${c.name} AND ${transactions.date} = ${c.date} AND ${transactions.id} < ${c.id})
+      )`;
+    case "category_asc":
+      return sql`(
+        ${transactions.category} > ${c.category}
+        OR (${transactions.category} = ${c.category} AND ${transactions.date} < ${c.date})
+        OR (${transactions.category} = ${c.category} AND ${transactions.date} = ${c.date} AND ${transactions.id} < ${c.id})
+      )`;
+    default: // date_desc
+      return sql`(
+        ${transactions.date} < ${c.date}
+        OR (${transactions.date} = ${c.date} AND ${transactions.createdAt} < ${c.createdAt}::timestamptz)
+      )`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function transactionUserFilter(userIds: string[]) {
   return userIds.length === 1
     ? eq(transactions.userId, userIds[0]!)
@@ -131,6 +220,14 @@ export async function listTransactions(filters: {
     );
   }
 
+  // Decode and apply cursor for keyset pagination
+  if (filters.cursor) {
+    const decoded = decodeCursor(filters.cursor);
+    if (decoded) {
+      conditions.push(buildCursorCondition(decoded, filters.sort));
+    }
+  }
+
   let query = db
     .select({
       id: transactions.id,
@@ -142,6 +239,7 @@ export async function listTransactions(filters: {
       amount: transactions.amount,
       currencyCode: transactions.currencyCode,
       category: transactions.category,
+      subCategory: transactions.subCategory,
       transactionType: transactions.transactionType,
       isTransfer: transactions.isTransfer,
       pending: transactions.pending,
@@ -162,6 +260,19 @@ export async function listTransactions(filters: {
   const page = hasMore ? rows.slice(0, limit) : rows;
   const memberMap = await getMemberMapForAccounts(page.map((row) => row.accountId));
 
+  const lastRow = page[page.length - 1];
+  const nextCursor =
+    hasMore && lastRow
+      ? encodeCursor({
+          id: lastRow.id,
+          date: lastRow.date,
+          createdAt: lastRow.createdAt.toISOString(),
+          amount: lastRow.amount,
+          name: lastRow.name,
+          category: lastRow.category,
+        })
+      : null;
+
   return {
     items: page.map((row) => {
       const member = memberMap.get(row.accountId);
@@ -175,6 +286,7 @@ export async function listTransactions(filters: {
         amount: row.amount,
         currencyCode: row.currencyCode,
         category: row.category,
+        subCategory: row.subCategory ?? null,
         transactionType: row.transactionType as "expense" | "income" | "transfer",
         isTransfer: row.isTransfer,
         pending: row.pending,
@@ -183,7 +295,7 @@ export async function listTransactions(filters: {
         memberColor: member?.memberColor ?? null,
       };
     }),
-    nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+    nextCursor,
   };
 }
 

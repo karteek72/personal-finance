@@ -92,6 +92,7 @@ export const transactions = pgTable(
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
     currencyCode: text("currency_code").notNull().default("USD"),
     category: text("category").notNull().default("Uncategorized"),
+    subCategory: text("sub_category"),
     transactionType: text("transaction_type").notNull(), // expense | income | transfer
     isTransfer: boolean("is_transfer").notNull().default(false),
     pending: boolean("pending").notNull().default(false),
@@ -160,6 +161,7 @@ export const merchantCategoryRules = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     merchantKey: text("merchant_key").notNull(),
     category: text("category").notNull(),
+    subCategory: text("sub_category"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

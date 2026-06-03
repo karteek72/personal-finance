@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { SPEND_CATEGORIES } from "../config/categories.js";
+import { SPEND_CATEGORIES, SUBCATEGORY_MAP } from "../config/categories.js";
 import { requireRequestUser } from "../lib/auth-http.js";
 import { parseBody } from "../lib/validate.js";
 import { updateTransactionCategory } from "../services/category-rules.js";
@@ -20,6 +20,7 @@ import type { Env } from "../config/env.js";
 
 const patchCategorySchema = z.object({
   category: z.string().min(1),
+  subCategory: z.string().min(1).nullable().optional().default(null),
   rememberForMerchant: z.boolean().optional().default(true),
 });
 
@@ -114,7 +115,10 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/transactions/category-options", async () => {
-    return { categories: [...SPEND_CATEGORIES] };
+    return {
+      categories: [...SPEND_CATEGORIES],
+      taxonomy: SUBCATEGORY_MAP,
+    };
   });
 
   app.patch("/transactions/:transactionId/category", async (request) => {
@@ -130,6 +134,7 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
       user.id,
       transactionId,
       body.category,
+      body.subCategory ?? null,
       body.rememberForMerchant ?? true,
     );
   });

@@ -11,11 +11,13 @@ export function useUpdateTransactionCategory() {
     mutationFn: (input: {
       transactionId: string;
       category: string;
+      subCategory?: string | null;
       rememberForMerchant?: boolean;
     }) =>
       api.updateTransactionCategory(
         input.transactionId,
         input.category,
+        input.subCategory ?? null,
         input.rememberForMerchant ?? true,
       ),
     onSuccess: () => {

@@ -118,12 +118,14 @@ export const api = {
   updateTransactionCategory(
     transactionId: string,
     category: string,
+    subCategory: string | null = null,
     rememberForMerchant = true,
   ): Promise<UpdateTransactionCategoryResponse> {
     if (USE_MOCKS) {
       return mockApi.updateTransactionCategory(
         transactionId,
         category,
+        subCategory,
         rememberForMerchant,
       );
     }
@@ -132,7 +134,7 @@ export const api = {
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, rememberForMerchant }),
+        body: JSON.stringify({ category, subCategory, rememberForMerchant }),
       },
     );
   },
