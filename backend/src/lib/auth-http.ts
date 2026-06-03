@@ -1,19 +1,17 @@
-import type { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyRequest } from "fastify";
 import type { Env } from "../config/env.js";
+import { AppError } from "./errors.js";
 import { resolveRequestUser } from "../services/auth/request-user.js";
 import type { UserRecord } from "../services/auth/user-auth.js";
 
 export async function requireRequestUser(
   request: FastifyRequest,
-  reply: FastifyReply,
   env: Env,
-): Promise<UserRecord | null> {
+): Promise<UserRecord> {
   const user = await resolveRequestUser(request, env);
   if (!user) {
-    await reply.status(401).send({
-      error: { code: "UNAUTHENTICATED", message: "Sign in required" },
-    });
-    return null;
+    throw AppError.unauthenticated();
   }
+  request.log.debug({ userId: user.id }, "authenticated request");
   return user;
 }

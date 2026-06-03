@@ -222,3 +222,193 @@ spendflow_stop_dev_servers() {
   spendflow_stop_port "${SPENDFLOW_UI_PORT}"
   sleep 1
 }
+
+# --- Local development (Postgres in Podman, API + UI on host) ---
+
+spendflow_dev_logs_dir() {
+  echo "${SPENDFLOW_REPO_ROOT}/logs/dev"
+}
+
+spendflow_load_dev_env() {
+  local root containers
+  root="$(spendflow_repo_root)"
+  containers="${root}/containers"
+
+  export SPENDFLOW_REPO_ROOT="${root}"
+  export SPENDFLOW_CONTAINERS_DIR="${containers}"
+
+  if [[ -f "${root}/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "${root}/.env"
+    set +a
+  fi
+  if [[ -f "${containers}/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "${containers}/.env"
+    set +a
+  fi
+
+  export SPENDFLOW_DEV_API_PORT="${SPENDFLOW_DEV_API_PORT:-4000}"
+  export SPENDFLOW_DEV_UI_PORT="${SPENDFLOW_DEV_UI_PORT:-3002}"
+  export POSTGRES_HOST_PORT="${POSTGRES_HOST_PORT:-5433}"
+
+  export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@127.0.0.1:${POSTGRES_HOST_PORT}/${POSTGRES_DB:-spendflow}"
+  export PORT="${SPENDFLOW_DEV_API_PORT}"
+  export NODE_ENV=development
+  export AUTH_ALLOW_DEV_USER="${AUTH_ALLOW_DEV_USER:-true}"
+  export CORS_ORIGIN="http://localhost:${SPENDFLOW_DEV_UI_PORT}"
+  export CORS_ORIGINS="http://localhost:${SPENDFLOW_DEV_UI_PORT},http://127.0.0.1:${SPENDFLOW_DEV_UI_PORT}"
+
+  export APP_URL="http://localhost:${SPENDFLOW_DEV_API_PORT}"
+  export NEXT_PUBLIC_API_URL="http://localhost:${SPENDFLOW_DEV_API_PORT}/api/v1"
+  export NEXT_PUBLIC_APP_URL="http://localhost:${SPENDFLOW_DEV_UI_PORT}"
+  export NEXT_PUBLIC_USE_MOCKS="${NEXT_PUBLIC_USE_MOCKS:-false}"
+  export NEXT_PUBLIC_GOOGLE_CLIENT_ID="${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-${GOOGLE_CLIENT_ID:-}}"
+
+  touch "${containers}/.env"
+  spendflow_ensure_jwt_secret
+}
+
+spendflow_dev_start_postgres() {
+  export SPENDFLOW_COMPOSE_PROFILE=bundled-db
+  echo "==> Starting Postgres (container) on 127.0.0.1:${POSTGRES_HOST_PORT:-5433}"
+  spendflow_compose up -d postgres
+  spendflow_wait_container_healthy spendflow-postgres 90
+}
+
+spendflow_dev_stop_postgres() {
+  export SPENDFLOW_COMPOSE_PROFILE=bundled-db
+  spendflow_compose stop postgres 2>/dev/null || true
+}
+
+spendflow_dev_pid_file() {
+  echo "$(spendflow_dev_logs_dir)/$1.pid"
+}
+
+spendflow_dev_log_file() {
+  echo "$(spendflow_dev_logs_dir)/$1.log"
+}
+
+spendflow_dev_is_running() {
+  local pid_file
+  pid_file="$(spendflow_dev_pid_file "$1")"
+  if [[ ! -f "${pid_file}" ]]; then
+    return 1
+  fi
+  local pid
+  pid="$(cat "${pid_file}")"
+  kill -0 "${pid}" 2>/dev/null
+}
+
+spendflow_dev_stop_process() {
+  local name="$1"
+  local pid_file
+  pid_file="$(spendflow_dev_pid_file "${name}")"
+  if [[ -f "${pid_file}" ]]; then
+    local pid
+    pid="$(cat "${pid_file}")"
+    if kill -0 "${pid}" 2>/dev/null; then
+      kill "${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
+    fi
+    rm -f "${pid_file}"
+  fi
+  spendflow_stop_port "$2"
+}
+
+spendflow_dev_stop_app_servers() {
+  spendflow_dev_stop_process api "${SPENDFLOW_DEV_API_PORT:-4000}"
+  spendflow_dev_stop_process ui "${SPENDFLOW_DEV_UI_PORT:-3002}"
+}
+
+spendflow_dev_require_node() {
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "error: npm not found — install Node.js 22+" >&2
+    exit 1
+  fi
+  if [[ ! -d "${SPENDFLOW_REPO_ROOT}/backend/node_modules" ]]; then
+    echo "error: run: cd backend && npm install" >&2
+    exit 1
+  fi
+  if [[ ! -d "${SPENDFLOW_REPO_ROOT}/ui/node_modules" ]]; then
+    echo "error: run: cd ui && npm install" >&2
+    exit 1
+  fi
+}
+
+spendflow_dev_start_api() {
+  local log_file pid_file
+  log_file="$(spendflow_dev_log_file api)"
+  pid_file="$(spendflow_dev_pid_file api)"
+
+  if spendflow_dev_is_running api; then
+    echo "info: backend already running (pid $(cat "${pid_file}"))" >&2
+    return 0
+  fi
+
+  spendflow_stop_port "${SPENDFLOW_DEV_API_PORT}"
+  echo "==> Starting backend on http://localhost:${SPENDFLOW_DEV_API_PORT} (log: ${log_file})"
+  (
+    cd "${SPENDFLOW_REPO_ROOT}/backend"
+    export DATABASE_URL PORT NODE_ENV AUTH_ALLOW_DEV_USER CORS_ORIGIN CORS_ORIGINS APP_URL
+    export JWT_SECRET PLAID_CLIENT_ID PLAID_SECRET PLAID_ENV PLAID_PRODUCTS PLAID_COUNTRY_CODES
+    export PLAID_REDIRECT_URI ENCRYPTION_KEY GOOGLE_CLIENT_ID GOOGLE_CLIENT_IDS GOOGLE_SECRET_KEY
+    npm run dev >>"${log_file}" 2>&1
+  ) &
+  echo $! >"${pid_file}"
+}
+
+spendflow_dev_start_ui() {
+  local log_file pid_file
+  log_file="$(spendflow_dev_log_file ui)"
+  pid_file="$(spendflow_dev_pid_file ui)"
+
+  if spendflow_dev_is_running ui; then
+    echo "info: UI already running (pid $(cat "${pid_file}"))" >&2
+    return 0
+  fi
+
+  spendflow_stop_port "${SPENDFLOW_DEV_UI_PORT}"
+  echo "==> Starting UI on http://localhost:${SPENDFLOW_DEV_UI_PORT} (log: ${log_file})"
+  (
+    cd "${SPENDFLOW_REPO_ROOT}/ui"
+    export NEXT_PUBLIC_API_URL NEXT_PUBLIC_APP_URL NEXT_PUBLIC_USE_MOCKS NEXT_PUBLIC_GOOGLE_CLIENT_ID
+    npm run dev >>"${log_file}" 2>&1
+  ) &
+  echo $! >"${pid_file}"
+}
+
+spendflow_dev_wait_for_api() {
+  local port="${SPENDFLOW_DEV_API_PORT:-4000}"
+  local i
+  for ((i = 0; i < 60; i++)); do
+    if curl -sf "http://127.0.0.1:${port}/api/v1/health" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "warn: API health check did not pass — see $(spendflow_dev_log_file api)" >&2
+  return 1
+}
+
+spendflow_dev_print_urls() {
+  cat <<EOF
+
+Dev stack:
+  UI:       http://localhost:${SPENDFLOW_DEV_UI_PORT}
+  API:      http://localhost:${SPENDFLOW_DEV_API_PORT}/api/v1/health
+  Postgres: 127.0.0.1:${POSTGRES_HOST_PORT} (container spendflow-postgres)
+
+Logs:
+  $(spendflow_dev_log_file api)
+  $(spendflow_dev_log_file ui)
+
+Commands:
+  ./scripts/podman/dev-logs.sh       # follow API + UI logs
+  ./scripts/podman/dev-logs.sh -f postgres
+  ./scripts/podman/dev-down.sh       # stop API, UI, and Postgres
+
+EOF
+}

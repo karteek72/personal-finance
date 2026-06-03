@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import postgres from "postgres";
+import { createLogger } from "../lib/logger.js";
+
+const log = createLogger("db.migrate");
 
 const MIGRATION_FILES = [
   "0000_init.sql",
@@ -45,8 +48,12 @@ async function runMigrationsOnce(databaseUrl?: string): Promise<void> {
     const [applied] = await sqlClient<{ filename: string }[]>`
       SELECT filename FROM schema_migrations WHERE filename = ${file}
     `;
-    if (applied) continue;
+    if (applied) {
+      log.debug({ file }, "migration already applied");
+      continue;
+    }
 
+    log.info({ file }, "applying migration");
     const migration = readFileSync(
       resolve(process.cwd(), "drizzle", file),
       "utf-8",
@@ -62,6 +69,7 @@ async function runMigrationsOnce(databaseUrl?: string): Promise<void> {
     await sqlClient`
       INSERT INTO schema_migrations (filename) VALUES (${file})
     `;
+    log.info({ file }, "migration applied");
   }
 
   await sqlClient.end({ timeout: 5 });

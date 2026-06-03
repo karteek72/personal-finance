@@ -1,0 +1,14 @@
+// Copy to Config/Local.xcconfig and override for local dev or secrets.
+#include? "Local.xcconfig"
+
+// Personal dev bundle ID — change in Local.xcconfig if needed (must match Google iOS OAuth client).
+PRODUCT_BUNDLE_IDENTIFIER = com.mx.spendflow
+
+API_BASE_URL = https:/$()/spendflow-api.stockpulse.win/api/v1
+
+// Native iOS OAuth client (GoogleService-Info.plist / URL scheme)
+GOOGLE_CLIENT_ID = 728391168383-3re772sah614aujgi4sf2q5umhsnaco6.apps.googleusercontent.com
+
+// Web OAuth client — backend GOOGLE_CLIENT_ID; used as ID token audience for /auth/google
+GOOGLE_SERVER_CLIENT_ID = 728391168383-u5rkj37lit2p1h4sc322c4lv10p4jah6.apps.googleusercontent.com
+

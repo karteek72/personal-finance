@@ -24,9 +24,8 @@ backend/
 │   │       ├── accounts.ts
 │   │       └── transactions.ts
 │   ├── plugins/
-│   │   ├── auth.ts               # JWT verification
-│   │   ├── cors.ts
-│   │   └── error-handler.ts
+│   │   ├── error-handler.ts      # AppError → JSON + logging
+│   │   └── request-context.ts    # Request ID + completion logs
 │   ├── routes/
 │   │   ├── health.ts
 │   │   ├── auth/
@@ -50,8 +49,10 @@ backend/
 │   │   ├── queue.ts              # BullMQ setup
 │   │   └── sync-transactions.job.ts
 │   ├── lib/
-│   │   ├── encrypt.ts            # AES-256-GCM
-│   │   └── logger.ts
+│   │   ├── errors.ts             # AppError + api-contract error shape
+│   │   ├── logger.ts             # Pino root + module child loggers
+│   │   ├── validate.ts           # Zod body helpers
+│   │   └── auth-http.ts
 │   └── types/
 │       └── index.ts              # Shared domain types
 └── tests/                        # Vitest (when added)

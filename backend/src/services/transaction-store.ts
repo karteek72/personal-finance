@@ -601,16 +601,7 @@ export async function getChartData(params: ChartDataParams) {
 
 export async function getAlerts() {
   return {
-    alerts: [
-      {
-        id: "real-data-imported",
-        severity: "info" as const,
-        title: "Real statement data loaded",
-        message:
-          "Transactions imported from Amex QFX and Bank of America PDF statements.",
-        dismissible: true,
-      },
-    ],
+    alerts: [],
   };
 }
 

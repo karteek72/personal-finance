@@ -33,7 +33,8 @@ export async function resolveRequestUser(
         const payload = await verifyAccessToken(token, jwtSecret);
         const user = await getUserById(payload.sub);
         if (user) return user;
-      } catch {
+      } catch (err) {
+        request.log.debug({ err }, "invalid or expired access token");
         return null;
       }
     }

@@ -37,11 +37,41 @@ The UI image is built with `NEXT_PUBLIC_API_URL` pointing at the **public API** 
 
 | Script | Purpose |
 |--------|---------|
-| `./scripts/podman/deploy.sh` | **Main entry** — build + `podman compose up -d` |
+| `./scripts/podman/dev.sh` | **Local dev** — Postgres container + API/UI on host with logs |
+| `./scripts/podman/dev-down.sh` | Stop dev API/UI (and Postgres unless `--keep-db`) |
+| `./scripts/podman/dev-logs.sh` | Follow `logs/dev/*.log` or Postgres container logs |
+| `./scripts/podman/deploy.sh` | **Production-style** — build + full stack in containers |
 | `./scripts/podman/build.sh` | Build API (Node) + UI (static `out/` in **nginx:alpine**) |
 | `./scripts/podman/deploy.sh --no-build` | Restart without rebuild |
 | `./scripts/podman/down.sh` | Stop and remove containers |
-| `./scripts/podman/logs.sh` | Follow compose logs |
+| `./scripts/podman/logs.sh` | Follow compose logs (container stack) |
+
+### Local development (recommended for day-to-day coding)
+
+Postgres runs in Podman; API and UI run with `npm run dev` on your machine so logs are easy to read.
+
+```bash
+# One-time: secrets in containers/.env (from env.example)
+cp containers/env.example containers/.env
+
+# Start Postgres + API + UI, then stream logs (Ctrl+C stops tail only)
+./scripts/podman/dev.sh
+
+# Or start in background
+./scripts/podman/dev.sh --detach
+./scripts/podman/dev-logs.sh
+
+# Stop everything
+./scripts/podman/dev-down.sh
+```
+
+| Service | Dev URL |
+|---------|---------|
+| UI | http://localhost:3002 |
+| API | http://localhost:4000/api/v1/health |
+| Postgres | `127.0.0.1:5433` (user/db from `containers/.env`) |
+
+Log files: `logs/dev/api.log`, `logs/dev/ui.log`.
 
 ## Cloudflare Tunnel (existing `cloudflared` pod)
 

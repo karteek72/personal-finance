@@ -1,5 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { AppError } from "../lib/errors.js";
+import { parseBody } from "../lib/validate.js";
 import { verifyGoogleIdToken } from "../services/auth/google.js";
 import {
   signAccessToken,
@@ -33,105 +35,68 @@ function authTokens(userId: string, jwtSecret: string) {
 }
 
 export const authRoutes: FastifyPluginAsync = async (app) => {
-  app.post("/auth/google", async (request, reply) => {
-    const body = googleBodySchema.safeParse(request.body ?? {});
-    if (!body.success) {
-      return reply.status(400).send({
-        error: { code: "VALIDATION_ERROR", message: "Invalid request body" },
-      });
-    }
+  app.post("/auth/google", async (request) => {
+    const body = parseBody(googleBodySchema, request.body);
 
     const clientIds = parseGoogleClientIds(app.config.env);
     if (clientIds.length === 0) {
-      return reply.status(503).send({
-        error: {
-          code: "AUTH_NOT_CONFIGURED",
-          message: "Google sign-in is not configured on the server",
-        },
-      });
+      throw AppError.authNotConfigured("Google sign-in is not configured on the server");
     }
 
     let jwtSecret: string;
     try {
       jwtSecret = getJwtSecretForSigning(app.config.env);
     } catch {
-      return reply.status(503).send({
-        error: {
-          code: "AUTH_NOT_CONFIGURED",
-          message: "JWT signing is not configured",
-        },
-      });
+      throw AppError.authNotConfigured("JWT signing is not configured");
     }
 
     try {
-      const profile = await verifyGoogleIdToken(body.data.idToken, clientIds);
+      const profile = await verifyGoogleIdToken(body.idToken, clientIds);
       const user = await findOrCreateUserFromGoogle(profile);
       const { accessToken, refreshToken } = await authTokens(user.id, jwtSecret);
+
+      request.log.info({ userId: user.id }, "user signed in with google");
 
       return {
         user: serializeUser(user),
         accessToken,
         refreshToken,
       };
-    } catch (err) {
-      request.log.warn({ err }, "Google sign-in failed");
-      return reply.status(401).send({
-        error: {
-          code: "GOOGLE_AUTH_FAILED",
-          message: "Could not verify Google sign-in",
-        },
-      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw AppError.googleAuthFailed(error);
     }
   });
 
-  app.post("/auth/refresh", async (request, reply) => {
-    const body = refreshBodySchema.safeParse(request.body ?? {});
-    if (!body.success) {
-      return reply.status(400).send({
-        error: { code: "VALIDATION_ERROR", message: "Invalid request body" },
-      });
-    }
+  app.post("/auth/refresh", async (request) => {
+    const body = parseBody(refreshBodySchema, request.body);
 
     let jwtSecret: string;
     try {
       jwtSecret = getJwtSecretForSigning(app.config.env);
     } catch {
-      return reply.status(503).send({
-        error: {
-          code: "AUTH_NOT_CONFIGURED",
-          message: "JWT signing is not configured",
-        },
-      });
+      throw AppError.authNotConfigured("JWT signing is not configured");
     }
 
     try {
-      const payload = await verifyRefreshToken(
-        body.data.refreshToken,
-        jwtSecret,
-      );
+      const payload = await verifyRefreshToken(body.refreshToken, jwtSecret);
       const user = await getUserById(payload.sub);
       if (!user) {
-        return reply.status(401).send({
-          error: { code: "UNAUTHENTICATED", message: "User not found" },
-        });
+        throw AppError.unauthenticated("User not found");
       }
 
       const { accessToken, refreshToken } = await authTokens(user.id, jwtSecret);
       return { accessToken, refreshToken };
-    } catch (err) {
-      request.log.warn({ err }, "Token refresh failed");
-      return reply.status(401).send({
-        error: { code: "UNAUTHENTICATED", message: "Invalid refresh token" },
-      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw AppError.unauthenticated("Invalid refresh token");
     }
   });
 
-  app.get("/auth/me", async (request, reply) => {
+  app.get("/auth/me", async (request) => {
     const user = await resolveRequestUser(request, app.config.env);
     if (!user) {
-      return reply.status(401).send({
-        error: { code: "UNAUTHENTICATED", message: "Sign in required" },
-      });
+      throw AppError.unauthenticated();
     }
     return { user: serializeUser(user) };
   });
