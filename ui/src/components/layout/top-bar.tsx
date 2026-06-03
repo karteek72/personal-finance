@@ -38,46 +38,35 @@ function ThemeToggleIcon({ theme }: { theme: "light" | "dark" }) {
   );
 }
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 export function TopBar({ title }: TopBarProps) {
   const { theme, toggleTheme } = useTheme();
   const isFetching = useIsFetching() > 0;
 
   return (
-    <header className="sticky top-0 z-20 px-4 pt-4 md:px-6 md:pt-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-2">
-          {isFetching ? (
-            <LoadingSpinner size="sm" label="Updating data" className="shrink-0" />
-          ) : null}
-          <div className="min-w-0">
-          <p className="text-xs font-medium text-text-muted md:hidden">
-            {getGreeting()}
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight text-text md:text-3xl">
-            {title}
-          </h1>
-          </div>
-        </div>
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-4 px-4 py-3 md:px-5 md:py-4">
+      {/* Left: title (mobile only) + fetch spinner */}
+      <div className="flex min-w-0 items-center gap-2">
+        {isFetching ? (
+          <LoadingSpinner size="sm" label="Updating data" className="shrink-0" />
+        ) : null}
+        {/* Page title: visible on mobile only — desktop sidebar provides navigation context */}
+        <h1 className="text-xl font-bold tracking-tight text-text md:hidden">
+          {title}
+        </h1>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <NotificationBell />
-          <UserMenu />
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] bg-surface text-text-muted transition-colors hover:text-primary card-shadow"
-            aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-          >
-            <ThemeToggleIcon theme={theme} />
-          </button>
-        </div>
+      {/* Right: actions */}
+      <div className="flex items-center gap-1.5">
+        <NotificationBell />
+        <UserMenu />
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] text-text-muted transition-colors hover:bg-primary-soft/40 hover:text-primary"
+          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+        >
+          <ThemeToggleIcon theme={theme} />
+        </button>
       </div>
     </header>
   );

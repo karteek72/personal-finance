@@ -3,13 +3,13 @@
   --color-primary-soft: #ede9fe;
   --color-accent: #f472b6;
   --color-danger: #ef4444;
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
-  --color-bg: #f8f7ff;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-bg: #f5f4fc;
   --color-surface: #ffffff;
   --color-surface-elevated: #ffffff;
-  --color-border: #e8e5f0;
-  --color-text: #1a1625;
+  --color-border: #e4e1f0;
+  --color-text: #13111d;
   --color-text-muted: #6b6578;
   --color-text-inverse: #ffffff;
   --radius-sm: 10px;
@@ -17,32 +17,35 @@
   --radius-lg: 24px;
   --radius-pill: 9999px;
   --shadow-sm: 0 1px 2px rgb(26 22 37 / 4%);
-  --shadow-card: 0 4px 24px rgb(124 58 237 / 6%);
-  --shadow-float: 0 8px 32px rgb(26 22 37 / 10%);
-  --gradient-hero: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%);
-  --gradient-subtle: linear-gradient(180deg, #f8f7ff 0%, #ffffff 100%);
+  --shadow-card: 0 2px 12px rgb(124 58 237 / 5%);
+  --shadow-float: 0 8px 32px rgb(26 22 37 / 12%);
+  --gradient-hero: linear-gradient(135deg, #6d28d9 0%, #9333ea 45%, #ec4899 100%);
+  --gradient-subtle: linear-gradient(180deg, #f5f4fc 0%, #ffffff 100%);
+  /* Sidebar */
+  --sidebar-width-collapsed: 64px;
+  --sidebar-width-expanded: 220px;
 }
 
 [data-theme="dark"],
 .dark {
   --color-primary: #a78bfa;
-  --color-primary-soft: rgb(167 139 250 / 12%);
+  --color-primary-soft: rgb(167 139 250 / 14%);
   --color-accent: #f472b6;
   --color-danger: #f87171;
   --color-success: #4ade80;
   --color-warning: #fbbf24;
-  --color-bg: #0d0b14;
-  --color-surface: #16131f;
-  --color-surface-elevated: #1e1a28;
-  --color-border: #2a2538;
-  --color-text: #f5f3ff;
+  --color-bg: #0a0812;
+  --color-surface: #13101c;
+  --color-surface-elevated: #1a1625;
+  --color-border: #252033;
+  --color-text: #f0eeff;
   --color-text-muted: #9d96ad;
-  --color-text-inverse: #0d0b14;
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 20%);
-  --shadow-card: 0 4px 24px rgb(0 0 0 / 25%);
-  --shadow-float: 0 8px 32px rgb(0 0 0 / 40%);
-  --gradient-hero: linear-gradient(135deg, #6d28d9 0%, #9333ea 50%, #db2777 100%);
-  --gradient-subtle: linear-gradient(180deg, #0d0b14 0%, #16131f 100%);
+  --color-text-inverse: #0a0812;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 25%);
+  --shadow-card: 0 2px 12px rgb(0 0 0 / 30%);
+  --shadow-float: 0 8px 32px rgb(0 0 0 / 50%);
+  --gradient-hero: linear-gradient(135deg, #5b21b6 0%, #7c3aed 45%, #be185d 100%);
+  --gradient-subtle: linear-gradient(180deg, #0a0812 0%, #13101c 100%);
 }
 
 @theme inline {

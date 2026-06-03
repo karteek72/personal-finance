@@ -1,17 +1,16 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { AlertBanner } from "@/components/ui/alert-banner";
-import { Card } from "@/components/ui/card";
+import Link from "next/link";
 import { SpendAnalyticsPanel } from "@/components/charts/spend-analytics-panel";
 import { KpiCard } from "@/components/ui/kpi-card";
+import { MetricGrid } from "@/components/ui/metric-grid";
 import { AsyncPanel } from "@/components/ui/async-panel";
 import {
   DrilldownDrawer,
   type DrilldownConfig,
 } from "@/components/ui/drilldown-drawer";
 import { AccountBalanceSummary } from "@/components/accounts/account-balance-summary";
-import { useAlerts } from "@/hooks/use-alerts";
 import { useSummary } from "@/hooks/use-summary";
 import {
   plaidHistoryDateRange,
@@ -26,38 +25,25 @@ function getGreeting(): string {
   return "Good evening";
 }
 
-function formatSavingsRate(rate: number): string {
-  const pct = (rate * 100).toFixed(1);
-  return `${pct}%`;
-}
-
 export default function DashboardPage() {
   const { from, to } = plaidHistoryDateRange();
   const {
     data: summary,
-    isLoading: summaryLoading,
-    isFetching: summaryFetching,
-    error: summaryError,
+    isLoading,
+    isFetching,
+    error,
   } = useSummary(from, to);
-  const {
-    data: alerts,
-    isLoading: alertsLoading,
-    isFetching: alertsFetching,
-  } = useAlerts();
-
-  const isLoading = summaryLoading || alertsLoading;
-  const isFetching = summaryFetching || alertsFetching;
 
   return (
     <AsyncPanel
       isLoading={isLoading}
       isFetching={isFetching}
-      error={summaryError}
+      error={error}
       loadingMessage="Loading dashboard…"
       errorMessage="Failed to load dashboard data"
     >
-      {summary && alerts ? (
-        <DashboardContent summary={summary} alerts={alerts} from={from} to={to} />
+      {summary ? (
+        <DashboardContent summary={summary} />
       ) : null}
     </AsyncPanel>
   );
@@ -65,20 +51,16 @@ export default function DashboardPage() {
 
 function DashboardContent({
   summary,
-  alerts,
-  from,
-  to,
 }: {
   summary: NonNullable<ReturnType<typeof useSummary>["data"]>;
-  alerts: NonNullable<ReturnType<typeof useAlerts>["data"]>;
-  from: string;
-  to: string;
 }) {
   const [drilldown, setDrilldown] = useState<DrilldownConfig | null>(null);
   const closeDrilldown = useCallback(() => setDrilldown(null), []);
 
   const netSavings = Number.parseFloat(summary.netSavings);
   const isPositive = netSavings >= 0;
+  const savingsRatePct = (summary.savingsRate * 100).toFixed(1);
+
   const savingsRateTone =
     summary.savingsRate >= 0.2
       ? "success"
@@ -90,180 +72,202 @@ function DashboardContent({
     setDrilldown(config);
   }
 
-  const baseDateFilter = { from, to };
-
   return (
     <>
-      <div className="flex flex-col gap-5">
-        {/* ── Hero card ─────────────────────────────────────────── */}
-        <Card
-          padding="lg"
-          className="overflow-hidden border-0 text-text-inverse"
+      <div className="flex flex-col gap-4">
+
+        {/* ── Greeting ──────────────────────────────────────────── */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-text">
+              {getGreeting()} 👋
+            </h2>
+            <p className="mt-0.5 text-xs font-medium text-text-muted">
+              {plaidHistoryPeriodLabel()}
+            </p>
+          </div>
+          <Link
+            href="/transactions"
+            className="rounded-[var(--radius-pill)] border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            All transactions →
+          </Link>
+        </div>
+
+        {/* ── Net Savings hero ──────────────────────────────────── */}
+        <div
+          className="relative overflow-hidden rounded-[var(--radius-card)] p-6 text-white"
           style={{ background: "var(--gradient-hero)" }}
         >
-          <p className="text-sm font-medium opacity-90">{getGreeting()} 👋</p>
-          <p className="mt-1 text-sm opacity-80">
-            Net savings · {plaidHistoryPeriodLabel()}
-          </p>
-          <p
-            className="mt-2 text-4xl font-extrabold tracking-tight md:text-5xl"
-            data-money
-          >
-            {formatMoney(summary.netSavings)}
-          </p>
-          <p className="mt-2 text-sm opacity-80">
-            {isPositive
-              ? "You're in the green — keep it up"
-              : "Spending's ahead of income — worth a look"}
-          </p>
-          <div className="mt-5 grid grid-cols-3 gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                openDrilldown({
-                  title: "Expenses",
-                  subtitle: `All expense transactions · ${plaidHistoryPeriodLabel()}`,
-                  filters: { type: "expense", ...baseDateFilter },
-                  viewAllHref: `/transactions?type=expense`,
-                })
-              }
-              className="rounded-[var(--radius-sm)] bg-white/15 px-3 py-2 text-left backdrop-blur-sm transition-colors hover:bg-white/25"
+          {/* Decorative circles */}
+          <div
+            className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full opacity-10"
+            style={{ background: "radial-gradient(circle, white 0%, transparent 70%)" }}
+            aria-hidden="true"
+          />
+          <div
+            className="pointer-events-none absolute -bottom-8 right-20 h-28 w-28 rounded-full opacity-10"
+            style={{ background: "radial-gradient(circle, white 0%, transparent 70%)" }}
+            aria-hidden="true"
+          />
+
+          <div className="relative flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-white/70">
+                Net Savings
+              </p>
+              <p
+                className="mt-1 text-4xl font-extrabold tracking-tight sm:text-5xl"
+                data-money
+              >
+                {formatMoney(summary.netSavings)}
+              </p>
+              <p className="mt-2 text-sm text-white/75">
+                {isPositive
+                  ? "You're in the green — keep it up"
+                  : "Spending's ahead of income — worth a look"}
+              </p>
+            </div>
+
+            {/* Savings rate badge */}
+            <div
+              className={`mt-3 self-start rounded-[var(--radius-pill)] px-4 py-2 sm:mt-0 sm:self-auto ${
+                isPositive
+                  ? "bg-white/20"
+                  : "bg-danger/30"
+              }`}
             >
-              <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
-                Spent
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/80">
+                Savings rate
               </p>
-              <p className="mt-0.5 text-sm font-bold tabular-nums" data-money>
-                {formatMoney(summary.totalSpent)}
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                openDrilldown({
-                  title: "Income",
-                  subtitle: `All income transactions · ${plaidHistoryPeriodLabel()}`,
-                  filters: { type: "income", ...baseDateFilter },
-                  viewAllHref: `/transactions?type=income`,
-                })
-              }
-              className="rounded-[var(--radius-sm)] bg-white/15 px-3 py-2 text-left backdrop-blur-sm transition-colors hover:bg-white/25"
-            >
-              <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
-                Income
-              </p>
-              <p className="mt-0.5 text-sm font-bold tabular-nums" data-money>
-                {formatMoney(summary.income)}
-              </p>
-            </button>
-            <div className="rounded-[var(--radius-sm)] bg-white/15 px-3 py-2 backdrop-blur-sm">
-              <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
-                Avg spend / mo
-              </p>
-              <p className="mt-0.5 text-sm font-bold tabular-nums" data-money>
-                {formatMoney(summary.avgMonthlySpend)}
+              <p className="text-xl font-extrabold tabular-nums">
+                {savingsRatePct}%
               </p>
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* ── Alerts ────────────────────────────────────────────── */}
-        {alerts.alerts.length > 0 ? (
-          <section aria-label="Alerts" className="flex flex-col gap-2">
-            {alerts.alerts.map((alert) => (
-              <AlertBanner
-                key={alert.id}
-                title={alert.title}
-                message={alert.message}
-                severity={alert.severity}
-                dismissible={alert.dismissible}
+        {/* ── Spent / Income row ────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() =>
+              openDrilldown({
+                title: "Expenses",
+                subtitle: `All expense transactions · ${plaidHistoryPeriodLabel()}`,
+                filters: { type: "expense" },
+                viewAllHref: "/transactions?type=expense",
+              })
+            }
+            className="group flex flex-col gap-1 rounded-[var(--radius-card)] border border-border bg-surface p-4 text-left transition-all hover:border-danger/30 hover:bg-danger/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+              <span
+                className="h-1.5 w-1.5 rounded-full bg-danger"
+                aria-hidden="true"
               />
-            ))}
-          </section>
-        ) : null}
+              Spent
+            </p>
+            <p className="text-2xl font-extrabold tabular-nums tracking-tight text-danger" data-money>
+              {formatMoney(summary.totalSpent)}
+            </p>
+            <p className="text-[11px] text-text-muted">
+              {formatMoney(summary.avgMonthlySpend)}/mo avg
+            </p>
+          </button>
 
-        {/* ── KPI grid ──────────────────────────────────────────── */}
-        <section aria-label="Key metrics">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
-            Key Metrics
-          </h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <KpiCard
-              label="Savings rate"
-              value={formatSavingsRate(summary.savingsRate)}
-              tone={savingsRateTone}
-              compact
-            />
-            <KpiCard
-              label="Top category"
-              value={formatMoney(summary.topCategory.amount)}
-              subtext={summary.topCategory.name}
-              tone="primary"
-              compact
-              onClick={() =>
-                openDrilldown({
-                  title: summary.topCategory.name,
-                  subtitle: `Top spending category · ${plaidHistoryPeriodLabel()}`,
-                  filters: {
-                    category: summary.topCategory.name,
-                    type: "expense",
-                    ...baseDateFilter,
-                  },
-                  viewAllHref: `/transactions?category=${encodeURIComponent(summary.topCategory.name)}&type=expense`,
-                })
-              }
-            />
-            <KpiCard
-              label="Transactions"
-              value={String(summary.transactionCount)}
-              subtext="expense txns in period"
-              compact
-              onClick={() =>
-                openDrilldown({
-                  title: "All Expenses",
-                  subtitle: `${summary.transactionCount} expense transactions · ${plaidHistoryPeriodLabel()}`,
-                  filters: { type: "expense", ...baseDateFilter },
-                  viewAllHref: `/transactions?type=expense`,
-                })
-              }
-            />
-            <KpiCard
-              label="CC payments excluded"
-              value={formatMoney(summary.ccPaymentsExcluded)}
-              subtext="transfer reconciliation"
-              compact
-              onClick={() =>
-                openDrilldown({
-                  title: "Credit Card Payments",
-                  subtitle: "Inter-account transfers excluded from spending",
-                  filters: { type: "transfer", ...baseDateFilter },
-                  viewAllHref: `/transactions?type=transfer`,
-                })
-              }
-            />
-            {summary.pendingCount > 0 ? (
-              <KpiCard
-                label="Pending"
-                value={String(summary.pendingCount)}
-                subtext="transactions not yet settled"
-                tone="warning"
-                compact
-                onClick={() =>
-                  openDrilldown({
-                    title: "Pending Transactions",
-                    subtitle: "Not yet settled — amounts may change",
-                    filters: { ...baseDateFilter },
-                    viewAllHref: `/transactions`,
-                  })
-                }
+          <button
+            type="button"
+            onClick={() =>
+              openDrilldown({
+                title: "Income",
+                subtitle: `All income transactions · ${plaidHistoryPeriodLabel()}`,
+                filters: { type: "income" },
+                viewAllHref: "/transactions?type=income",
+              })
+            }
+            className="group flex flex-col gap-1 rounded-[var(--radius-card)] border border-border bg-surface p-4 text-left transition-all hover:border-success/30 hover:bg-success/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+              <span
+                className="h-1.5 w-1.5 rounded-full bg-success"
+                aria-hidden="true"
               />
-            ) : null}
-          </div>
-        </section>
+              Income
+            </p>
+            <p className="text-2xl font-extrabold tabular-nums tracking-tight text-success" data-money>
+              {formatMoney(summary.income)}
+            </p>
+            <p className="text-[11px] text-text-muted">
+              {summary.transactionCount} transactions
+            </p>
+          </button>
+        </div>
+
+        {/* ── KPI strip ─────────────────────────────────────────── */}
+        <MetricGrid minColumnWidth="10rem">
+          <KpiCard
+            label="Savings rate"
+            value={`${savingsRatePct}%`}
+            subtext="of income saved"
+            tone={savingsRateTone}
+            compact
+          />
+          <KpiCard
+            label="Top category"
+            value={formatMoney(summary.topCategory.amount)}
+            subtext={summary.topCategory.name}
+            tone="primary"
+            compact
+            onClick={() =>
+              openDrilldown({
+                title: summary.topCategory.name,
+                subtitle: `Top spending category · ${plaidHistoryPeriodLabel()}`,
+                filters: {
+                  category: summary.topCategory.name,
+                  type: "expense",
+                },
+                viewAllHref: `/transactions?category=${encodeURIComponent(summary.topCategory.name)}&type=expense`,
+              })
+            }
+          />
+          <KpiCard
+            label="CC transfers out"
+            value={formatMoney(summary.ccPaymentsExcluded)}
+            subtext="excluded from spending"
+            compact
+            onClick={() =>
+              openDrilldown({
+                title: "Credit Card Payments",
+                subtitle: "Inter-account transfers excluded from spending",
+                filters: { type: "transfer" },
+                viewAllHref: "/transactions?type=transfer",
+              })
+            }
+          />
+          {summary.pendingCount > 0 ? (
+            <KpiCard
+              label="Pending"
+              value={String(summary.pendingCount)}
+              subtext="not yet settled"
+              tone="warning"
+              compact
+              onClick={() =>
+                openDrilldown({
+                  title: "Pending Transactions",
+                  subtitle: "Not yet settled — amounts may change",
+                  filters: {},
+                  viewAllHref: "/transactions",
+                })
+              }
+            />
+          ) : null}
+        </MetricGrid>
 
         {/* ── Account balance summary ───────────────────────────── */}
         <AccountBalanceSummary />
 
-        {/* ── Interactive analytics ────────────────────────────── */}
+        {/* ── Analytics charts ─────────────────────────────────── */}
         <SpendAnalyticsPanel onOpenDrilldown={openDrilldown} />
       </div>
 

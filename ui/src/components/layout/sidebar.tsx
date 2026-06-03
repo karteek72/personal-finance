@@ -9,18 +9,18 @@ const navItems = [
   { href: "/flow", label: "Flow" },
   { href: "/categories", label: "Spend" },
   { href: "/transactions", label: "Activity" },
-  { href: "/family", label: "Family" },
-  { href: "/accounts", label: "Wallet" },
+  { href: "/accounts", label: "Accounts" },
   { href: "/debt", label: "Debt" },
+  { href: "/family", label: "Family" },
 ] as const;
 
 function NavIcon({ href, active }: { href: string; active: boolean }) {
-  const common = clsx("h-[18px] w-[18px]", active && "stroke-[2.5]");
+  const cls = clsx("h-[18px] w-[18px]", active && "stroke-[2.5]");
 
   switch (href) {
     case "/":
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
           <path
             d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z"
             stroke="currentColor"
@@ -31,7 +31,7 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
       );
     case "/flow":
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
           <path
             d="M4 14h4l2-4 4 8 2-4h4"
             stroke="currentColor"
@@ -43,15 +43,18 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
       );
     case "/categories":
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
-          <circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="2" />
-          <circle cx="17" cy="7" r="3" stroke="currentColor" strokeWidth="2" />
-          <circle cx="12" cy="17" r="3" stroke="currentColor" strokeWidth="2" />
+        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
+          <path
+            d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
         </svg>
       );
     case "/transactions":
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
           <path
             d="M4 7h16M4 12h16M4 17h10"
             stroke="currentColor"
@@ -62,7 +65,7 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
       );
     case "/accounts":
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
           <rect
             x="3"
             y="6"
@@ -77,7 +80,7 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
       );
     case "/debt":
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
           <path
             d="M12 3v18M7 8h6a4 4 0 0 1 0 8H9"
             stroke="currentColor"
@@ -89,7 +92,7 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
       );
     case "/family":
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
           <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="2" />
           <circle cx="17" cy="9" r="2.5" stroke="currentColor" strokeWidth="2" />
           <path
@@ -109,14 +112,29 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden h-full w-[220px] shrink-0 flex-col px-4 py-6 md:flex md:flex-col">
-      <Link href="/" className="mb-8 px-3">
-        <span className="text-xl font-extrabold tracking-tight text-gradient">
+    <aside className="hidden md:flex md:flex-col sticky top-0 h-screen shrink-0 overflow-y-auto w-16 lg:w-[220px] border-r border-border bg-surface py-5 transition-all">
+      {/* Logo */}
+      <Link
+        href="/"
+        className="mb-8 flex items-center justify-center lg:justify-start lg:px-4"
+        aria-label="SpendFlow home"
+      >
+        {/* Icon-only: SF pill */}
+        <span
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[11px] font-extrabold text-white lg:hidden"
+          style={{ background: "var(--gradient-hero)" }}
+          aria-hidden="true"
+        >
+          SF
+        </span>
+        {/* Full logo */}
+        <span className="hidden lg:block text-xl font-extrabold tracking-tight text-gradient">
           SpendFlow
         </span>
       </Link>
 
-      <nav className="flex flex-1 flex-col gap-1">
+      {/* Nav items */}
+      <nav className="flex flex-1 flex-col gap-0.5 px-2" aria-label="Main navigation">
         {navItems.map((item) => {
           const isActive =
             item.href === "/"
@@ -127,15 +145,17 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              title={item.label}
               className={clsx(
-                "flex items-center gap-3 rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-semibold transition-all",
+                "flex items-center gap-3 rounded-[var(--radius-sm)] px-2.5 py-2.5 text-sm font-semibold transition-all",
+                "justify-center lg:justify-start lg:px-3",
                 isActive
                   ? "bg-primary-soft text-primary"
-                  : "text-text-muted hover:bg-surface hover:text-text",
+                  : "text-text-muted hover:bg-primary-soft/30 hover:text-text",
               )}
             >
               <NavIcon href={item.href} active={isActive} />
-              {item.label}
+              <span className="hidden lg:inline">{item.label}</span>
             </Link>
           );
         })}
