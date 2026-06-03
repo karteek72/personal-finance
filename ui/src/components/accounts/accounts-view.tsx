@@ -175,7 +175,7 @@ export function AccountsView() {
         action={
           <>
             <Link
-              href="/flow"
+              href="/categories"
               className="inline-flex items-center rounded-[var(--radius-pill)] bg-surface px-4 py-2.5 text-sm font-semibold text-text transition-opacity hover:opacity-80 card-shadow"
             >
               Cash flow
