@@ -149,6 +149,7 @@ export const api = {
       `/transactions${buildQuery({
         month: filters.month,
         category: filters.category,
+        subCategory: filters.subCategory,
         accountId: filters.accountId,
         q: filters.q,
         type: filters.type,

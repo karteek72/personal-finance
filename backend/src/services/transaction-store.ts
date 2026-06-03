@@ -174,6 +174,7 @@ export async function listTransactions(filters: {
   userIds: string[];
   month?: string;
   category?: string;
+  subCategory?: string;
   accountId?: string;
   scopedAccountIds?: string[] | null;
   q?: string;
@@ -206,6 +207,9 @@ export async function listTransactions(filters: {
 
   if (filters.category) {
     conditions.push(eq(transactions.category, filters.category));
+  }
+  if (filters.subCategory) {
+    conditions.push(eq(transactions.subCategory, filters.subCategory));
   }
   if (filters.accountId) {
     conditions.push(eq(transactions.accountId, filters.accountId));
@@ -391,33 +395,67 @@ export async function getCategories(
       ? sql`date >= ${from} AND date <= ${to}`
       : sql`TRUE`;
 
+  // Single query: group by category + sub_category to get both levels at once
   const rows = await db.execute<{
-    name: string;
+    category: string;
+    sub_category: string | null;
     amount: string;
   }>(sql`
-    SELECT category AS name, SUM(amount::numeric)::text AS amount
+    SELECT
+      category,
+      sub_category,
+      SUM(amount::numeric)::text AS amount
     FROM transactions
     WHERE ${userFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND ${dateFilter}
-    GROUP BY category
-    ORDER BY SUM(amount::numeric) DESC
+    GROUP BY category, sub_category
+    ORDER BY category, SUM(amount::numeric) DESC
   `);
 
-  const total = rows.reduce(
-    (sum, row) => sum + Number.parseFloat(row.amount),
+  // Aggregate category totals and nest subcategories
+  const categoryMap = new Map<string, { amount: number; subs: Map<string, number> }>();
+  for (const row of rows) {
+    const existing = categoryMap.get(row.category) ?? { amount: 0, subs: new Map() };
+    const rowAmount = Number.parseFloat(row.amount);
+    existing.amount += rowAmount;
+    if (row.sub_category) {
+      existing.subs.set(
+        row.sub_category,
+        (existing.subs.get(row.sub_category) ?? 0) + rowAmount,
+      );
+    }
+    categoryMap.set(row.category, existing);
+  }
+
+  const grandTotal = Array.from(categoryMap.values()).reduce(
+    (sum, cat) => sum + cat.amount,
     0,
   );
 
-  return {
-    categories: rows.map((row) => ({
-      name: row.name,
-      amount: row.amount,
-      percentage: total > 0 ? (Number.parseFloat(row.amount) / total) * 100 : 0,
-      deltaVsPriorMonth: 0,
-    })),
-  };
+  const categories = Array.from(categoryMap.entries())
+    .sort(([, a], [, b]) => b.amount - a.amount)
+    .map(([name, cat]) => {
+      const catTotal = cat.amount;
+      const subcategories = Array.from(cat.subs.entries())
+        .sort(([, a], [, b]) => b - a)
+        .map(([subName, subAmount]) => ({
+          name: subName,
+          amount: subAmount.toFixed(2),
+          percentage: catTotal > 0 ? (subAmount / catTotal) * 100 : 0,
+        }));
+
+      return {
+        name,
+        amount: catTotal.toFixed(2),
+        percentage: grandTotal > 0 ? (catTotal / grandTotal) * 100 : 0,
+        deltaVsPriorMonth: 0,
+        subcategories,
+      };
+    });
+
+  return { categories };
 }
 
 export async function getMoneyFlow(

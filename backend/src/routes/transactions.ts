@@ -61,6 +61,7 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
       userIds: scope.ctx.userIds,
       month: query.month,
       category: query.category,
+      subCategory: query.subCategory,
       accountId: query.accountId,
       scopedAccountIds: scope.scopedAccountIds,
       q: query.q,

@@ -102,11 +102,18 @@ export interface Alert {
   dismissible: boolean;
 }
 
+export interface SubCategoryTotal {
+  name: string;
+  amount: string;
+  percentage: number;
+}
+
 export interface CategoryTotal {
   name: string;
   amount: string;
   percentage: number;
   deltaVsPriorMonth: number;
+  subcategories?: SubCategoryTotal[];
 }
 
 export interface CategoryTrend {
@@ -325,6 +332,7 @@ export interface HouseholdInsightsResponse {
 export interface TransactionFilters {
   month?: string;
   category?: string;
+  subCategory?: string;
   accountId?: string;
   memberId?: string;
   scope?: "all" | "household" | "personal";
