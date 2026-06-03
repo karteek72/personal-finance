@@ -116,12 +116,20 @@ spendflow/
 - Per-member color coding on charts
 - Family view with member-level breakdown
 
-### Accounts View
-- All connected accounts in one dashboard
+### Accounts & Debt View
+- All connected accounts in one dashboard, **grouped by type** (Checking, Savings, Cash & Other, Credit Cards, Trading & Investments) with per-group totals
 - Live balances (current + available) per account
-- Institution name and last-synced timestamp
-- Account status badges (active / error / reauth required)
-- One-click Plaid Link to add new institutions
+- **Per-tile credit/liability detail** (merged from the former Debt page): statement balance, minimum due + due date, last payment, APR, est. interest — revealed progressively as Plaid syncs
+- A debt-totals KPI strip appears when credit accounts exist (total balance, statement, min due, utilization)
+- Status shown as **icons with tooltips** in the card header (Live / Imported / Reconnect required / Sync error / Overdue) plus last-synced date
+- Icon-first header actions (cash flow, refresh all, add account) and one-click Plaid Link to add new institutions
+
+### Web App Navigation (Information Architecture)
+- Single **sectioned sidebar** (Overview · Money · Insights · Family) — no separate "Preview" group
+- Related roadmap features are consolidated into **tabbed hubs**: Plan, Wealth, Insights, Protect (see [ui/STRUCTURE.md](ui/STRUCTURE.md))
+- Spend is tabbed (Overview / Merchants / Patterns); legacy routes redirect (`/flow` → `/categories`, `/debt` → `/accounts`)
+- Roadmap concepts ship as interactive **preview** mockups; sections still on illustrative data carry an amber banner, while Net Worth and Investments are wired to real balances
+- Global UI: a floating **Coach** assistant and a seasonal **Wrapped** year-in-review banner
 
 ### Infrastructure
 - BullMQ job queue for async Plaid sync (webhook-enqueued, idempotent)
@@ -453,9 +461,10 @@ Research shows that tracking data alone doesn't change behavior. What changes be
 
 - ✅ Phase 1: Auth, Plaid integration, DB schema, transaction sync
 - ✅ Phase 2: Webhook receiver, BullMQ queue, reconciliation engine, categorization, dashboard UI
-- 🔄 Phase 3: Categories page, smart alerts, CSV export, mobile responsive polish
+- 🔄 Phase 3: Spend page, smart alerts, CSV export, mobile responsive polish, **unified navigation IA + Accounts/Debt merge**
+- 🧪 Phase 3.5: Roadmap features prototyped as interactive **preview** hubs (Plan, Wealth, Insights, Protect, Coach, Wrapped) — Net Worth & Investments wired to real balances, rest on illustrative data pending backend endpoints
 - ⏳ Phase 4: iPhone app (SwiftUI)
-- ⏳ Phase 5: AI coach, budgets, net worth, investment analysis
+- ⏳ Phase 5: Productionize AI coach, budgets, net worth, investment analysis (back the previews with real APIs)
 
 ---
 

@@ -1,18 +1,34 @@
-# UI Folder Structure (Planned)
+# UI Folder Structure
 
-Target layout for Phase 1 scaffolding. Do not create files outside this structure without updating this doc.
+Current layout of the Next.js web app. Update this doc whenever routes or top-level component groups change.
+
+## Information architecture (navigation)
+
+The sidebar is a single sectioned list (no separate "Preview" group). Routes marked **(redirect)** keep old links working; routes marked **(preview)** are interactive mockups built on illustrative data.
+
+| Section | Route | Page | Notes |
+|---------|-------|------|-------|
+| Overview | `/` | Home | KPIs, net savings hero, account-balance rollup, seasonal Wrapped banner |
+| Overview | `/transactions` | Activity | Live transaction list |
+| Overview | `/categories` | Spend | Tabbed: **Overview** (live) · **Merchants** (preview) · **Patterns** (preview) |
+| Money | `/plan` | Plan | Hub (preview): Budgets & Goals · Calendar · Forecast · Recurring (subs + leaks) |
+| Money | `/wealth` | Wealth | Hub: **Net Worth** (live) · **Investments** (live balances) · FIRE (preview) · Time Machine (preview) |
+| Money | `/accounts` | Accounts & Debt | Connected accounts grouped by type + progressive credit/liability detail on tiles |
+| Insights | `/understand` | Insights | Hub (preview): Wellness · Spending DNA · Behavioral |
+| Insights | `/protect` | Protect | Hub (preview): Resilience · Inflation |
+| — | `/family` | Family | Household members + shared spend |
+| — | `/flow` | → `/categories` | (redirect) retired Money Flow route |
+| — | `/debt` | → `/accounts` | (redirect) Debt merged into Accounts |
+
+Global, non-route UI: **Coach** is a floating assistant (FAB) mounted in the dashboard layout; **Wrapped** is a seasonal banner/overlay on Home.
+
+## Folder tree
 
 ```
 ui/
 ├── README.md
 ├── STRUCTURE.md
 ├── package.json
-├── tsconfig.json
-├── next.config.ts
-├── postcss.config.mjs
-├── .env.example
-├── public/
-│   └── fonts/                    # Inter, JetBrains Mono (self-hosted)
 └── src/
     ├── app/
     │   ├── layout.tsx            # Root layout, fonts, providers
@@ -21,51 +37,51 @@ ui/
     │   │   ├── login/page.tsx
     │   │   └── register/page.tsx
     │   └── (dashboard)/
-    │       ├── layout.tsx        # Sidebar + top bar shell
-    │       ├── page.tsx          # Dashboard
-    │       ├── flow/page.tsx
-    │       ├── categories/page.tsx
+    │       ├── layout.tsx        # Sidebar + top bar shell; mounts CoachAssistant; PAGE_TITLES map
+    │       ├── page.tsx          # Home
     │       ├── transactions/page.tsx
-    │       └── accounts/page.tsx
+    │       ├── categories/page.tsx   # Spend (tabbed: Overview/Merchants/Patterns)
+    │       ├── plan/page.tsx         # Plan hub
+    │       ├── wealth/page.tsx       # Wealth hub (was /grow)
+    │       ├── accounts/page.tsx     # Accounts & Debt (renders AccountsView)
+    │       ├── understand/page.tsx   # Insights hub
+    │       ├── protect/page.tsx      # Protect hub
+    │       ├── family/page.tsx
+    │       ├── flow/page.tsx         # redirect → /categories
+    │       └── debt/page.tsx         # redirect → /accounts
     ├── components/
-    │   ├── ui/                   # Design system primitives
-    │   │   ├── kpi-card.tsx
-    │   │   ├── alert-banner.tsx
-    │   │   ├── skeleton.tsx
-    │   │   └── ...
-    │   ├── charts/
-    │   │   ├── trend-chart.tsx
-    │   │   └── donut-chart.tsx
-    │   ├── layout/
-    │   │   ├── sidebar.tsx
-    │   │   ├── top-bar.tsx
-    │   │   └── mobile-nav.tsx
-    │   ├── plaid/
-    │   │   └── plaid-link-button.tsx
-    │   ├── categories/
-    │   │   └── category-row.tsx
-    │   └── transactions/
-    │       └── transaction-row.tsx
-    ├── hooks/
-    │   ├── use-transactions.ts
-    │   ├── use-summary.ts
-    │   └── use-theme.ts
-    ├── lib/
-    │   ├── api-client.ts         # Typed fetch wrapper
-    │   ├── category-colors.ts
-    │   └── format-money.ts
-    ├── providers/
-    │   ├── query-provider.tsx
-    │   └── auth-provider.tsx
-    ├── styles/
-    │   └── tokens.css            # CSS custom properties from design-system.md
+    │   ├── ui/                   # Design system primitives (kpi-card, async-panel, page-header, icon-button, …)
+    │   ├── charts/               # Interactive charts + spend/category analytics panels
+    │   ├── layout/               # sidebar.tsx (sectioned nav), top-bar.tsx, mobile-nav.tsx, user-menu.tsx
+    │   ├── accounts/
+    │   │   ├── accounts-view.tsx          # grouped tiles, progressive liability detail, debt-totals strip
+    │   │   └── account-balance-summary.tsx
+    │   ├── debt/                 # (credit-debt logic now lives on account tiles; hook still in hooks/)
+    │   ├── plaid/                # plaid-link-button.tsx (default/dashed/icon variants)
+    │   ├── categories/ · transactions/ · notifications/ · family/
+    │   └── preview/              # Roadmap/novel-feature mockups (illustrative data)
+    │       ├── preview-hub.tsx           # tabbed shell for hub pages
+    │       ├── coach-assistant.tsx       # global floating AI coach
+    │       ├── wrapped-banner.tsx        # seasonal year-in-review
+    │       └── panels/                   # one component per feature, suffixed *-panel.tsx
+    │           ├── budgets · calendar · forecast · recurring (subs+leaks)
+    │           ├── net-worth · investments · fire · time-machine
+    │           ├── wellness · dna · behavioral · merchants · patterns
+    │           └── resilience · inflation · subscriptions · leaks
+    ├── hooks/                    # use-accounts, use-credit-debt, use-summary, use-chart-data, use-theme, …
+    ├── lib/                      # api-client, mock-api, format-money, date-ranges, categories, notifications
+    ├── providers/               # query-provider, auth-provider
+    ├── stores/                  # zustand (view-mode, …)
     └── types/
         └── api.ts                # Mirrors docs/design/api-contract.md
 ```
 
 ## Conventions
 
-- **Server Components by default** — add `"use client"` only for interactivity (charts, Plaid Link, theme toggle)
-- **One component per file** — PascalCase export matching filename
-- **Colocate tests** — `kpi-card.test.tsx` next to component (when tests added)
-- **No business logic** — reconciliation and categorization rules live in backend only
+- **Hub pages** compose feature panels via `preview/preview-hub.tsx`; each panel owns its own preview banner so live and mock tabs can mix.
+- **Preview vs live:** wire real data where cheap (`useAccounts`, `useCreditDebtSummary`); flag only still-mock sections with the amber preview banner. Net Worth & Investments use real balances; their trend/holdings detail stay flagged.
+- **No duplicate information** — every metric has a single canonical home (e.g., credit statement/min-due lives on the account tile, not a separate page).
+- **Icon-first actions** — toolbar/action controls render as icon buttons with `title` + `aria-label` tooltips; keep text for data, headings, and primary empty-state CTAs.
+- **Server Components by default** — add `"use client"` only for interactivity (charts, Plaid Link, hubs, theme toggle).
+- **One component per file** — PascalCase export matching filename.
+- **No business logic** — reconciliation and categorization rules live in backend only.

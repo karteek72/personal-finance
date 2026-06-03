@@ -94,11 +94,54 @@
   ],
   "navigation": {
     "primaryDestinations": [
-      { "id": "dashboard", "label": "Dashboard", "route": "/" },
-      { "id": "flow", "label": "Money Flow", "route": "/flow" },
-      { "id": "categories", "label": "Categories", "route": "/categories" },
-      { "id": "transactions", "label": "Transactions", "route": "/transactions" },
-      { "id": "accounts", "label": "Accounts", "route": "/accounts" }
+      { "id": "home", "label": "Home", "route": "/" },
+      { "id": "categories", "label": "Spend", "route": "/categories" },
+      { "id": "transactions", "label": "Activity", "route": "/transactions" },
+      { "id": "accounts", "label": "Accounts", "route": "/accounts" },
+      { "id": "family", "label": "Family", "route": "/family" }
+    ],
+    "webSidebarSections": [
+      {
+        "id": "overview",
+        "label": null,
+        "items": [
+          { "id": "home", "label": "Home", "route": "/" },
+          { "id": "transactions", "label": "Activity", "route": "/transactions" },
+          { "id": "categories", "label": "Spend", "route": "/categories" }
+        ]
+      },
+      {
+        "id": "money",
+        "label": "Money",
+        "items": [
+          { "id": "plan", "label": "Plan", "route": "/plan", "preview": true },
+          { "id": "wealth", "label": "Wealth", "route": "/wealth" },
+          { "id": "accounts", "label": "Accounts", "route": "/accounts" }
+        ]
+      },
+      {
+        "id": "insights",
+        "label": "Insights",
+        "items": [
+          { "id": "understand", "label": "Insights", "route": "/understand", "preview": true },
+          { "id": "protect", "label": "Protect", "route": "/protect", "preview": true }
+        ]
+      },
+      {
+        "id": "family",
+        "label": null,
+        "items": [
+          { "id": "family", "label": "Family", "route": "/family" }
+        ]
+      }
+    ],
+    "redirects": [
+      { "from": "/flow", "to": "/categories" },
+      { "from": "/debt", "to": "/accounts" }
+    ],
+    "global": [
+      { "id": "coach", "label": "Coach", "type": "floating-assistant" },
+      { "id": "wrapped", "label": "Wrapped", "type": "seasonal-banner" }
     ]
   }
 }

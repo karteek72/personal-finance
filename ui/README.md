@@ -2,7 +2,7 @@
 
 Next.js 15 frontend for SpendFlow. Deploys as its own Podman container (`spendflow-ui`).
 
-**Status:** Not scaffolded yet — structure and rules only.
+**Status:** Active. Core pages live; roadmap features ship as interactive preview hubs. See [STRUCTURE.md](STRUCTURE.md) for the route map and navigation IA.
 
 ---
 
@@ -23,7 +23,8 @@ Next.js 15 frontend for SpendFlow. Deploys as its own Podman container (`spendfl
 
 ## Responsibilities
 
-- Render dashboard, money flow, categories, transactions, accounts pages
+- Render Home, Activity, Spend, Plan, Wealth, Accounts & Debt, Insights, Protect, and Family pages (see [STRUCTURE.md](STRUCTURE.md) for the full IA)
+- Compose roadmap features into tabbed preview hubs; wire real data where cheap and flag still-mock sections
 - Call backend REST API (`NEXT_PUBLIC_API_URL`) — no direct DB access
 - Run Plaid Link in browser; send `public_token` to backend for exchange
 - Dark/light theme, responsive layout (375px+)
