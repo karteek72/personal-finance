@@ -14,24 +14,11 @@ const navItems = [
 ] as const;
 
 const previewItems = [
-  { href: "/budgets", label: "Budgets" },
-  { href: "/wellness", label: "Wellness" },
-  { href: "/subscriptions", label: "Subscriptions" },
-  { href: "/coach", label: "AI Coach" },
-  { href: "/net-worth", label: "Net Worth" },
-  { href: "/investments", label: "Investments" },
-  { href: "/inflation", label: "Inflation" },
-  { href: "/behavioral", label: "Behavioral" },
-  { href: "/wrapped", label: "Wrapped" },
-  { href: "/calendar", label: "Money Calendar" },
-  { href: "/resilience", label: "Resilience" },
-  { href: "/fire", label: "FIRE" },
-  { href: "/time-machine", label: "Time Machine" },
-  { href: "/forecast", label: "Forecast" },
-  { href: "/dna", label: "Spending DNA" },
-  { href: "/why", label: "Why Tagger" },
-  { href: "/leaks", label: "Money Leaks" },
-  { href: "/merchants", label: "Merchants & Income" },
+  { href: "/plan", label: "Plan" },
+  { href: "/grow", label: "Grow" },
+  { href: "/understand", label: "Understand" },
+  { href: "/protect", label: "Protect" },
+  { href: "/trim", label: "Trim" },
 ] as const;
 
 function NavIcon({ href, active }: { href: string; active: boolean }) {

@@ -7,6 +7,7 @@ import { QueryActivityBar } from "@/components/layout/query-activity-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { InsightNotificationsSync } from "@/components/notifications/insight-notifications-sync";
+import { CoachAssistant } from "@/components/preview/coach-assistant";
 import { AuthGate } from "@/providers/auth-provider";
 
 const PAGE_TITLES: Record<string, string> = {
@@ -17,24 +18,11 @@ const PAGE_TITLES: Record<string, string> = {
   "/accounts": "Accounts",
   "/debt": "Debt",
   "/family": "Family",
-  "/budgets": "Budgets & Goals",
-  "/wellness": "Wellness Score",
-  "/subscriptions": "Subscriptions",
-  "/coach": "AI Coach",
-  "/net-worth": "Net Worth",
-  "/inflation": "Inflation Intel",
-  "/behavioral": "Behavioral",
-  "/investments": "Investments",
-  "/wrapped": "Wrapped",
-  "/calendar": "Money Calendar",
-  "/resilience": "Financial Immune System",
-  "/fire": "FIRE Calculator",
-  "/time-machine": "Financial Time Machine",
-  "/forecast": "Financial Forecast",
-  "/dna": "Spending DNA",
-  "/why": "Why Tagger",
-  "/leaks": "Money Leaks",
-  "/merchants": "Merchants & Income",
+  "/plan": "Plan",
+  "/grow": "Grow",
+  "/understand": "Understand",
+  "/protect": "Protect",
+  "/trim": "Trim",
 };
 
 export default function DashboardLayout({
@@ -60,6 +48,7 @@ export default function DashboardLayout({
           </main>
         </div>
         <MobileNav />
+        <CoachAssistant />
       </div>
     </AuthGate>
   );

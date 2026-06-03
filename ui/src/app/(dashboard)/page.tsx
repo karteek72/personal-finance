@@ -11,6 +11,7 @@ import {
   type DrilldownConfig,
 } from "@/components/ui/drilldown-drawer";
 import { AccountBalanceSummary } from "@/components/accounts/account-balance-summary";
+import { WrappedBanner } from "@/components/preview/wrapped-banner";
 import { useSummary } from "@/hooks/use-summary";
 import {
   plaidHistoryDateRange,
@@ -93,6 +94,9 @@ function DashboardContent({
             All transactions →
           </Link>
         </div>
+
+        {/* ── Wrapped (seasonal) ────────────────────────────────── */}
+        <WrappedBanner />
 
         {/* ── Net Savings hero ──────────────────────────────────── */}
         <div
