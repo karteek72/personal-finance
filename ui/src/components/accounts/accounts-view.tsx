@@ -3,6 +3,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
+import Link from "next/link";
+
 import { PlaidLinkButton } from "@/components/plaid/plaid-link-button";
 import { AsyncPanel } from "@/components/ui/async-panel";
 import { Card } from "@/components/ui/card";
@@ -172,6 +174,12 @@ export function AccountsView() {
         subtitle="Connect banks or manage imported statements"
         action={
           <>
+            <Link
+              href="/debt"
+              className="inline-flex items-center rounded-[var(--radius-pill)] bg-surface px-4 py-2.5 text-sm font-semibold text-text transition-opacity hover:opacity-80 card-shadow"
+            >
+              Credit & debt
+            </Link>
             {hasPlaidAccounts ? (
               <button
                 type="button"
@@ -289,25 +297,41 @@ export function AccountsView() {
                   {formatMoney(account.balanceCurrent)}
                 </p>
               </div>
-              <div className="flex items-center justify-between gap-2 bg-surface px-4 py-3 text-xs">
-                <span
-                  className={`rounded-[var(--radius-pill)] px-2 py-0.5 font-semibold ${
-                    account.status === "active"
-                      ? "bg-success/15 text-success"
-                      : account.status === "reauth_required"
-                        ? "bg-warning/15 text-warning"
-                        : "bg-danger/15 text-danger"
-                  }`}
-                >
-                  {account.source === "plaid" ? "Live" : "Imported"}
-                </span>
-                <span className="text-text-muted">
-                  {account.lastSyncedAt
-                    ? new Date(account.lastSyncedAt).toLocaleDateString()
-                    : account.source === "import"
-                      ? "From statement"
-                      : "Not synced yet"}
-                </span>
+              <div className="flex flex-col gap-1 bg-surface px-4 py-3 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={`rounded-[var(--radius-pill)] px-2 py-0.5 font-semibold ${
+                      account.status === "active"
+                        ? "bg-success/15 text-success"
+                        : account.status === "reauth_required"
+                          ? "bg-warning/15 text-warning"
+                          : "bg-danger/15 text-danger"
+                    }`}
+                  >
+                    {account.source === "plaid" ? "Live" : "Imported"}
+                  </span>
+                  <span className="text-text-muted">
+                    {account.lastSyncedAt
+                      ? new Date(account.lastSyncedAt).toLocaleDateString()
+                      : account.source === "import"
+                        ? "From statement"
+                        : "Not synced yet"}
+                  </span>
+                </div>
+                {account.type === "credit" && account.liability ? (
+                  <p className="text-text-muted">
+                    Min due{" "}
+                    {account.liability.minimumPaymentAmount
+                      ? formatMoney(account.liability.minimumPaymentAmount)
+                      : "—"}
+                    {account.liability.nextPaymentDueDate
+                      ? ` · due ${new Date(`${account.liability.nextPaymentDueDate}T00:00:00`).toLocaleDateString()}`
+                      : ""}
+                    {account.liability.isOverdue ? (
+                      <span className="ml-1 font-semibold text-danger">· Overdue</span>
+                    ) : null}
+                  </p>
+                ) : null}
               </div>
             </article>
           ))}

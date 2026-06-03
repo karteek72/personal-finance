@@ -4,6 +4,7 @@ import { countMonthsInclusive } from "../lib/date-range.js";
 import { formatMoneyAmount, roundDecimal, roundPercent } from "../lib/money.js";
 import { accounts, transactions } from "../db/schema.js";
 import { getMemberMapForAccounts } from "./household-store.js";
+import { getLiabilityMapForAccounts } from "./liability-store.js";
 import {
   GENERAL_SUBCATEGORY,
 } from "./infer-subcategory.js";
@@ -18,6 +19,7 @@ export async function listAccounts(userId: string) {
     .orderBy(accounts.name);
 
   const memberMap = await getMemberMapForAccounts(rows.map((row) => row.id));
+  const liabilityMap = await getLiabilityMapForAccounts(rows.map((row) => row.id));
 
   return {
     accounts: rows.map((row) => {
@@ -40,6 +42,8 @@ export async function listAccounts(userId: string) {
         memberId: member?.memberId ?? null,
         memberName: member?.memberName ?? null,
         memberColor: member?.memberColor ?? null,
+        liability:
+          row.type === "credit" ? (liabilityMap.get(row.id) ?? null) : null,
       };
     }),
   };

@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  jsonb,
   numeric,
   pgTable,
   text,
@@ -74,6 +75,32 @@ export const accounts = pgTable(
     uniqueIndex("accounts_plaid_account_id_idx").on(table.plaidAccountId),
   ],
 );
+
+export const creditCardLiabilities = pgTable("credit_card_liabilities", {
+  accountId: uuid("account_id")
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: "cascade" }),
+  lastStatementBalance: numeric("last_statement_balance", {
+    precision: 12,
+    scale: 2,
+  }),
+  lastStatementIssueDate: date("last_statement_issue_date"),
+  minimumPaymentAmount: numeric("minimum_payment_amount", {
+    precision: 12,
+    scale: 2,
+  }),
+  nextPaymentDueDate: date("next_payment_due_date"),
+  lastPaymentAmount: numeric("last_payment_amount", {
+    precision: 12,
+    scale: 2,
+  }),
+  lastPaymentDate: date("last_payment_date"),
+  isOverdue: boolean("is_overdue"),
+  aprs: jsonb("aprs").notNull().default([]),
+  syncedAt: timestamp("synced_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 export const transactions = pgTable(
   "transactions",

@@ -8,6 +8,7 @@ import type {
   CategoriesResponse,
   ChartDataFilters,
   ChartDataResponse,
+  CreditDebtSummary,
   DeleteAccountResponse,
   HouseholdInsightsResponse,
   HouseholdInviteAcceptResponse,
@@ -167,6 +168,13 @@ export const api = {
       return mockApi.getAccounts();
     }
     return fetchJson<AccountsResponse>("/accounts");
+  },
+
+  getCreditDebtSummary(): Promise<CreditDebtSummary> {
+    if (USE_MOCKS) {
+      return mockApi.getCreditDebtSummary();
+    }
+    return fetchJson<CreditDebtSummary>("/liabilities/summary");
   },
 
   deleteAccount(accountId: string): Promise<DeleteAccountResponse> {

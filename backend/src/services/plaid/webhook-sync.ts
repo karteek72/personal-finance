@@ -23,6 +23,8 @@ const TRANSACTIONS_SYNC_CODES = new Set([
   "DEFAULT_UPDATE",
 ]);
 
+const LIABILITIES_SYNC_CODES = new Set(["DEFAULT_UPDATE"]);
+
 export async function syncPlaidItemByPlaidItemId(
   plaidItemId: string,
   env: Env,
@@ -61,11 +63,31 @@ export async function handlePlaidWebhookPayload(
   payload: PlaidWebhookPayload,
   env: Env,
 ): Promise<void> {
-  if (payload.webhook_type !== "TRANSACTIONS") {
+  if (!payload.webhook_code || !payload.item_id) {
     return;
   }
 
-  if (!payload.webhook_code || !payload.item_id) {
+  if (
+    payload.webhook_type === "LIABILITIES" &&
+    LIABILITIES_SYNC_CODES.has(payload.webhook_code)
+  ) {
+    logOperation(log, "started", "Plaid liabilities webhook received", {
+      operation: "plaid.webhook_sync",
+      operationId: randomUUID(),
+      plaidItemId: payload.item_id,
+      webhookCode: payload.webhook_code,
+      trigger: `webhook:${payload.webhook_code}`,
+    });
+
+    await syncPlaidItemByPlaidItemId(
+      payload.item_id,
+      env,
+      payload.webhook_code,
+    );
+    return;
+  }
+
+  if (payload.webhook_type !== "TRANSACTIONS") {
     return;
   }
 

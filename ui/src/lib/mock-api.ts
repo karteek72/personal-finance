@@ -10,6 +10,7 @@ import type {
   AlertsResponse,
   CategoriesResponse,
   ChartDataResponse,
+  CreditDebtSummary,
   HouseholdInsightsResponse,
   HouseholdMember,
   HouseholdResponse,
@@ -190,6 +191,33 @@ export async function getTransactions(
 export async function getAccounts(): Promise<AccountsResponse> {
   await delay();
   return accountsData as AccountsResponse;
+}
+
+export async function getCreditDebtSummary(): Promise<CreditDebtSummary> {
+  await delay();
+  const data = accountsData as AccountsResponse;
+  const cards = data.accounts
+    .filter((account) => account.type === "credit")
+    .map((account) => ({
+      accountId: account.id,
+      name: account.name,
+      mask: account.mask,
+      institutionName: account.institutionName,
+      balanceCurrent: account.balanceCurrent,
+      liability: null,
+    }));
+
+  return {
+    totalCurrentBalance: cards
+      .reduce((sum, card) => sum + Number.parseFloat(card.balanceCurrent), 0)
+      .toFixed(2),
+    totalStatementBalance: "0.00",
+    totalMinimumDue: "0.00",
+    totalEstimatedMonthlyInterest: "0.00",
+    overdueCount: 0,
+    coverageLabel: "Mock mode — link cards with Liabilities enabled for statement data",
+    cards,
+  };
 }
 
 export async function deleteAccount(

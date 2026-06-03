@@ -38,8 +38,13 @@ export function parsePlaidProducts(raw: string): Products[] {
       if (item === "auth") return Products.Auth;
       if (item === "identity") return Products.Identity;
       if (item === "balance") return Products.Balance;
+      if (item === "liabilities") return Products.Liabilities;
       throw new Error(`Unsupported Plaid product: ${item}`);
     });
+}
+
+export function hasLiabilitiesProduct(env: Env): boolean {
+  return parsePlaidProducts(env.PLAID_PRODUCTS).includes(Products.Liabilities);
 }
 
 export function parseCountryCodes(raw: string): CountryCode[] {

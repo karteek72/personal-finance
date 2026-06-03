@@ -16,6 +16,27 @@ export interface AuthRefreshResponse {
   refreshToken: string;
 }
 
+export interface AccountCreditLiability {
+  lastStatementBalance: string | null;
+  lastStatementIssueDate: string | null;
+  minimumPaymentAmount: string | null;
+  nextPaymentDueDate: string | null;
+  lastPaymentAmount: string | null;
+  lastPaymentDate: string | null;
+  isOverdue: boolean | null;
+  aprs: {
+    aprType: string;
+    aprPercentage: string;
+    balanceSubjectToApr: string | null;
+    interestChargeAmount: string | null;
+  }[];
+  purchaseApr: string | null;
+  estimatedMonthlyInterest: string | null;
+  statementVsCurrentDelta: string | null;
+  daysUntilDue: number | null;
+  syncedAt: string | null;
+}
+
 export interface Account {
   id: string;
   name: string;
@@ -34,6 +55,26 @@ export interface Account {
   memberId?: string | null;
   memberName?: string | null;
   memberColor?: string | null;
+  liability?: AccountCreditLiability | null;
+}
+
+export interface CreditCardDebtRow {
+  accountId: string;
+  name: string;
+  mask: string | null;
+  institutionName: string;
+  balanceCurrent: string;
+  liability: AccountCreditLiability | null;
+}
+
+export interface CreditDebtSummary {
+  totalCurrentBalance: string;
+  totalStatementBalance: string;
+  totalMinimumDue: string;
+  totalEstimatedMonthlyInterest: string;
+  overdueCount: number;
+  coverageLabel: string;
+  cards: CreditCardDebtRow[];
 }
 
 export interface Transaction {

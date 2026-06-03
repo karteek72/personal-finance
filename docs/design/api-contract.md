@@ -48,6 +48,14 @@ HTTP status codes: `200` success, `201` created, `204` no content, `400` validat
 | DELETE | `/plaid/items/:itemId` | — | `204` |
 | POST | `/plaid/items/:itemId/sync` | — | `{ status: "queued" }` |
 
+### Liabilities (credit cards)
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/liabilities/summary` | `CreditDebtSummary` — statement balance, minimum due, due dates, APRs per card |
+
+Requires `PLAID_PRODUCTS=transactions,liabilities`. Existing items must be re-linked to grant the Liabilities product.
+
 **Webhook (Plaid → backend, not UI):**
 
 | Method | Path | Notes |

@@ -22,6 +22,7 @@ import { inferClassification } from "../infer-subcategory.js";
 import { resolveInternalTransfer } from "../transfer-classification.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
 import { mapPlaidTransaction } from "./map-transaction.js";
+import { syncCreditCardLiabilities } from "./sync-liabilities.js";
 import {
   deletePlaidTransactionsByExternalIds,
   PLAID_TXN_BATCH_SIZE,
@@ -38,6 +39,7 @@ export interface SyncResult {
   added: number;
   modified: number;
   removed: number;
+  liabilitiesUpdated: number;
 }
 
 export interface PlaidSyncOptions {
@@ -312,6 +314,19 @@ export async function syncPlaidItem(
     [...accountIdByPlaidId.values()],
   );
 
+  const liabilitySync = await syncCreditCardLiabilities(
+    accessToken,
+    accountIdByPlaidId,
+    env,
+  );
+
+  if (liabilitySync.creditCardsUpdated > 0) {
+    logOperation(log, "liabilities_synced", "Plaid credit card liabilities updated", {
+      ...baseContext,
+      creditCardsUpdated: liabilitySync.creditCardsUpdated,
+    });
+  }
+
   const categoryRules = await getMerchantCategoryRulesMap(item.userId);
 
   const accountTypeByPlaidId = new Map(
@@ -421,6 +436,7 @@ export async function syncPlaidItem(
     added,
     modified,
     removed,
+    liabilitiesUpdated: liabilitySync.creditCardsUpdated,
   };
 
   logOperation(log, "completed", "Plaid item sync completed successfully", {

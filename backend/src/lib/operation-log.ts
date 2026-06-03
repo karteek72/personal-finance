@@ -7,6 +7,7 @@ export type OperationStage =
   | "token_decrypted"
   | "institution_resolved"
   | "accounts_synced"
+  | "liabilities_synced"
   | "transactions_page"
   | "cursor_saved"
   | "completed"
