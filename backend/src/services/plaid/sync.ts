@@ -1,14 +1,24 @@
-import { CountryCode } from "plaid";
+import { CountryCode, type Transaction as PlaidTransaction } from "plaid";
 import { eq } from "drizzle-orm";
 import type { Env } from "../../config/env.js";
 import { getDb } from "../../db/client.js";
-import { accounts, plaidItems, transactions } from "../../db/schema.js";
+import { accounts, plaidItems } from "../../db/schema.js";
 import { AppError } from "../../lib/errors.js";
 import { createLogger } from "../../lib/logger.js";
 import { getPlaidClient } from "./client.js";
 import { decryptPlaidToken } from "./crypto.js";
+import {
+  applyMerchantCategoryRule,
+  getMerchantCategoryRulesMap,
+} from "../category-rules.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
 import { mapPlaidTransaction } from "./map-transaction.js";
+import {
+  deletePlaidTransactionsByExternalIds,
+  PLAID_TXN_BATCH_SIZE,
+  upsertPlaidTransactionBatch,
+  type PlaidTransactionInsert,
+} from "./upsert-transactions.js";
 
 const log = createLogger("plaid.sync");
 
@@ -45,6 +55,49 @@ async function resolveInstitutionName(
   }
 }
 
+function mapTxnToRow(
+  userId: string,
+  accountId: string,
+  txn: PlaidTransaction,
+  accountType: "depository" | "credit",
+  categoryRules: Map<string, string>,
+): PlaidTransactionInsert {
+  const mapped = mapPlaidTransaction(txn, accountType);
+  const category = applyMerchantCategoryRule(
+    categoryRules,
+    mapped.merchantName,
+    mapped.name,
+    mapped.category,
+  );
+
+  return {
+    userId,
+    accountId,
+    externalId: mapped.externalId,
+    date: mapped.date,
+    name: mapped.name,
+    merchantName: mapped.merchantName,
+    amount: mapped.amount,
+    category,
+    transactionType: mapped.transactionType,
+    isTransfer: mapped.isTransfer,
+    pending: mapped.pending,
+    source: "plaid",
+  };
+}
+
+async function flushTransactionBatch(
+  db: ReturnType<typeof getDb>,
+  batch: PlaidTransactionInsert[],
+): Promise<void> {
+  for (let i = 0; i < batch.length; i += PLAID_TXN_BATCH_SIZE) {
+    await upsertPlaidTransactionBatch(
+      db,
+      batch.slice(i, i + PLAID_TXN_BATCH_SIZE),
+    );
+  }
+}
+
 export async function syncPlaidItem(
   itemDbId: string,
   env: Env,
@@ -62,7 +115,17 @@ export async function syncPlaidItem(
     throw AppError.notFound("Plaid item not found");
   }
 
-  const accessToken = decryptPlaidToken(item.accessTokenEncrypted, env);
+  let accessToken: string;
+  try {
+    accessToken = decryptPlaidToken(item.accessTokenEncrypted, env);
+  } catch (error) {
+    log.error({ itemDbId, err: error }, "failed to decrypt plaid access token");
+    throw AppError.plaidSyncError(
+      "Could not decrypt stored Plaid credentials. Re-link the account or check ENCRYPTION_KEY.",
+      error,
+    );
+  }
+
   const client = getPlaidClient(env);
   const { institutionId, institutionName } =
     await resolveInstitutionName(accessToken, env);
@@ -145,6 +208,15 @@ export async function syncPlaidItem(
     [...accountIdByPlaidId.values()],
   );
 
+  const categoryRules = await getMerchantCategoryRulesMap(item.userId);
+
+  const accountTypeByPlaidId = new Map(
+    accountsResponse.data.accounts.map((account) => [
+      account.account_id,
+      account.type as "depository" | "credit",
+    ]),
+  );
+
   let cursor = item.cursor ?? undefined;
   let added = 0;
   let modified = 0;
@@ -157,103 +229,50 @@ export async function syncPlaidItem(
       cursor,
     });
 
-    const accountTypeByPlaidId = new Map(
-      accountsResponse.data.accounts.map((account) => [
-        account.account_id,
-        account.type as "depository" | "credit",
-      ]),
-    );
+    const upsertBatch: PlaidTransactionInsert[] = [];
 
     for (const txn of syncResponse.data.added) {
       const accountId = accountIdByPlaidId.get(txn.account_id);
       if (!accountId) continue;
 
-      const mapped = mapPlaidTransaction(
-        txn,
-        accountTypeByPlaidId.get(txn.account_id) ?? "depository",
-      );
-
-      await db
-        .insert(transactions)
-        .values({
-          userId: item.userId,
+      upsertBatch.push(
+        mapTxnToRow(
+          item.userId,
           accountId,
-          externalId: mapped.externalId,
-          date: mapped.date,
-          name: mapped.name,
-          merchantName: mapped.merchantName,
-          amount: mapped.amount,
-          category: mapped.category,
-          transactionType: mapped.transactionType,
-          isTransfer: mapped.isTransfer,
-          pending: mapped.pending,
-          source: "plaid",
-        })
-        .onConflictDoUpdate({
-          target: [transactions.accountId, transactions.externalId],
-          set: {
-            date: mapped.date,
-            name: mapped.name,
-            merchantName: mapped.merchantName,
-            amount: mapped.amount,
-            category: mapped.category,
-            transactionType: mapped.transactionType,
-            isTransfer: mapped.isTransfer,
-            pending: mapped.pending,
-            source: "plaid",
-          },
-        });
-      added++;
+          txn,
+          accountTypeByPlaidId.get(txn.account_id) ?? "depository",
+          categoryRules,
+        ),
+      );
     }
+    await flushTransactionBatch(db, upsertBatch);
+    added += upsertBatch.length;
 
+    const modifiedBatch: PlaidTransactionInsert[] = [];
     for (const txn of syncResponse.data.modified) {
       const accountId = accountIdByPlaidId.get(txn.account_id);
       if (!accountId) continue;
 
-      const mapped = mapPlaidTransaction(
-        txn,
-        accountTypeByPlaidId.get(txn.account_id) ?? "depository",
-      );
-
-      await db
-        .insert(transactions)
-        .values({
-          userId: item.userId,
+      modifiedBatch.push(
+        mapTxnToRow(
+          item.userId,
           accountId,
-          externalId: mapped.externalId,
-          date: mapped.date,
-          name: mapped.name,
-          merchantName: mapped.merchantName,
-          amount: mapped.amount,
-          category: mapped.category,
-          transactionType: mapped.transactionType,
-          isTransfer: mapped.isTransfer,
-          pending: mapped.pending,
-          source: "plaid",
-        })
-        .onConflictDoUpdate({
-          target: [transactions.accountId, transactions.externalId],
-          set: {
-            date: mapped.date,
-            name: mapped.name,
-            merchantName: mapped.merchantName,
-            amount: mapped.amount,
-            category: mapped.category,
-            transactionType: mapped.transactionType,
-            isTransfer: mapped.isTransfer,
-            pending: mapped.pending,
-            source: "plaid",
-          },
-        });
-      modified++;
+          txn,
+          accountTypeByPlaidId.get(txn.account_id) ?? "depository",
+          categoryRules,
+        ),
+      );
     }
+    await flushTransactionBatch(db, modifiedBatch);
+    modified += modifiedBatch.length;
 
-    for (const removedTxn of syncResponse.data.removed) {
-      await db
-        .delete(transactions)
-        .where(eq(transactions.externalId, `plaid-${removedTxn.transaction_id}`));
-      removed++;
-    }
+    const removedExternalIds = syncResponse.data.removed.map(
+      (removedTxn) => `plaid-${removedTxn.transaction_id}`,
+    );
+    removed += await deletePlaidTransactionsByExternalIds(
+      db,
+      removedExternalIds,
+    );
 
     cursor = syncResponse.data.next_cursor;
     hasMore = syncResponse.data.has_more;

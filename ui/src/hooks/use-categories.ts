@@ -2,14 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
-
-function defaultDateRange(): { from: string; to: string } {
-  const year = new Date().getFullYear();
-  return { from: `${year - 1}-01-01`, to: `${year}-12-31` };
-}
+import { plaidHistoryDateRange } from "@/lib/date-ranges";
 
 export function useCategories(from?: string, to?: string) {
-  const range = defaultDateRange();
+  const range = plaidHistoryDateRange();
   const fromDate = from ?? range.from;
   const toDate = to ?? range.to;
 

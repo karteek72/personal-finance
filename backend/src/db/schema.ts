@@ -151,6 +151,30 @@ export const householdAccountAssignments = pgTable(
   },
 );
 
+export const merchantCategoryRules = pgTable(
+  "merchant_category_rules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    merchantKey: text("merchant_key").notNull(),
+    category: text("category").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("merchant_category_rules_user_merchant_idx").on(
+      table.userId,
+      table.merchantKey,
+    ),
+  ],
+);
+
 export const householdInvitations = pgTable("household_invitations", {
   id: uuid("id").primaryKey().defaultRandom(),
   householdId: uuid("household_id")

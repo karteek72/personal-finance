@@ -23,7 +23,7 @@ export const accountRoutes: FastifyPluginAsync = async (app) => {
     return result;
   });
 
-  app.post("/accounts/:accountId/sync", async (request) => {
+  app.post("/accounts/:accountId/sync", async (request, reply) => {
     const { accountId } = request.params as { accountId: string };
     const user = await requireRequestUser(request, app.config.env);
     const account = await getAccount(accountId, user.id);
@@ -40,12 +40,26 @@ export const accountRoutes: FastifyPluginAsync = async (app) => {
       throw AppError.notPlaidAccount();
     }
 
-    try {
-      const syncResult = await syncPlaidItem(account.plaidItemId, app.config.env);
-      return { status: "completed", ...syncResult };
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw AppError.plaidSyncError("Unable to sync account", error);
-    }
+    const env = app.config.env;
+    const itemDbId = account.plaidItemId;
+
+    void syncPlaidItem(itemDbId, env).catch((error: unknown) => {
+      request.log.error(
+        { err: error, accountId, itemDbId },
+        "background account plaid sync failed",
+      );
+    });
+
+    return reply.status(202).send({
+      status: "started",
+      itemId: itemDbId,
+      institutionName: account.institutionName,
+      accountsSynced: 1,
+      added: 0,
+      modified: 0,
+      removed: 0,
+      message:
+        "Sync started in the background. This account will update shortly.",
+    });
   });
 };

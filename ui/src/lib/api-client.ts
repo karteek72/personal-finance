@@ -24,6 +24,7 @@ import type {
   TransactionFilters,
   TransactionSummary,
   TrendsResponse,
+  UpdateTransactionCategoryResponse,
 } from "@/types/api";
 
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== "false";
@@ -59,7 +60,7 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
 
-  if (!response.ok) {
+  if (!response.ok && response.status !== 202) {
     const body: unknown = await response.json().catch(() => null);
     const message =
       typeof body === "object" &&
@@ -111,6 +112,28 @@ export const api = {
     }
     return fetchJson<TransactionSummary>(
       `/transactions/summary${buildQuery({ from, to })}`,
+    );
+  },
+
+  updateTransactionCategory(
+    transactionId: string,
+    category: string,
+    rememberForMerchant = true,
+  ): Promise<UpdateTransactionCategoryResponse> {
+    if (USE_MOCKS) {
+      return mockApi.updateTransactionCategory(
+        transactionId,
+        category,
+        rememberForMerchant,
+      );
+    }
+    return fetchJson<UpdateTransactionCategoryResponse>(
+      `/transactions/${transactionId}/category`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category, rememberForMerchant }),
+      },
     );
   },
 

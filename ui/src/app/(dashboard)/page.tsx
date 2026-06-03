@@ -4,14 +4,11 @@ import { AlertBanner } from "@/components/ui/alert-banner";
 import { Card } from "@/components/ui/card";
 import { SpendAnalyticsPanel } from "@/components/charts/spend-analytics-panel";
 import { KpiCard } from "@/components/ui/kpi-card";
+import { AsyncPanel } from "@/components/ui/async-panel";
 import { useAlerts } from "@/hooks/use-alerts";
 import { useSummary } from "@/hooks/use-summary";
+import { plaidHistoryDateRange } from "@/lib/date-ranges";
 import { formatMoney } from "@/lib/format-money";
-
-function yearToDateRange(): { from: string; to: string } {
-  const year = new Date().getFullYear();
-  return { from: `${year}-01-01`, to: `${year}-12-31` };
-}
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -21,29 +18,44 @@ function getGreeting(): string {
 }
 
 export default function DashboardPage() {
-  const { from, to } = yearToDateRange();
-  const { data: summary, isLoading: summaryLoading, error: summaryError } =
-    useSummary(from, to);
-  const { data: alerts, isLoading: alertsLoading } = useAlerts();
+  const { from, to } = plaidHistoryDateRange();
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    isFetching: summaryFetching,
+    error: summaryError,
+  } = useSummary(from, to);
+  const {
+    data: alerts,
+    isLoading: alertsLoading,
+    isFetching: alertsFetching,
+  } = useAlerts();
 
-  if (summaryLoading || alertsLoading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-text-muted">
-        Loading dashboard…
-      </div>
-    );
-  }
+  const isLoading = summaryLoading || alertsLoading;
+  const isFetching = summaryFetching || alertsFetching;
 
-  if (summaryError || !summary || !alerts) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-danger">
-        {summaryError instanceof Error
-          ? summaryError.message
-          : "Failed to load dashboard data"}
-      </div>
-    );
-  }
+  return (
+    <AsyncPanel
+      isLoading={isLoading}
+      isFetching={isFetching}
+      error={summaryError}
+      loadingMessage="Loading dashboard…"
+      errorMessage="Failed to load dashboard data"
+    >
+      {summary && alerts ? (
+        <DashboardContent summary={summary} alerts={alerts} />
+      ) : null}
+    </AsyncPanel>
+  );
+}
 
+function DashboardContent({
+  summary,
+  alerts,
+}: {
+  summary: NonNullable<ReturnType<typeof useSummary>["data"]>;
+  alerts: NonNullable<ReturnType<typeof useAlerts>["data"]>;
+}) {
   const netSavings = Number.parseFloat(summary.netSavings);
   const isPositive = netSavings >= 0;
 

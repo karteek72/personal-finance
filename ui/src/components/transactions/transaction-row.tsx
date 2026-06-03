@@ -1,5 +1,8 @@
+"use client";
+
 import clsx from "clsx";
 
+import { SPEND_CATEGORIES } from "@/lib/categories";
 import { getCategoryColor } from "@/lib/category-colors";
 
 interface TransactionRowProps {
@@ -17,6 +20,8 @@ interface TransactionRowProps {
   pending: boolean;
   memberName?: string | null;
   memberColor?: string | null;
+  onCategoryChange?: (category: string) => void;
+  categoryUpdating?: boolean;
 }
 
 function formatAmount(amount: string, currencyCode: string): string {
@@ -62,6 +67,8 @@ export function TransactionRow({
   pending,
   memberName,
   memberColor,
+  onCategoryChange,
+  categoryUpdating = false,
 }: TransactionRowProps) {
   const displayName = merchantName ?? name;
   const isHighlightedTransfer = isTransfer || transactionType === "transfer";
@@ -69,6 +76,7 @@ export function TransactionRow({
   const categoryColor = getCategoryColor(category);
   const prefix =
     transactionType === "income" ? "+" : transactionType === "expense" ? "−" : "";
+  const canEditCategory = Boolean(onCategoryChange) && !isHighlightedTransfer;
 
   return (
     <div
@@ -104,12 +112,33 @@ export function TransactionRow({
             </span>
           ) : null}
         </div>
-        <p className="mt-0.5 truncate text-xs text-text-muted">
-          {category}
-          {accountMask ? ` · ••${accountMask}` : ""}
-          {" · "}
-          {formatDate(date)}
-        </p>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
+          {canEditCategory ? (
+            <select
+              value={
+                SPEND_CATEGORIES.includes(category as (typeof SPEND_CATEGORIES)[number])
+                  ? category
+                  : "Uncategorized"
+              }
+              disabled={categoryUpdating}
+              onChange={(event) => onCategoryChange?.(event.target.value)}
+              onClick={(event) => event.stopPropagation()}
+              title="Change category — saved for this merchant going forward"
+              aria-label={`Category for ${displayName}`}
+              className="max-w-[11rem] truncate rounded-[var(--radius-sm)] border-0 bg-bg py-0.5 pl-1 pr-6 text-xs font-medium text-text outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+            >
+              {SPEND_CATEGORIES.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span>{category}</span>
+          )}
+          {accountMask ? <span>· ••{accountMask}</span> : null}
+          <span>· {formatDate(date)}</span>
+        </div>
       </div>
 
       <div className="shrink-0 text-right">

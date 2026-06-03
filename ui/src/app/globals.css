@@ -1,4 +1,13 @@
 @import "tailwindcss";
+
+@keyframes query-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
 @import "../styles/tokens.css";
 
 @layer base {
@@ -43,5 +52,14 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+}
+
+@keyframes query-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
   }
 }

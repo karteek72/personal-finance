@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { AsyncPanel } from "@/components/ui/async-panel";
 import { ChartFilterBar } from "@/components/charts/chart-filter-bar";
 import { InteractiveAreaChart } from "@/components/charts/interactive-area-chart";
 import { InteractiveBarChart } from "@/components/charts/interactive-bar-chart";
@@ -23,7 +24,7 @@ export function SpendAnalyticsPanel() {
 
   const { data: accountsData } = useAccounts();
   const { data: householdData } = useHousehold();
-  const { data, isLoading, error } = useChartData({
+  const { data, isLoading, isFetching, error } = useChartData({
     accountId: selectedAccountId || undefined,
     category: selectedCategory || undefined,
     memberId: selectedMemberId || undefined,
@@ -41,19 +42,15 @@ export function SpendAnalyticsPanel() {
     setSelectedMemberId("");
   }
 
-  if (isLoading) {
-    return (
-      <p className="text-sm text-text-muted">Loading interactive charts…</p>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <p className="text-sm text-danger">Couldn't load chart data.</p>
-    );
-  }
-
   return (
+    <AsyncPanel
+      isLoading={isLoading}
+      isFetching={isFetching}
+      error={error}
+      loadingMessage="Loading interactive charts…"
+      errorMessage="Couldn't load chart data."
+    >
+      {data ? (
     <section aria-label="Interactive spending charts" className="flex flex-col gap-5">
       <ChartFilterBar
         accounts={accountsData?.accounts ?? []}
@@ -126,5 +123,7 @@ export function SpendAnalyticsPanel() {
         subtitle="Click a legend item to focus"
       />
     </section>
+      ) : null}
+    </AsyncPanel>
   );
 }

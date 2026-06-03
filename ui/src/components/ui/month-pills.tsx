@@ -1,39 +1,47 @@
 "use client";
 
 import clsx from "clsx";
+import { useMemo } from "react";
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
+/** Last 24 calendar months (newest first), for filtering Plaid-scale history. */
+function buildRecentMonthOptions(): { key: string; label: string }[] {
+  const options: { key: string; label: string }[] = [];
+  const now = new Date();
+
+  for (let offset = 0; offset < 24; offset += 1) {
+    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const key = `${year}-${String(month).padStart(2, "0")}`;
+    const label = date.toLocaleString("en-US", {
+      month: "short",
+      year: "numeric",
+    });
+    options.push({ key, label });
+  }
+
+  return options;
+}
 
 interface MonthPillsProps {
-  selectedMonth: number | null;
-  onSelect: (month: number | null) => void;
+  /** `YYYY-MM` or null for all months */
+  selectedMonth: string | null;
+  onSelect: (month: string | null) => void;
 }
 
 export function MonthPills({ selectedMonth, onSelect }: MonthPillsProps) {
+  const months = useMemo(() => buildRecentMonthOptions(), []);
+
   return (
     <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
-      {MONTHS.map((label, index) => {
-        const month = index + 1;
-        const isActive = selectedMonth === month;
+      {months.map(({ key, label }) => {
+        const isActive = selectedMonth === key;
 
         return (
           <button
-            key={label}
+            key={key}
             type="button"
-            onClick={() => onSelect(month)}
+            onClick={() => onSelect(isActive ? null : key)}
             className={clsx(
               "shrink-0 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-semibold transition-all",
               isActive

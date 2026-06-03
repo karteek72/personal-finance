@@ -1,4 +1,11 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import { z } from "zod";
+import { SPEND_CATEGORIES } from "../config/categories.js";
+import { requireRequestUser } from "../lib/auth-http.js";
+import { parseBody } from "../lib/validate.js";
+import { updateTransactionCategory } from "../services/category-rules.js";
+import { resolveHouseholdContext } from "../services/household-access.js";
+import { resolveScopedAccountIdsForContext } from "../services/household-store.js";
 import {
   listAccounts as getAccountsFromDb,
   getAlerts,
@@ -9,10 +16,12 @@ import {
   getTrends,
   listTransactions,
 } from "../services/transaction-store.js";
-import { resolveScopedAccountIdsForContext } from "../services/household-store.js";
-import { resolveHouseholdContext } from "../services/household-access.js";
-import { requireRequestUser } from "../lib/auth-http.js";
 import type { Env } from "../config/env.js";
+
+const patchCategorySchema = z.object({
+  category: z.string().min(1),
+  rememberForMerchant: z.boolean().optional().default(true),
+});
 
 type ViewScope = "all" | "household" | "personal";
 
@@ -102,6 +111,27 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
     const ctx = await resolveHouseholdContext(user.id);
     const query = request.query as { from?: string; to?: string };
     return getMoneyFlow(ctx.userIds, query.from, query.to);
+  });
+
+  app.get("/transactions/category-options", async () => {
+    return { categories: [...SPEND_CATEGORIES] };
+  });
+
+  app.patch("/transactions/:transactionId/category", async (request) => {
+    const { transactionId } = request.params as { transactionId: string };
+    const body = parseBody(
+      patchCategorySchema,
+      request.body,
+      "category is required",
+    );
+    const user = await requireRequestUser(request, app.config.env);
+
+    return updateTransactionCategory(
+      user.id,
+      transactionId,
+      body.category,
+      body.rememberForMerchant ?? true,
+    );
   });
 };
 

@@ -1,6 +1,8 @@
+import { plaidHistoryDateRange } from "@/lib/date-ranges";
+
+/** Default analytics range: up to 2 years of Plaid history. */
 export function yearToDateRange(): { from: string; to: string } {
-  const year = new Date().getFullYear();
-  return { from: `${year}-01-01`, to: `${year}-12-31` };
+  return plaidHistoryDateRange();
 }
 
 export function formatMonthLabel(month: string): string {

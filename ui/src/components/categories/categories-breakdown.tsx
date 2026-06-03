@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { CategoryRow } from "@/components/categories/category-row";
-import { TransactionRow } from "@/components/transactions/transaction-row";
+import { TransactionList } from "@/components/transactions/transaction-list";
 import { Card } from "@/components/ui/card";
-import { useTransactions } from "@/hooks/use-transactions";
 import { getCategoryColor } from "@/lib/category-colors";
 import { formatMoney } from "@/lib/format-money";
 import type { CategoryTotal } from "@/types/api";
@@ -38,11 +37,13 @@ export function CategoriesBreakdown({
     }
   }
 
-  const { data, isLoading, error } = useTransactions({
-    category: selectedCategory ?? undefined,
-    limit: 25,
-    sort: "date_desc",
-  });
+  const transactionFilters = useMemo(
+    () =>
+      selectedCategory
+        ? { category: selectedCategory, sort: "date_desc" as const }
+        : {},
+    [selectedCategory],
+  );
 
   return (
     <section aria-label="Category usage" className="flex flex-col gap-4">
@@ -93,42 +94,23 @@ export function CategoriesBreakdown({
                 {selectedCategory}
               </h3>
               <p className="text-sm text-text-muted">
-                Tap a category to explore · tap again to close
+                Scroll or use Load all to see every transaction · tap again to close
               </p>
             </div>
             <Link
               href={`/transactions?category=${encodeURIComponent(selectedCategory)}`}
               className="rounded-[var(--radius-pill)] bg-primary-soft px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
             >
-              See all →
+              See all in Activity →
             </Link>
           </div>
 
-          {isLoading ? (
-            <p className="px-4 py-12 text-center text-sm text-text-muted">
-              Loading…
-            </p>
-          ) : null}
-
-          {error ? (
-            <p className="px-4 py-12 text-center text-sm text-danger">
-              Couldn't load transactions.
-            </p>
-          ) : null}
-
-          {!isLoading && !error && data?.items.length === 0 ? (
-            <p className="px-4 py-12 text-center text-sm text-text-muted">
-              No transactions in this category yet.
-            </p>
-          ) : null}
-
-          {!isLoading && !error && data && data.items.length > 0 ? (
-            <div className="divide-y divide-border/60">
-              {data.items.map((transaction) => (
-                <TransactionRow key={transaction.id} {...transaction} />
-              ))}
-            </div>
-          ) : null}
+          <TransactionList
+            filters={transactionFilters}
+            pageSize={50}
+            emptyMessage="No transactions in this category yet."
+            loadingMessage={`Loading ${selectedCategory}…`}
+          />
         </Card>
       ) : null}
     </section>

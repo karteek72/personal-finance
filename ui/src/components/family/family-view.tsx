@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { useState } from "react";
 
+import { AsyncPanel } from "@/components/ui/async-panel";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -21,7 +22,7 @@ const ROLE_LABELS: Record<HouseholdMemberRole, string> = {
 };
 
 export function FamilyView() {
-  const { data, isLoading, error } = useHousehold();
+  const { data, isLoading, isFetching, error } = useHousehold();
   const { data: insights } = useHouseholdInsights();
   const mutations = useHouseholdMutations();
 
@@ -107,17 +108,17 @@ export function FamilyView() {
     }
   }
 
-  if (isLoading) {
-    return <p className="text-sm text-text-muted">Loading family…</p>;
-  }
-
-  if (error || !data) {
-    return <p className="text-sm text-danger">Couldn't load family data.</p>;
-  }
-
-  const isOwner = data.accessRole === "owner";
+  const isOwner = data?.accessRole === "owner";
 
   return (
+    <AsyncPanel
+      isLoading={isLoading}
+      isFetching={isFetching}
+      error={error ?? (!data && !isLoading ? new Error("Couldn't load family data.") : null)}
+      loadingMessage="Loading family…"
+      errorMessage="Couldn't load family data."
+    >
+      {data ? (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Family"
@@ -443,5 +444,7 @@ export function FamilyView() {
         </Card>
       ) : null}
     </div>
+      ) : null}
+    </AsyncPanel>
   );
 }

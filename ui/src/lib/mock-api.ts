@@ -18,6 +18,7 @@ import type {
   TransactionFilters,
   TransactionSummary,
   TrendsResponse,
+  UpdateTransactionCategoryResponse,
 } from "@/types/api";
 
 const MOCK_DELAY_MS = 150;
@@ -51,6 +52,46 @@ export async function getSummary(
 ): Promise<TransactionSummary> {
   await delay();
   return summaryData as TransactionSummary;
+}
+
+function normalizeMerchantKey(
+  merchantName: string | null | undefined,
+  name: string,
+): string {
+  return (merchantName?.trim() || name.trim()).toLowerCase().replace(/\s+/g, " ");
+}
+
+export async function updateTransactionCategory(
+  transactionId: string,
+  category: string,
+  rememberForMerchant: boolean,
+): Promise<UpdateTransactionCategoryResponse> {
+  await delay();
+  const items = (transactionsData as PaginatedTransactions).items;
+  const txn = items.find((row) => row.id === transactionId);
+  if (!txn) {
+    throw new Error("Transaction not found");
+  }
+
+  const merchantKey = normalizeMerchantKey(txn.merchantName, txn.name);
+  let merchantTransactionsUpdated = 0;
+
+  if (rememberForMerchant) {
+    for (const row of items) {
+      if (normalizeMerchantKey(row.merchantName, row.name) === merchantKey) {
+        row.category = category;
+        merchantTransactionsUpdated++;
+      }
+    }
+  } else {
+    txn.category = category;
+    merchantTransactionsUpdated = 1;
+  }
+
+  return {
+    transaction: { id: transactionId, category, merchantKey },
+    merchantTransactionsUpdated,
+  };
 }
 
 export async function getTransactions(

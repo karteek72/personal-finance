@@ -54,6 +54,15 @@ export interface Transaction {
   memberColor?: string | null;
 }
 
+export interface UpdateTransactionCategoryResponse {
+  transaction: {
+    id: string;
+    category: string;
+    merchantKey: string;
+  };
+  merchantTransactionsUpdated: number;
+}
+
 export interface TransactionSummary {
   totalSpent: string;
   income: string;
@@ -130,6 +139,7 @@ export interface PlaidSyncResponse {
   added: number;
   modified: number;
   removed: number;
+  message?: string;
 }
 
 export interface PlaidSyncAllResponse {
@@ -138,6 +148,8 @@ export interface PlaidSyncAllResponse {
   added: number;
   modified: number;
   removed: number;
+  message?: string;
+  failures?: { itemId: string; institutionName: string | null; message: string }[];
 }
 
 export interface PaginatedTransactions {

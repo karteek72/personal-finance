@@ -3,14 +3,15 @@
 import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { TransactionRow } from "@/components/transactions/transaction-row";
+import { TransactionList } from "@/components/transactions/transaction-list";
 import { Card } from "@/components/ui/card";
+import { SectionLoader } from "@/components/ui/section-loader";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { MonthPills } from "@/components/ui/month-pills";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useCategories } from "@/hooks/use-categories";
-import { useTransactions } from "@/hooks/use-transactions";
+import type { InfiniteTransactionFilters } from "@/hooks/use-infinite-transactions";
 import { useHousehold } from "@/hooks/use-household";
 import type { TransactionFilters } from "@/types/api";
 import { useViewModeStore } from "@/stores/view-mode-store";
@@ -35,12 +36,8 @@ const SORT_OPTIONS: { value: NonNullable<TransactionFilters["sort"]>; label: str
     { value: "category_asc", label: "Category A–Z" },
   ];
 
-function monthQueryValue(selectedMonth: number | null): string | undefined {
-  if (selectedMonth === null) {
-    return undefined;
-  }
-  const year = new Date().getFullYear();
-  return `${year}-${String(selectedMonth).padStart(2, "0")}`;
+function monthQueryValue(selectedMonth: string | null): string | undefined {
+  return selectedMonth ?? undefined;
 }
 
 function TransactionsContent() {
@@ -49,7 +46,7 @@ function TransactionsContent() {
 
   const [filter, setFilter] = useState<TransactionFilter>("all");
   const [search, setSearch] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [accountId, setAccountId] = useState(
     () => searchParams.get("accountId") ?? "",
   );
@@ -66,7 +63,9 @@ function TransactionsContent() {
   const { data: categoriesData } = useCategories();
   const { data: householdData } = useHousehold();
 
-  const { data, isLoading, error } = useTransactions({
+  const [categoryFeedback, setCategoryFeedback] = useState<string | null>(null);
+
+  const transactionFilters: InfiniteTransactionFilters = {
     type: filter === "all" ? undefined : filter,
     q: search || undefined,
     month: monthQueryValue(selectedMonth),
@@ -75,8 +74,7 @@ function TransactionsContent() {
     memberId: selectedMemberId || undefined,
     scope: selectedMemberId ? undefined : scope,
     sort,
-    limit: 100,
-  });
+  };
 
   const accountOptions = useMemo(
     () => [
@@ -237,32 +235,20 @@ function TransactionsContent() {
         />
       </div>
 
+      {categoryFeedback ? (
+        <p className="rounded-[var(--radius-sm)] bg-primary-soft/60 px-3 py-2 text-sm text-primary">
+          {categoryFeedback}
+        </p>
+      ) : null}
+
       <Card padding="none" className="overflow-hidden">
-        {isLoading ? (
-          <p className="px-4 py-12 text-center text-sm text-text-muted">
-            Loading…
-          </p>
-        ) : null}
-
-        {error ? (
-          <p className="px-4 py-12 text-center text-sm text-danger">
-            Couldn't load transactions.
-          </p>
-        ) : null}
-
-        {!isLoading && !error && data?.items.length === 0 ? (
-          <p className="px-4 py-12 text-center text-sm text-text-muted">
-            Nothing here — try changing your filters
-          </p>
-        ) : null}
-
-        {!isLoading && !error && data && data.items.length > 0 ? (
-          <div className="divide-y divide-border/60">
-            {data.items.map((transaction) => (
-              <TransactionRow key={transaction.id} {...transaction} />
-            ))}
-          </div>
-        ) : null}
+        <TransactionList
+          filters={transactionFilters}
+          pageSize={50}
+          emptyMessage="Nothing here — try changing your filters"
+          loadingMessage="Loading activity…"
+          onCategoryUpdated={setCategoryFeedback}
+        />
       </Card>
     </div>
   );
@@ -271,9 +257,7 @@ function TransactionsContent() {
 export default function TransactionsPage() {
   return (
     <Suspense
-      fallback={
-        <p className="text-sm text-text-muted">Loading activity…</p>
-      }
+      fallback={<SectionLoader message="Loading activity…" />}
     >
       <TransactionsContent />
     </Suspense>

@@ -8,6 +8,7 @@ import {
   parseCountryCodes,
   parsePlaidProducts,
 } from "../services/plaid/client.js";
+import { Products } from "plaid";
 import {
   deletePlaidItem,
   exchangeAndSync,
@@ -43,14 +44,19 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
 
     const user = await requireRequestUser(request, app.config.env);
     const client = getPlaidClient(app.config.env);
+    const products = parsePlaidProducts(app.config.env.PLAID_PRODUCTS);
     const linkTokenRequest: Parameters<typeof client.linkTokenCreate>[0] = {
       user: { client_user_id: user.id },
       client_name: "SpendFlow",
-      products: parsePlaidProducts(app.config.env.PLAID_PRODUCTS),
+      products,
       country_codes: parseCountryCodes(app.config.env.PLAID_COUNTRY_CODES),
       language: "en",
       webhook: `${app.config.env.APP_URL}/api/v1/webhooks/plaid`,
     };
+
+    if (products.includes(Products.Transactions)) {
+      linkTokenRequest.transactions = { days_requested: 730 };
+    }
 
     const redirectUri = resolvePlaidRedirectUri(app.config.env);
     if (redirectUri) {
@@ -123,14 +129,23 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
     return { items };
   });
 
-  app.post("/plaid/sync", async (request) => {
+  app.post("/plaid/sync", async (request, reply) => {
     const user = await requireRequestUser(request, app.config.env);
-    try {
-      return await syncAllPlaidItems(user.id, app.config.env);
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw AppError.plaidSyncError("Unable to sync Plaid accounts", error);
-    }
+    const env = app.config.env;
+
+    void syncAllPlaidItems(user.id, env).catch((error: unknown) => {
+      request.log.error({ err: error, userId: user.id }, "background plaid sync failed");
+    });
+
+    return reply.status(202).send({
+      status: "started",
+      itemsSynced: 0,
+      added: 0,
+      modified: 0,
+      removed: 0,
+      message:
+        "Sync started in the background. Balances and transactions will update shortly.",
+    });
   });
 
   app.post("/plaid/items/:itemId/sync", async (request) => {

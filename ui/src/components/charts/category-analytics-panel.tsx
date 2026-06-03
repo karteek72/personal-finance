@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { CategoriesBreakdown } from "@/components/categories/categories-breakdown";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ChartFilterBar } from "@/components/charts/chart-filter-bar";
 import { InteractiveAreaChart } from "@/components/charts/interactive-area-chart";
 import { InteractiveDonutChart } from "@/components/charts/interactive-donut-chart";
@@ -22,7 +23,7 @@ export function CategoryAnalyticsPanel({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const { data: accountsData } = useAccounts();
-  const { data, isLoading } = useChartData({
+  const { data, isLoading, isFetching } = useChartData({
     accountId: selectedAccountId || undefined,
     category: selectedCategory ?? undefined,
   });
@@ -61,8 +62,11 @@ export function CategoryAnalyticsPanel({
         }}
       />
 
-      {isLoading ? (
-        <p className="text-sm text-text-muted">Updating charts…</p>
+      {isFetching && !isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-text-muted" aria-live="polite">
+          <LoadingSpinner size="sm" label="Updating charts" />
+          Updating charts…
+        </div>
       ) : null}
 
       {data ? (

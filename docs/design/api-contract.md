@@ -64,7 +64,8 @@ HTTP status codes: `200` success, `201` created, `204` no content, `400` validat
 | GET | `/transactions/summary` | `from`, `to` | `TransactionSummary` |
 | GET | `/transactions/by-category` | `from`, `to` | `{ categories: CategoryTotal[] }` |
 | GET | `/transactions/flow` | `from`, `to` | `MoneyFlowResponse` |
-| PATCH | `/transactions/:id/category` | `{ category }` | `{ transaction }` |
+| PATCH | `/transactions/:id/category` | `{ category, rememberForMerchant? }` | `{ transaction, merchantTransactionsUpdated }` |
+| GET | `/transactions/category-options` | — | `{ categories: string[] }` |
 | GET | `/transactions/export.csv` | same as list filters | `text/csv` stream |
 
 ---
