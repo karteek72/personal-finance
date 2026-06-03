@@ -14,12 +14,10 @@ import { createLogger } from "../../lib/logger.js";
 import { getPlaidClient } from "./client.js";
 import { decryptPlaidToken } from "./crypto.js";
 import {
-  applyMerchantCategoryRule,
   getMerchantCategoryRulesMap,
   type CategoryRule,
 } from "../category-rules.js";
-import { inferClassification } from "../infer-subcategory.js";
-import { resolveInternalTransfer } from "../transfer-classification.js";
+import { classifyBankingTransaction } from "../classify-banking-transaction.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
 import { mapPlaidTransaction } from "./map-transaction.js";
 import { syncCreditCardLiabilities } from "./sync-liabilities.js";
@@ -80,25 +78,14 @@ function mapTxnToRow(
   categoryRules: Map<string, CategoryRule>,
 ): PlaidTransactionInsert {
   const mapped = mapPlaidTransaction(txn, accountType);
-  const inferred = inferClassification(
-    mapped.category,
-    mapped.merchantName,
-    mapped.name,
-  );
-  const { category, subCategory } = applyMerchantCategoryRule(
-    categoryRules,
-    mapped.merchantName,
-    mapped.name,
-    inferred.category,
-    inferred.subCategory,
-  );
-
-  const resolved = resolveInternalTransfer({
-    category,
-    subCategory,
+  const classified = classifyBankingTransaction({
+    categoryHint: mapped.category,
     name: mapped.name,
     merchantName: mapped.merchantName,
+    categoryRules,
     pfcDetailed: txn.personal_finance_category?.detailed ?? null,
+    transactionType: mapped.transactionType,
+    isTransfer: mapped.isTransfer,
   });
 
   return {
@@ -109,10 +96,10 @@ function mapTxnToRow(
     name: mapped.name,
     merchantName: mapped.merchantName,
     amount: mapped.amount,
-    category: resolved?.category ?? category,
-    subCategory: resolved?.subCategory ?? subCategory,
-    transactionType: resolved?.transactionType ?? mapped.transactionType,
-    isTransfer: resolved?.isTransfer ?? mapped.isTransfer,
+    category: classified.category,
+    subCategory: classified.subCategory,
+    transactionType: classified.transactionType,
+    isTransfer: classified.isTransfer,
     pending: mapped.pending,
     source: "plaid",
   };

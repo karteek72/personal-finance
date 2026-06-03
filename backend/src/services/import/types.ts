@@ -57,6 +57,8 @@ export interface ParsedBankingTransaction {
   transactionType: "expense" | "income" | "transfer";
   isTransfer: boolean;
   category: string;
+  /** Set after classification (preview + persist). */
+  subCategory?: string | null;
 }
 
 export interface ParsedStatement {

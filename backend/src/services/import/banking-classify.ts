@@ -9,17 +9,17 @@ const TRANSFER_PATTERNS = [
 export function categorizeBankingTransaction(name: string): string {
   const n = name.toUpperCase();
   if (/CISCO SYSTEMS.*PAYROLL|PAYROLL|DIRECT DEPOSIT/.test(n)) return "Income";
-  if (/ZELLE|FID BKG|MONEYLINE/.test(n)) return "Transfers";
+  if (/ZELLE|FID BKG|MONEYLINE/.test(n)) return "Transfers (internal)";
   if (/AMERICAN EXPRESS.*ACH|ONLINE SCHEDULEMENT PAYMENT|VEHICLE LOAN/.test(n))
-    return "Transfers";
+    return "Transfers (internal)";
   if (/COSTCO|WHOLE FOODS|SPROUTS|GROCERY/.test(n)) return "Food & Groceries";
   if (/TST |RESTAURANT|DOMINO|VELVET TACO/.test(n)) return "Dining & Restaurants";
   if (/CURSOR|APPLE\.COM|NETFLIX|SUBSCRIPTION/.test(n))
     return "Subscriptions & Software";
   if (/COSERV|ALLENWATER|AT&T \*PAYMENT|UTILITY|ELECTRIC/.test(n))
     return "Utilities & Bills";
-  if (/FEDEX|NTTA|TOLL|GAS|RACETRAC/.test(n)) return "Transport & Gas";
-  if (/INTEREST CHARGE|LATE FEE|FEE/.test(n)) return "Financial";
+  if (/FEDEX|NTTA|TOLL|GAS|RACETRAC/.test(n)) return "Transportation";
+  if (/INTEREST CHARGE|LATE FEE|FEE/.test(n)) return "Financial & Insurance";
   return "Uncategorized";
 }
 

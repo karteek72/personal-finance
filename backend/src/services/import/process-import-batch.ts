@@ -5,14 +5,17 @@ import { getDb } from "../../db/client.js";
 import { importBatches, importFiles } from "../../db/schema.js";
 import { decryptBytes } from "../../lib/field-crypto.js";
 import { createLogger } from "../../lib/logger.js";
+import { getMerchantCategoryRulesMap } from "../category-rules.js";
 import {
   findMatchingImportAccount,
   resolveOrCreateImportAccount,
 } from "./account-resolver.js";
+import { enrichStatementsWithClassification } from "./enrich-classification.js";
 import { parseImportFileAsync } from "./parse-file.js";
 import { purgeStaleImportBlobs } from "./purge-import-blobs.js";
 import { logImportAuditEvent } from "./import-audit.js";
 import { persistBankingTransactions } from "./persist-banking.js";
+import type { BankingTransactionSource } from "./persist-banking.js";
 import { persistInvestmentTransactions } from "./persist-investment.js";
 import type { ImportFilePreviewPayload, ParsedStatement } from "./types.js";
 
@@ -62,6 +65,7 @@ async function persistStatementsForFile(
   matchedAccountIds: (string | null)[],
   accountMappings: Record<string, string> | undefined,
   fileId: string,
+  categoryRules: Awaited<ReturnType<typeof getMerchantCategoryRulesMap>>,
 ): Promise<{ inserted: number; skipped: number }> {
   let inserted = 0;
   let skipped = 0;
@@ -80,8 +84,12 @@ async function persistStatementsForFile(
       );
     }
 
-    const bankSource =
-      statement.format === "ofx" ? ("ofx" as const) : ("qfx" as const);
+    const bankSource: BankingTransactionSource =
+      statement.format === "ofx"
+        ? "ofx"
+        : statement.format === "csv"
+          ? "csv"
+          : "qfx";
 
     if (statement.bankingTransactions.length > 0) {
       const bankResult = await persistBankingTransactions(
@@ -90,6 +98,7 @@ async function persistStatementsForFile(
         accountId,
         statement.bankingTransactions,
         bankSource,
+        categoryRules,
       );
       inserted += bankResult.inserted;
       skipped += bankResult.skipped;
@@ -146,6 +155,8 @@ export async function previewImportBatch(
     .from(importFiles)
     .where(eq(importFiles.batchId, batchId));
 
+  const categoryRules = await getMerchantCategoryRulesMap(batch.userId);
+
   let filesProcessed = 0;
 
   try {
@@ -161,10 +172,13 @@ export async function previewImportBatch(
         .where(eq(importFiles.id, file.id));
 
       const plaintext = decryptBytes(file.contentEncrypted, env, IMPORT_BLOB_SALT);
-      const statements = await parseImportFileAsync(
-        file.format,
-        file.format === "pdf" ? plaintext : plaintext.toString("utf8"),
-        file.filename,
+      const statements = enrichStatementsWithClassification(
+        await parseImportFileAsync(
+          file.format,
+          file.format === "pdf" ? plaintext : plaintext.toString("utf8"),
+          file.filename,
+        ),
+        categoryRules,
       );
 
       const matchedAccountIds: (string | null)[] = [];
@@ -284,6 +298,8 @@ export async function confirmImportBatch(
     .from(importFiles)
     .where(eq(importFiles.batchId, batchId));
 
+  const categoryRules = await getMerchantCategoryRulesMap(batch.userId);
+
   let filesProcessed = 0;
   let txnsInserted = 0;
   let txnsSkipped = 0;
@@ -307,6 +323,7 @@ export async function confirmImportBatch(
         preview.matchedAccountIds,
         options.accountMappings,
         file.id,
+        categoryRules,
       );
 
       txnsInserted += result.inserted;

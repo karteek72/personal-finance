@@ -13,6 +13,10 @@ import {
   mapInvestmentAction,
   mapRobinhoodTransCode,
 } from "./map-action.js";
+import {
+  categorizeBankingTransaction,
+  classifyBankingType,
+} from "./banking-classify.js";
 import type { ParsedBankingTransaction, ParsedInvestmentTransaction, ParsedStatement } from "./types.js";
 
 function externalId(prefix: string, parts: string[]): string {
@@ -578,7 +582,15 @@ export function parseSoFiCheckingCsv(
     const typeCol = rowValue(row, map, "Type");
     const rawAmt = Number.parseFloat(parseSignedMoney(rowValue(row, map, "Amount")));
     const isDeposit = /deposit|credit|interest/i.test(typeCol) || rawAmt > 0;
-    const amount = Math.abs(rawAmt).toFixed(2);
+    let amount = Math.abs(rawAmt).toFixed(2);
+    const { transactionType, isTransfer } = classifyBankingType(
+      name,
+      "depository",
+      rawAmt,
+    );
+    if (isTransfer) {
+      amount = Math.abs(Number.parseFloat(amount)).toFixed(2);
+    }
 
     banking.push({
       externalId: externalId("csv:sofi", [date, name, amount]),
@@ -586,9 +598,13 @@ export function parseSoFiCheckingCsv(
       name,
       merchantName: name,
       amount,
-      transactionType: isDeposit ? "income" : "expense",
-      isTransfer: false,
-      category: isDeposit ? "Income" : "Uncategorized",
+      transactionType: isTransfer ? transactionType : isDeposit ? "income" : "expense",
+      isTransfer,
+      category: isTransfer
+        ? "Transfers (internal)"
+        : isDeposit
+          ? "Income"
+          : categorizeBankingTransaction(name),
     });
   }
 

@@ -1,10 +1,14 @@
 import { and, eq } from "drizzle-orm";
+import type { CategoryRule } from "../category-rules.js";
+import { classifyBankingTransaction } from "../classify-banking-transaction.js";
 import type { getDb } from "../../db/client.js";
 import { transactions } from "../../db/schema.js";
 import { bankingDedupFingerprint } from "./fingerprint.js";
 import type { ParsedBankingTransaction } from "./types.js";
 
 export const BANKING_TXN_BATCH_SIZE = 500;
+
+export type BankingTransactionSource = "qfx" | "ofx" | "csv";
 
 export interface PersistBankingResult {
   inserted: number;
@@ -16,7 +20,8 @@ export async function persistBankingTransactions(
   userId: string,
   accountId: string,
   txns: ParsedBankingTransaction[],
-  source: "qfx" | "ofx" = "qfx",
+  source: BankingTransactionSource,
+  categoryRules: Map<string, CategoryRule>,
 ): Promise<PersistBankingResult> {
   let inserted = 0;
   let skipped = 0;
@@ -48,6 +53,15 @@ export async function persistBankingTransactions(
         continue;
       }
 
+      const classified = classifyBankingTransaction({
+        categoryHint: txn.category,
+        name: txn.name,
+        merchantName: txn.merchantName,
+        categoryRules,
+        transactionType: txn.transactionType,
+        isTransfer: txn.isTransfer,
+      });
+
       const result = await db
         .insert(transactions)
         .values({
@@ -58,10 +72,10 @@ export async function persistBankingTransactions(
           name: txn.name,
           merchantName: txn.merchantName,
           amount: txn.amount,
-          category: txn.category,
-          subCategory: null,
-          transactionType: txn.transactionType,
-          isTransfer: txn.isTransfer,
+          category: classified.category,
+          subCategory: classified.subCategory,
+          transactionType: classified.transactionType,
+          isTransfer: classified.isTransfer,
           pending: false,
           source,
           dedupFingerprint,
