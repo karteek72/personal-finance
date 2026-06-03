@@ -2,7 +2,11 @@ import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "d
 import { getDb } from "../db/client.js";
 import { countMonthsInclusive } from "../lib/date-range.js";
 import { formatMoneyAmount, roundDecimal, roundPercent } from "../lib/money.js";
-import { accounts, transactions } from "../db/schema.js";
+import {
+  accounts,
+  creditCardLiabilities,
+  transactions,
+} from "../db/schema.js";
 import { getMemberMapForAccounts } from "./household-store.js";
 import { getLiabilityMapForAccounts } from "./liability-store.js";
 import {
@@ -902,10 +906,132 @@ export async function getChartData(params: ChartDataParams) {
   };
 }
 
-export async function getAlerts() {
+type AlertSeverity = "warning" | "info";
+
+interface SpendingAlert {
+  id: string;
+  severity: AlertSeverity;
+  title: string;
+  message: string;
+  dismissible: boolean;
+}
+
+function monthBounds(month: string): { from: string; to: string } {
+  const [year, mon] = month.split("-");
+  const lastDay = new Date(Number.parseInt(year!, 10), Number.parseInt(mon!, 10), 0)
+    .getDate();
   return {
-    alerts: [],
+    from: `${year}-${mon}-01`,
+    to: `${year}-${mon}-${String(lastDay).padStart(2, "0")}`,
   };
+}
+
+function priorMonth(month: string): string {
+  const [yearStr, monStr] = month.split("-");
+  const year = Number.parseInt(yearStr ?? "", 10);
+  const mon = Number.parseInt(monStr ?? "", 10);
+  const date = new Date(year, mon - 2, 1);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+async function categorySpendByMonth(
+  userIds: string[],
+  month: string,
+  category: string,
+): Promise<number> {
+  const db = getDb();
+  const { from, to } = monthBounds(month);
+  const userFilter = sqlUserIdsIn(userIds);
+  const rows = await db.execute<{ total: string }>(sql`
+    SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
+    FROM transactions
+    WHERE ${userFilter}
+      AND transaction_type = 'expense'
+      AND is_transfer = false
+      AND category = ${category}
+      AND pending = false
+      AND date >= ${from}
+      AND date <= ${to}
+  `);
+  return Number.parseFloat(rows[0]?.total ?? "0");
+}
+
+export async function getAlerts(
+  userIds: string[],
+  month?: string,
+): Promise<{ alerts: SpendingAlert[] }> {
+  const db = getDb();
+  const alerts: SpendingAlert[] = [];
+  const refMonth = month ?? "2026-05";
+  const prevMonth = priorMonth(refMonth);
+
+  const watchCategories = [
+    "Dining & Restaurants",
+    "Subscriptions & Software",
+  ] as const;
+
+  for (const category of watchCategories) {
+    const current = await categorySpendByMonth(userIds, refMonth, category);
+    const previous = await categorySpendByMonth(userIds, prevMonth, category);
+    if (previous <= 0 || current <= previous) {
+      continue;
+    }
+    const pct = Math.round(((current - previous) / previous) * 100);
+    alerts.push({
+      id: `alert-spend-${category.toLowerCase().replace(/\s+/g, "-")}`,
+      severity: pct >= 15 ? "warning" : "info",
+      title: `${category} spend up ${pct}%`,
+      message: `You spent ${formatMoneyAmount(current)} on ${category} in ${refMonth}, up ${pct}% from ${prevMonth} (${formatMoneyAmount(previous)}).`,
+      dismissible: true,
+    });
+  }
+
+  const userFilter = sqlUserIdsIn(userIds);
+  const { from, to } = monthBounds(refMonth);
+  const pendingRows = await db.execute<{ count: string }>(sql`
+    SELECT COUNT(*)::text AS count
+    FROM transactions
+    WHERE ${userFilter}
+      AND pending = true
+      AND date >= ${from}
+      AND date <= ${to}
+  `);
+  const pendingCount = Number.parseInt(pendingRows[0]?.count ?? "0", 10);
+  if (pendingCount > 0) {
+    alerts.push({
+      id: "alert-pending-transactions",
+      severity: "info",
+      title: `${pendingCount} pending transaction${pendingCount === 1 ? "" : "s"}`,
+      message: `There ${pendingCount === 1 ? "is" : "are"} ${pendingCount} pending charge${pendingCount === 1 ? "" : "s"} this month that are not included in spend totals yet.`,
+      dismissible: true,
+    });
+  }
+
+  const overdueRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(creditCardLiabilities)
+    .innerJoin(accounts, eq(accounts.id, creditCardLiabilities.accountId))
+    .where(
+      and(
+        inArray(accounts.userId, userIds),
+        eq(creditCardLiabilities.isOverdue, true),
+      ),
+    );
+
+  const overdueCount = overdueRows[0]?.count ?? 0;
+  if (overdueCount > 0) {
+    alerts.push({
+      id: "alert-overdue-card",
+      severity: "warning",
+      title: "Credit card payment overdue",
+      message: `${overdueCount} linked card${overdueCount === 1 ? " has" : "s have"} an overdue statement balance. Pay at least the minimum to avoid fees.`,
+      dismissible: true,
+    });
+  }
+
+  return { alerts };
 }
 
 export async function transactionCount(userId?: string): Promise<number> {

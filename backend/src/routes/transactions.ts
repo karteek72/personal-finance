@@ -143,8 +143,10 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
 
 export const insightRoutes: FastifyPluginAsync = async (app) => {
   app.get("/insights/alerts", async (request) => {
-    await requireRequestUser(request, app.config.env);
-    return getAlerts();
+    const user = await requireRequestUser(request, app.config.env);
+    const ctx = await resolveHouseholdContext(user.id);
+    const query = request.query as { month?: string };
+    return getAlerts(ctx.userIds, query.month);
   });
 
   app.get("/insights/trends", async (request) => {

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "description": "Deterministic SpendFlow demo dataset for local backend + UI testing",
+  "devUserEmail": "personal@spendflow.local",
+  "partnerUserEmail": "partner@spendflow.local",
+  "externalIdPrefix": "mock:",
+  "scenarios": [
+    "dashboard-summary-kpis",
+    "transaction-list-filters-pagination",
+    "category-breakdown-and-subcategories",
+    "money-flow-and-trends-multi-month",
+    "insights-alerts-month-over-month",
+    "accounts-credit-and-depository-mix",
+    "credit-card-liabilities-statements",
+    "internal-transfers-excluded-from-spend",
+    "pending-transactions",
+    "merchant-category-rules",
+    "household-members-and-account-assignments",
+    "household-pending-invitation",
+    "linked-partner-user-household-scope",
+    "plaid-linked-accounts-metadata"
+  ],
+  "files": {
+    "users": "users.json",
+    "accounts": "accounts.json",
+    "plaidItems": "plaid-items.json",
+    "transactionsMay": "transactions-may.json",
+    "monthlySpend": "monthly-spend.json",
+    "merchantCategoryRules": "merchant-category-rules.json",
+    "creditCardLiabilities": "credit-card-liabilities.json",
+    "household": "household.json"
+  }
+}

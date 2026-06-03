@@ -169,12 +169,6 @@ export function CreditDebtDashboard() {
               />
             </section>
 
-            {data.overdueCount > 0 ? (
-              <Card padding="sm" className="border-danger/30 bg-danger/5 text-sm text-danger">
-                {data.overdueCount} card{data.overdueCount === 1 ? "" : "s"} report an overdue payment.
-              </Card>
-            ) : null}
-
             {data.cards.length === 0 ? (
               <Card padding="lg" className="text-center">
                 <p className="text-lg font-bold text-text">No credit cards linked</p>

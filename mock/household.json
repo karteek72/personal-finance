@@ -1,0 +1,59 @@
+{
+  "household": {
+    "id": "00000000-0000-4000-8000-000000000010",
+    "name": "Chenna Family"
+  },
+  "members": [
+    {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "userEmail": "personal@spendflow.local",
+      "displayName": "Me",
+      "role": "owner",
+      "avatarColor": "#7c3aed"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000012",
+      "userEmail": "partner@spendflow.local",
+      "displayName": "Alex",
+      "role": "partner",
+      "avatarColor": "#ec4899"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000013",
+      "userEmail": null,
+      "displayName": "Sam",
+      "role": "child",
+      "avatarColor": "#14b8a6"
+    }
+  ],
+  "accountAssignments": [
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901001",
+      "memberId": "00000000-0000-4000-8000-000000000011"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901002",
+      "memberId": "00000000-0000-4000-8000-000000000012"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901003",
+      "memberId": "00000000-0000-4000-8000-000000000012"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901004",
+      "memberId": "00000000-0000-4000-8000-000000000011"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901005",
+      "memberId": "00000000-0000-4000-8000-000000000011"
+    }
+  ],
+  "invitations": [
+    {
+      "memberId": "00000000-0000-4000-8000-000000000013",
+      "email": "sam@example.com",
+      "token": "seed-invite-sam-demo-token",
+      "expiresInDays": 14
+    }
+  ]
+}

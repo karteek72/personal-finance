@@ -35,7 +35,9 @@ export async function resolveRequestUser(
         if (user) return user;
       } catch (err) {
         request.log.debug({ err }, "invalid or expired access token");
-        return null;
+        if (!allowDevUser(env)) {
+          return null;
+        }
       }
     }
   }

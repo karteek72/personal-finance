@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
+import { MetricGrid } from "@/components/ui/metric-grid";
 import { useAccounts } from "@/hooks/use-accounts";
 import { formatMoney } from "@/lib/format-money";
 import type { Account } from "@/types/api";
@@ -81,14 +82,14 @@ export function AccountBalanceSummary() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <MetricGrid minColumnWidth="11rem">
         {[0, 1, 2].map((i) => (
           <div
             key={i}
             className="h-20 animate-pulse rounded-[var(--radius-card)] bg-border/30"
           />
         ))}
-      </div>
+      </MetricGrid>
     );
   }
 
@@ -102,7 +103,7 @@ export function AccountBalanceSummary() {
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
         Account Balances
       </h3>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <MetricGrid minColumnWidth="11rem">
         {groups.map((group) => (
           <button
             key={group.type}
@@ -142,7 +143,7 @@ export function AccountBalanceSummary() {
             </p>
           </button>
         ))}
-      </div>
+      </MetricGrid>
     </section>
   );
 }

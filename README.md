@@ -161,6 +161,17 @@ npm install
 npm run dev                         # starts on :3002
 ```
 
+### Demo data (mock seed)
+
+Load deterministic fixtures from [`mock/`](mock/) into Postgres (see [`mock/README.md`](mock/README.md)):
+
+```bash
+cd backend
+npm run db:seed
+```
+
+Use with `AUTH_ALLOW_DEV_USER=true` and `NEXT_PUBLIC_USE_MOCKS=false` to exercise the real API and UI.
+
 ### Database migrations
 
 ```bash
