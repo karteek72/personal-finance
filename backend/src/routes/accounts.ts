@@ -42,11 +42,43 @@ export const accountRoutes: FastifyPluginAsync = async (app) => {
 
     const env = app.config.env;
     const itemDbId = account.plaidItemId;
+    const operationId = request.id;
 
-    void syncPlaidItem(itemDbId, env).catch((error: unknown) => {
+    request.log.info(
+      {
+        operation: "plaid.sync_item",
+        operationId,
+        stage: "queued",
+        userId: user.id,
+        userEmail: user.email,
+        accountId,
+        accountName: account.name,
+        accountMask: account.mask,
+        itemDbId,
+        institutionName: account.institutionName,
+        trigger: "api_account_sync",
+      },
+      "Plaid account sync accepted — background sync queued",
+    );
+
+    void syncPlaidItem(itemDbId, env, {
+      operationId,
+      trigger: "api_account_sync",
+      requestId: request.id,
+    }).catch((error: unknown) => {
       request.log.error(
-        { err: error, accountId, itemDbId },
-        "background account plaid sync failed",
+        {
+          err: error,
+          operation: "plaid.sync_item",
+          operationId,
+          userId: user.id,
+          userEmail: user.email,
+          accountId,
+          accountName: account.name,
+          itemDbId,
+          stage: "failed",
+        },
+        "Plaid account background sync failed",
       );
     });
 

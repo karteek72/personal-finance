@@ -47,7 +47,6 @@ function getGreeting(): string {
 
 export function TopBar({ title }: TopBarProps) {
   const { theme, toggleTheme } = useTheme();
-  const year = new Date().getFullYear();
   const isFetching = useIsFetching() > 0;
 
   return (
@@ -68,9 +67,6 @@ export function TopBar({ title }: TopBarProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="hidden rounded-[var(--radius-pill)] bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary sm:inline">
-            {year}
-          </span>
           <NotificationBell />
           <UserMenu />
           <button

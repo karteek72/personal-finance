@@ -132,9 +132,37 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
   app.post("/plaid/sync", async (request, reply) => {
     const user = await requireRequestUser(request, app.config.env);
     const env = app.config.env;
+    const operationId = request.id;
 
-    void syncAllPlaidItems(user.id, env).catch((error: unknown) => {
-      request.log.error({ err: error, userId: user.id }, "background plaid sync failed");
+    request.log.info(
+      {
+        operation: "plaid.sync_all",
+        operationId,
+        stage: "queued",
+        userId: user.id,
+        userEmail: user.email,
+        trigger: "api_refresh_all",
+      },
+      "Plaid refresh-all accepted — background sync queued",
+    );
+
+    void syncAllPlaidItems(user.id, env, {
+      operationId,
+      trigger: "api_refresh_all",
+      requestId: request.id,
+      userEmail: user.email,
+    }).catch((error: unknown) => {
+      request.log.error(
+        {
+          err: error,
+          operation: "plaid.sync_all",
+          operationId,
+          userId: user.id,
+          userEmail: user.email,
+          stage: "failed",
+        },
+        "Plaid refresh-all background sync failed",
+      );
     });
 
     return reply.status(202).send({
@@ -160,8 +188,27 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
       throw AppError.notFound("Plaid item not found");
     }
 
+    request.log.info(
+      {
+        operation: "plaid.sync_item",
+        operationId: request.id,
+        stage: "started",
+        userId: user.id,
+        userEmail: user.email,
+        itemDbId: item.id,
+        plaidItemId: item.plaidItemId,
+        institutionName: item.institutionName,
+        trigger: "api_item_sync",
+      },
+      "Plaid single-item sync started (synchronous)",
+    );
+
     try {
-      const syncResult = await syncPlaidItem(item.id, app.config.env);
+      const syncResult = await syncPlaidItem(item.id, app.config.env, {
+        operationId: request.id,
+        trigger: "api_item_sync",
+        requestId: request.id,
+      });
       return { status: "completed", ...syncResult };
     } catch (error) {
       if (error instanceof AppError) throw error;

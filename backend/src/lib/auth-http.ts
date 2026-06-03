@@ -12,6 +12,6 @@ export async function requireRequestUser(
   if (!user) {
     throw AppError.unauthenticated();
   }
-  request.log.debug({ userId: user.id }, "authenticated request");
+  request.spendflowUser = { id: user.id, email: user.email };
   return user;
 }

@@ -2,8 +2,14 @@ import { CountryCode, type Transaction as PlaidTransaction } from "plaid";
 import { eq } from "drizzle-orm";
 import type { Env } from "../../config/env.js";
 import { getDb } from "../../db/client.js";
-import { accounts, plaidItems } from "../../db/schema.js";
+import { accounts, plaidItems, users } from "../../db/schema.js";
 import { AppError } from "../../lib/errors.js";
+import {
+  createOperationTimer,
+  logOperation,
+  logOperationError,
+  logOperationWarn,
+} from "../../lib/operation-log.js";
 import { createLogger } from "../../lib/logger.js";
 import { getPlaidClient } from "./client.js";
 import { decryptPlaidToken } from "./crypto.js";
@@ -29,6 +35,12 @@ export interface SyncResult {
   added: number;
   modified: number;
   removed: number;
+}
+
+export interface PlaidSyncOptions {
+  operationId?: string;
+  trigger?: string;
+  requestId?: string;
 }
 
 async function resolveInstitutionName(
@@ -101,9 +113,13 @@ async function flushTransactionBatch(
 export async function syncPlaidItem(
   itemDbId: string,
   env: Env,
+  options: PlaidSyncOptions = {},
 ): Promise<SyncResult> {
-  log.info({ itemDbId }, "plaid sync started");
+  const operationId = options.operationId ?? crypto.randomUUID();
+  const trigger = options.trigger ?? "manual";
+  const elapsed = createOperationTimer();
   const db = getDb();
+
   const [item] = await db
     .select()
     .from(plaidItems)
@@ -111,15 +127,51 @@ export async function syncPlaidItem(
     .limit(1);
 
   if (!item) {
-    log.warn({ itemDbId }, "plaid item not found");
+    logOperationWarn(
+      log,
+      "failed",
+      "Plaid item not found — sync aborted",
+      { operation: "plaid.sync_item", operationId, itemDbId, trigger },
+    );
     throw AppError.notFound("Plaid item not found");
   }
+
+  const [userRow] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, item.userId))
+    .limit(1);
+
+  const baseContext = {
+    operation: "plaid.sync_item" as const,
+    operationId,
+    trigger,
+    requestId: options.requestId,
+    userId: item.userId,
+    userEmail: userRow?.email ?? null,
+    itemDbId,
+    plaidItemId: item.plaidItemId,
+    hadCursor: Boolean(item.cursor),
+  };
+
+  logOperation(log, "started", "Plaid item sync started", {
+    ...baseContext,
+    lastSyncedAt: item.lastSyncedAt?.toISOString() ?? null,
+    institutionName: item.institutionName,
+  });
 
   let accessToken: string;
   try {
     accessToken = decryptPlaidToken(item.accessTokenEncrypted, env);
+    logOperation(log, "token_decrypted", "Plaid access token decrypted", baseContext);
   } catch (error) {
-    log.error({ itemDbId, err: error }, "failed to decrypt plaid access token");
+    logOperationError(
+      log,
+      "failed",
+      "Failed to decrypt Plaid access token — sync aborted",
+      baseContext,
+      error,
+    );
     throw AppError.plaidSyncError(
       "Could not decrypt stored Plaid credentials. Re-link the account or check ENCRYPTION_KEY.",
       error,
@@ -129,6 +181,12 @@ export async function syncPlaidItem(
   const client = getPlaidClient(env);
   const { institutionId, institutionName } =
     await resolveInstitutionName(accessToken, env);
+
+  logOperation(log, "institution_resolved", "Plaid institution resolved", {
+    ...baseContext,
+    institutionName,
+    institutionId,
+  });
 
   await db
     .update(plaidItems)
@@ -144,6 +202,13 @@ export async function syncPlaidItem(
   });
 
   const accountIdByPlaidId = new Map<string, string>();
+  const accountSummaries: {
+    accountId: string;
+    plaidAccountId: string;
+    name: string;
+    mask: string;
+    type: string;
+  }[] = [];
 
   for (const plaidAccount of accountsResponse.data.accounts) {
     const mask = plaidAccount.mask ?? "0000";
@@ -176,6 +241,13 @@ export async function syncPlaidItem(
         })
         .where(eq(accounts.id, existing[0].id));
       accountIdByPlaidId.set(plaidAccount.account_id, existing[0].id);
+      accountSummaries.push({
+        accountId: existing[0].id,
+        plaidAccountId: plaidAccount.account_id,
+        name: plaidAccount.name,
+        mask,
+        type: plaidAccount.type,
+      });
       continue;
     }
 
@@ -201,7 +273,21 @@ export async function syncPlaidItem(
       .returning();
 
     accountIdByPlaidId.set(plaidAccount.account_id, inserted!.id);
+    accountSummaries.push({
+      accountId: inserted!.id,
+      plaidAccountId: plaidAccount.account_id,
+      name: plaidAccount.name,
+      mask,
+      type: plaidAccount.type,
+    });
   }
+
+  logOperation(log, "accounts_synced", "Plaid accounts loaded and balances updated", {
+    ...baseContext,
+    institutionName,
+    accountsSynced: accountSummaries.length,
+    accounts: accountSummaries,
+  });
 
   await ensureAccountsAssignedToOwner(
     item.userId,
@@ -222,8 +308,17 @@ export async function syncPlaidItem(
   let modified = 0;
   let removed = 0;
   let hasMore = true;
+  let page = 0;
 
   while (hasMore) {
+    page += 1;
+    logOperation(log, "transactions_page", "Fetching transaction page from Plaid", {
+      ...baseContext,
+      institutionName,
+      page,
+      cursorPresent: Boolean(cursor),
+    });
+
     const syncResponse = await client.transactionsSync({
       access_token: accessToken,
       cursor,
@@ -276,6 +371,19 @@ export async function syncPlaidItem(
 
     cursor = syncResponse.data.next_cursor;
     hasMore = syncResponse.data.has_more;
+
+    logOperation(log, "transactions_page", "Transaction page applied to database", {
+      ...baseContext,
+      institutionName,
+      page,
+      pageAdded: upsertBatch.length,
+      pageModified: modifiedBatch.length,
+      pageRemoved: removedExternalIds.length,
+      totalAdded: added,
+      totalModified: modified,
+      totalRemoved: removed,
+      hasMore,
+    });
   }
 
   await db
@@ -296,6 +404,17 @@ export async function syncPlaidItem(
     modified,
     removed,
   };
-  log.info({ itemDbId, ...result }, "plaid sync completed");
+
+  logOperation(log, "completed", "Plaid item sync completed successfully", {
+    ...baseContext,
+    institutionName,
+    accountsSynced: result.accountsSynced,
+    added: result.added,
+    modified: result.modified,
+    removed: result.removed,
+    transactionPages: page,
+    durationMs: elapsed(),
+  });
+
   return result;
 }

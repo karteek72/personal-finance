@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { Env } from "../../config/env.js";
 import { getDb } from "../../db/client.js";
 import { plaidItems } from "../../db/schema.js";
+import { logOperation, logOperationWarn } from "../../lib/operation-log.js";
 import { createLogger } from "../../lib/logger.js";
 import { syncPlaidItem } from "./sync.js";
 
@@ -24,29 +26,35 @@ const TRANSACTIONS_SYNC_CODES = new Set([
 export async function syncPlaidItemByPlaidItemId(
   plaidItemId: string,
   env: Env,
+  webhookCode: string,
 ): Promise<void> {
+  const operationId = randomUUID();
   const db = getDb();
   const [item] = await db
-    .select({ id: plaidItems.id })
+    .select({ id: plaidItems.id, userId: plaidItems.userId })
     .from(plaidItems)
     .where(eq(plaidItems.plaidItemId, plaidItemId))
     .limit(1);
 
   if (!item) {
-    log.warn({ plaidItemId }, "webhook item_id not found in database");
+    logOperationWarn(
+      log,
+      "skipped",
+      "Plaid webhook item_id not found in database — sync skipped",
+      {
+        operation: "plaid.webhook_sync",
+        operationId,
+        plaidItemId,
+        webhookCode,
+      },
+    );
     return;
   }
 
-  const result = await syncPlaidItem(item.id, env);
-  log.info(
-    {
-      plaidItemId,
-      added: result.added,
-      modified: result.modified,
-      removed: result.removed,
-    },
-    "webhook-triggered plaid sync completed",
-  );
+  await syncPlaidItem(item.id, env, {
+    operationId,
+    trigger: `webhook:${webhookCode}`,
+  });
 }
 
 export async function handlePlaidWebhookPayload(
@@ -65,10 +73,17 @@ export async function handlePlaidWebhookPayload(
     return;
   }
 
-  log.info(
-    { itemId: payload.item_id, code: payload.webhook_code },
-    "plaid transactions webhook received",
-  );
+  logOperation(log, "started", "Plaid transactions webhook received", {
+    operation: "plaid.webhook_sync",
+    operationId: randomUUID(),
+    plaidItemId: payload.item_id,
+    webhookCode: payload.webhook_code,
+    trigger: `webhook:${payload.webhook_code}`,
+  });
 
-  await syncPlaidItemByPlaidItemId(payload.item_id, env);
+  await syncPlaidItemByPlaidItemId(
+    payload.item_id,
+    env,
+    payload.webhook_code,
+  );
 }

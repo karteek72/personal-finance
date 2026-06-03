@@ -7,7 +7,7 @@ import { TransactionList } from "@/components/transactions/transaction-list";
 import { Card } from "@/components/ui/card";
 import { SectionLoader } from "@/components/ui/section-loader";
 import { FilterSelect } from "@/components/ui/filter-select";
-import { MonthPills } from "@/components/ui/month-pills";
+import { MonthFilterSelect } from "@/components/ui/month-filter-select";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useCategories } from "@/hooks/use-categories";
@@ -125,8 +125,6 @@ function TransactionsContent() {
         subtitle="Everything you've spent, earned, or moved"
       />
 
-      <MonthPills selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
-
       {householdData && householdData.members.length > 0 ? (
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button
@@ -200,7 +198,11 @@ function TransactionsContent() {
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <MonthFilterSelect
+          selectedMonth={selectedMonth}
+          onChange={setSelectedMonth}
+        />
         <FilterSelect
           id="transaction-account-filter"
           label="Account"

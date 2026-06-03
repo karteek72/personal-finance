@@ -21,6 +21,11 @@ declare module "fastify" {
   interface FastifyInstance {
     config: { env: Env };
   }
+
+  interface FastifyRequest {
+    /** Set by requireRequestUser for richer request/sync logs */
+    spendflowUser?: { id: string; email: string };
+  }
 }
 
 async function main(): Promise<void> {

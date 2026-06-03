@@ -1,13 +1,23 @@
+import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import type { Env } from "../../config/env.js";
 import { getDb } from "../../db/client.js";
 import { AppError } from "../../lib/errors.js";
-import { plaidItems } from "../../db/schema.js";
-import { encryptPlaidToken } from "./crypto.js";
+import { plaidItems, users } from "../../db/schema.js";
+import {
+  createOperationTimer,
+  logOperation,
+  logOperationError,
+} from "../../lib/operation-log.js";
 import { createLogger } from "../../lib/logger.js";
-import { syncPlaidItem } from "./sync.js";
+import { encryptPlaidToken } from "./crypto.js";
+import { syncPlaidItem, type PlaidSyncOptions } from "./sync.js";
 
 const log = createLogger("plaid.item-store");
+
+export interface SyncAllPlaidOptions extends PlaidSyncOptions {
+  userEmail?: string | null;
+}
 
 export async function createPlaidItemFromExchange(
   userId: string,
@@ -74,21 +84,90 @@ export async function deletePlaidItem(itemDbId: string, userId: string) {
     );
 }
 
-export async function syncAllPlaidItems(userId: string, env: Env) {
+export async function syncAllPlaidItems(
+  userId: string,
+  env: Env,
+  options: SyncAllPlaidOptions = {},
+) {
+  const operationId = options.operationId ?? randomUUID();
+  const trigger = options.trigger ?? "sync_all";
+  const elapsed = createOperationTimer();
+  const db = getDb();
   const items = await listPlaidItems(userId);
-  const results = [];
-  const failures: { itemId: string; institutionName: string | null; message: string }[] =
-    [];
 
+  const [userRow] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  const userEmail = options.userEmail ?? userRow?.email ?? null;
+
+  logOperation(log, "started", "Plaid sync-all started for user", {
+    operation: "plaid.sync_all",
+    operationId,
+    trigger,
+    requestId: options.requestId,
+    userId,
+    userEmail,
+    itemCount: items.length,
+    items: items.map((item) => ({
+      itemDbId: item.id,
+      plaidItemId: item.plaidItemId,
+      institutionName: item.institutionName,
+      lastSyncedAt: item.lastSyncedAt?.toISOString() ?? null,
+    })),
+  });
+
+  const results = [];
+  const failures: {
+    itemId: string;
+    institutionName: string | null;
+    message: string;
+  }[] = [];
+
+  let itemIndex = 0;
   for (const item of items) {
+    itemIndex += 1;
+    logOperation(log, "item_loaded", "Syncing Plaid item for user", {
+      operation: "plaid.sync_all",
+      operationId,
+      trigger,
+      userId,
+      userEmail,
+      itemDbId: item.id,
+      plaidItemId: item.plaidItemId,
+      institutionName: item.institutionName,
+      itemIndex,
+      itemCount: items.length,
+    });
+
     try {
-      results.push(await syncPlaidItem(item.id, env));
+      results.push(
+        await syncPlaidItem(item.id, env, {
+          operationId,
+          trigger,
+          requestId: options.requestId,
+        }),
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Plaid sync failed";
-      log.error(
-        { itemDbId: item.id, plaidItemId: item.plaidItemId, err: error },
-        "plaid item sync failed",
+      logOperationError(
+        log,
+        "failed",
+        "Plaid item sync failed during sync-all",
+        {
+          operation: "plaid.sync_all",
+          operationId,
+          userId,
+          userEmail,
+          itemDbId: item.id,
+          plaidItemId: item.plaidItemId,
+          institutionName: item.institutionName,
+          itemIndex,
+        },
+        error,
       );
       failures.push({
         itemId: item.plaidItemId,
@@ -98,14 +177,13 @@ export async function syncAllPlaidItems(userId: string, env: Env) {
     }
   }
 
-  if (results.length === 0 && failures.length > 0) {
-    const first = failures[0]!;
-    const label = first.institutionName ?? first.itemId;
-    throw AppError.plaidSyncError(`${label}: ${first.message}`);
-  }
-
-  return {
-    status: failures.length > 0 ? ("partial" as const) : ("completed" as const),
+  const summary = {
+    status:
+      failures.length > 0
+        ? results.length > 0
+          ? ("partial" as const)
+          : ("failed" as const)
+        : ("completed" as const),
     itemsSynced: results.length,
     added: results.reduce((sum, row) => sum + row.added, 0),
     modified: results.reduce((sum, row) => sum + row.modified, 0),
@@ -113,6 +191,49 @@ export async function syncAllPlaidItems(userId: string, env: Env) {
     results,
     failures: failures.length > 0 ? failures : undefined,
   };
+
+  if (results.length === 0 && failures.length > 0) {
+    logOperationError(
+      log,
+      "failed",
+      "Plaid sync-all finished with no successful items",
+      {
+        operation: "plaid.sync_all",
+        operationId,
+        userId,
+        userEmail,
+        failureCount: failures.length,
+        durationMs: elapsed(),
+      },
+      failures[0]!.message,
+    );
+    const first = failures[0]!;
+    const label = first.institutionName ?? first.itemId;
+    throw AppError.plaidSyncError(`${label}: ${first.message}`);
+  }
+
+  logOperation(
+    log,
+    summary.status === "partial" ? "completed" : "completed",
+    summary.status === "partial"
+      ? "Plaid sync-all completed with some failures"
+      : "Plaid sync-all completed successfully",
+    {
+      operation: "plaid.sync_all",
+      operationId,
+      userId,
+      userEmail,
+      itemsSynced: summary.itemsSynced,
+      added: summary.added,
+      modified: summary.modified,
+      removed: summary.removed,
+      failureCount: failures.length,
+      failures: failures.length > 0 ? failures : undefined,
+      durationMs: elapsed(),
+    },
+  );
+
+  return summary;
 }
 
 export async function exchangeAndSync(
@@ -120,6 +241,7 @@ export async function exchangeAndSync(
   plaidItemId: string,
   accessToken: string,
   env: Env,
+  options: PlaidSyncOptions = {},
 ) {
   const item = await createPlaidItemFromExchange(
     userId,
@@ -127,6 +249,9 @@ export async function exchangeAndSync(
     accessToken,
     env,
   );
-  const syncResult = await syncPlaidItem(item.id, env);
+  const syncResult = await syncPlaidItem(item.id, env, {
+    ...options,
+    trigger: options.trigger ?? "link_exchange",
+  });
   return { item, syncResult };
 }
