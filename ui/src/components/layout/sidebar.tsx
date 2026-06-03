@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { href: "/", label: "Home" },
-  { href: "/flow", label: "Flow" },
   { href: "/categories", label: "Spend" },
   { href: "/transactions", label: "Activity" },
   { href: "/accounts", label: "Accounts" },
@@ -25,18 +24,6 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
             d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z"
             stroke="currentColor"
             strokeWidth="2"
-            strokeLinejoin="round"
-          />
-        </svg>
-      );
-    case "/flow":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" className={cls} aria-hidden="true">
-          <path
-            d="M4 14h4l2-4 4 8 2-4h4"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
             strokeLinejoin="round"
           />
         </svg>

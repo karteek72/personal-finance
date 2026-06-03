@@ -11,10 +11,10 @@ import { AuthGate } from "@/providers/auth-provider";
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "Home",
-  "/flow": "Flow",
+  "/flow": "Cash Flow",
   "/categories": "Spend",
   "/transactions": "Activity",
-  "/accounts": "Wallet",
+  "/accounts": "Accounts",
   "/debt": "Debt",
   "/family": "Family",
 };
