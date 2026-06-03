@@ -45,7 +45,8 @@ The UI image is built with `NEXT_PUBLIC_API_URL` pointing at the **public API** 
 | `./scripts/podman/deploy.sh --build` | Rebuild images, then start stack |
 | `./scripts/podman/verify.sh` | Check config, images, and HTTP health (after deploy) |
 | `./scripts/podman/build.sh` | Build API (Node) + UI (static `out/` in **nginx:alpine**) |
-| `./scripts/podman/down.sh` | Stop and remove containers |
+| `./scripts/podman/down.sh` | Stop app containers (api, worker, ui); Postgres and Redis keep running |
+| `./scripts/podman/down.sh --all` | Stop full stack including Postgres and Redis |
 | `./scripts/podman/logs.sh` | Follow compose logs (container stack) |
 
 ## Worker service
