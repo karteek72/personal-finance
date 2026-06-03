@@ -13,6 +13,27 @@ const navItems = [
   { href: "/family", label: "Family" },
 ] as const;
 
+const previewItems = [
+  { href: "/budgets", label: "Budgets" },
+  { href: "/wellness", label: "Wellness" },
+  { href: "/subscriptions", label: "Subscriptions" },
+  { href: "/coach", label: "AI Coach" },
+  { href: "/net-worth", label: "Net Worth" },
+  { href: "/investments", label: "Investments" },
+  { href: "/inflation", label: "Inflation" },
+  { href: "/behavioral", label: "Behavioral" },
+  { href: "/wrapped", label: "Wrapped" },
+  { href: "/calendar", label: "Money Calendar" },
+  { href: "/resilience", label: "Resilience" },
+  { href: "/fire", label: "FIRE" },
+  { href: "/time-machine", label: "Time Machine" },
+  { href: "/forecast", label: "Forecast" },
+  { href: "/dna", label: "Spending DNA" },
+  { href: "/why", label: "Why Tagger" },
+  { href: "/leaks", label: "Money Leaks" },
+  { href: "/merchants", label: "Merchants & Income" },
+] as const;
+
 function NavIcon({ href, active }: { href: string; active: boolean }) {
   const cls = clsx("h-[18px] w-[18px]", active && "stroke-[2.5]");
 
@@ -146,6 +167,52 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Preview section */}
+        <div className="mt-4 hidden lg:block">
+          <p className="mb-1.5 px-3 text-[9px] font-bold uppercase tracking-widest text-text-muted/60">
+            Preview
+          </p>
+          {previewItems.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={item.label}
+                className={clsx(
+                  "flex items-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-xs font-semibold transition-all",
+                  isActive
+                    ? "bg-primary-soft text-primary"
+                    : "text-text-muted hover:bg-primary-soft/30 hover:text-text",
+                )}
+              >
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Preview icon-only (collapsed) */}
+        <div className="mt-4 lg:hidden">
+          {previewItems.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={item.label}
+                className={clsx(
+                  "flex items-center justify-center rounded-[var(--radius-sm)] p-2 transition-all",
+                  isActive ? "bg-primary-soft text-primary" : "text-text-muted hover:bg-primary-soft/30",
+                )}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+              </Link>
+            );
+          })}
+        </div>
       </nav>
     </aside>
   );
