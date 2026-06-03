@@ -28,6 +28,7 @@ const RECATEGORIZE_RULES: RecategorizeRule[] = [
   { pattern: /at&t|att\*/, category: "Utilities & Bills", subCategory: "Phone & Mobile" },
   { pattern: /ntta autocharge|toll/, category: "Transportation", subCategory: "Tolls & Parking" },
   { pattern: /costco gas|racetrac|shell|chevron/, category: "Transportation", subCategory: "Gas & Fuel" },
+  { pattern: /payment thank you|autopay|ach pmt|credit card payment|payment from chk|card autopay|epayment|e-payment/, category: "Transfers (internal)", subCategory: "Credit Card Payments" },
   { pattern: /chewy\.com|chewy/, category: "Pet", subCategory: "Food & Treats" },
   { pattern: /petsmart|petco|pet supplies/, category: "Pet", subCategory: "Supplies & Toys" },
   { pattern: /banfield|vca animal|vet clinic|veterinary|animal hospital/, category: "Pet", subCategory: "Veterinary & Medical" },
@@ -66,7 +67,6 @@ const MERCHANT_RULES: MerchantRule[] = [
   { categories: ["Financial & Insurance", "Financial"], pattern: /aaa.*insur|usaa.*insur|home insurance|auto insurance/, subCategory: "Home & Auto Insurance" },
   { categories: ["Financial & Insurance", "Financial"], pattern: /interest charge|late fee|overdraft|bank fee/, subCategory: "Bank Fees & Interest" },
   { categories: ["Financial & Insurance", "Financial"], pattern: /loan payment|student loan|mortgage payment/, subCategory: "Loan Payments" },
-  { categories: ["Financial & Insurance", "Financial"], pattern: /payment thank you|autopay|ach pmt|credit card payment/, subCategory: "Credit Card Payments" },
   // Subscriptions & Software
   { categories: ["Subscriptions & Software", "Financial"], pattern: /cursor|claude\.ai|perplexity|openai|chatgpt|copilot/, subCategory: "AI Tools" },
   { categories: ["Subscriptions & Software", "Financial"], pattern: /netflix|disney\+|hulu|hbo|streaming/, subCategory: "Streaming Video" },

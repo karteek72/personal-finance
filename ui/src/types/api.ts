@@ -73,6 +73,8 @@ export interface TransactionSummary {
   topCategory: { name: string; amount: string };
   ccPaymentsExcluded: string;
   savingsRate: number;
+  transactionCount: number;
+  pendingCount: number;
   /** Calendar months in the summary date range (for avg/month). */
   monthsInPeriod?: number;
 }

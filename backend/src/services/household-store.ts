@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
+import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
 import {
   accounts,
   householdAccountAssignments,
@@ -476,6 +477,7 @@ export async function getHouseholdInsights(userId: string) {
         WHERE account_id IN (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})
           AND transaction_type = 'expense'
           AND NOT is_transfer
+          AND category != ${INTERNAL_TRANSFER_CATEGORY}
           AND date >= ${from}
           AND date <= ${to}
       `);
@@ -496,6 +498,7 @@ export async function getHouseholdInsights(userId: string) {
         WHERE account_id IN (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})
           AND transaction_type = 'expense'
           AND NOT is_transfer
+          AND category != ${INTERNAL_TRANSFER_CATEGORY}
           AND date >= ${from}
           AND date <= ${to}
         GROUP BY category

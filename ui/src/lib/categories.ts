@@ -79,7 +79,6 @@ export const SUBCATEGORY_MAP: Record<SpendCategory, readonly string[]> = {
     "Loan Payments",
     "Bank Fees & Interest",
     "Investments",
-    "Credit Card Payments",
   ],
   "Health & Medical": [
     "Doctor & Hospital",

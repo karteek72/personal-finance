@@ -7,6 +7,7 @@ import { getMemberMapForAccounts } from "./household-store.js";
 import {
   GENERAL_SUBCATEGORY,
 } from "./infer-subcategory.js";
+import { INTERNAL_TRANSFER_CATEGORY, CREDIT_CARD_PAYMENT_SUBCATEGORY } from "./transfer-classification.js";
 
 export async function listAccounts(userId: string) {
   const db = getDb();
@@ -329,6 +330,7 @@ export async function getSummary(
     WHERE ${userFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
+      AND category != ${INTERNAL_TRANSFER_CATEGORY}
       AND pending = false
       AND ${dateFilter}
   `);
@@ -348,6 +350,8 @@ export async function getSummary(
     FROM transactions
     WHERE ${userFilter}
       AND is_transfer = true
+      AND category = ${INTERNAL_TRANSFER_CATEGORY}
+      AND sub_category = ${CREDIT_CARD_PAYMENT_SUBCATEGORY}
       AND pending = false
       AND ${dateFilter}
   `);
@@ -361,6 +365,7 @@ export async function getSummary(
     WHERE ${userFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
+      AND category != ${INTERNAL_TRANSFER_CATEGORY}
       AND pending = false
       AND ${dateFilter}
     GROUP BY category
@@ -374,6 +379,25 @@ export async function getSummary(
   const incomeNum = Number.parseFloat(income);
   const spentNum = Number.parseFloat(totalSpent);
   const net = incomeNum - spentNum;
+
+  const txCountRows = await db.execute<{ count: string }>(sql`
+    SELECT COUNT(*)::text AS count
+    FROM transactions
+    WHERE ${userFilter}
+      AND transaction_type = 'expense'
+      AND is_transfer = false
+      AND category != ${INTERNAL_TRANSFER_CATEGORY}
+      AND pending = false
+      AND ${dateFilter}
+  `);
+
+  const pendingCountRows = await db.execute<{ count: string }>(sql`
+    SELECT COUNT(*)::text AS count
+    FROM transactions
+    WHERE ${userFilter}
+      AND pending = true
+      AND ${dateFilter}
+  `);
 
   const monthsInPeriod =
     from && to ? countMonthsInclusive(from, to) : 1;
@@ -391,6 +415,8 @@ export async function getSummary(
       : { name: "None", amount: "0.00" },
     ccPaymentsExcluded: formatMoneyAmount(ccPaymentsExcluded),
     savingsRate: roundDecimal(incomeNum > 0 ? net / incomeNum : 0),
+    transactionCount: Number.parseInt(txCountRows[0]?.count ?? "0", 10),
+    pendingCount: Number.parseInt(pendingCountRows[0]?.count ?? "0", 10),
     monthsInPeriod,
   };
 }
@@ -421,6 +447,7 @@ export async function getCategories(
     WHERE ${userFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
+      AND category != ${INTERNAL_TRANSFER_CATEGORY}
       AND ${dateFilter}
     GROUP BY category, sub_category
     ORDER BY category, SUM(amount::numeric) DESC
@@ -590,6 +617,7 @@ export async function getTrends(
     FROM transactions
     WHERE ${userFilter}
       AND transaction_type = 'expense' AND NOT is_transfer
+      AND category != ${INTERNAL_TRANSFER_CATEGORY}
     GROUP BY category, date_trunc('month', date)
     ORDER BY category, month
   `);
@@ -659,12 +687,12 @@ export async function getChartData(params: ChartDataParams) {
   }>(sql`
     SELECT
       to_char(date_trunc('month', t.date), 'YYYY-MM') AS month,
-      COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' AND NOT t.is_transfer THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS expenses,
+      COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' AND NOT t.is_transfer AND t.category != ${INTERNAL_TRANSFER_CATEGORY} THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS expenses,
       COALESCE(SUM(CASE WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS income,
       COALESCE(SUM(
         CASE
           WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric)
-          WHEN t.transaction_type = 'expense' AND NOT t.is_transfer THEN -ABS(t.amount::numeric)
+          WHEN t.transaction_type = 'expense' AND NOT t.is_transfer AND t.category != ${INTERNAL_TRANSFER_CATEGORY} THEN -ABS(t.amount::numeric)
           ELSE 0
         END
       ), 0)::text AS net
@@ -680,6 +708,7 @@ export async function getChartData(params: ChartDataParams) {
     WHERE ${whereClause}
       AND t.transaction_type = 'expense'
       AND NOT t.is_transfer
+      AND t.category != ${INTERNAL_TRANSFER_CATEGORY}
     GROUP BY t.category
     ORDER BY SUM(ABS(t.amount::numeric)) DESC
   `);
@@ -700,6 +729,7 @@ export async function getChartData(params: ChartDataParams) {
     WHERE ${whereClause}
       AND t.transaction_type = 'expense'
       AND NOT t.is_transfer
+      AND t.category != ${INTERNAL_TRANSFER_CATEGORY}
     GROUP BY a.id, a.name
     ORDER BY SUM(ABS(t.amount::numeric)) DESC
   `);
@@ -726,6 +756,7 @@ export async function getChartData(params: ChartDataParams) {
     WHERE ${whereClause}
       AND t.transaction_type = 'expense'
       AND NOT t.is_transfer
+      AND t.category != ${INTERNAL_TRANSFER_CATEGORY}
     GROUP BY hm.id, hm.display_name, hm.avatar_color
     ORDER BY SUM(ABS(t.amount::numeric)) DESC
   `);
@@ -748,6 +779,7 @@ export async function getChartData(params: ChartDataParams) {
     WHERE ${whereClause}
       AND t.transaction_type = 'expense'
       AND NOT t.is_transfer
+      AND t.category != ${INTERNAL_TRANSFER_CATEGORY}
     GROUP BY t.category, date_trunc('month', t.date)
     ORDER BY t.category, month
   `);

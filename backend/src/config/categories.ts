@@ -80,7 +80,6 @@ export const SUBCATEGORY_MAP = {
     "Loan Payments",
     "Bank Fees & Interest",
     "Investments",
-    "Credit Card Payments",
   ],
   "Health & Medical": [
     "Doctor & Hospital",

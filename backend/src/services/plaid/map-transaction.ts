@@ -1,4 +1,9 @@
 import type { Transaction as PlaidTransaction } from "plaid";
+import {
+  CREDIT_CARD_PAYMENT_SUBCATEGORY,
+  INTERNAL_TRANSFER_CATEGORY,
+  resolveInternalTransfer,
+} from "../transfer-classification.js";
 
 interface PFCEntry {
   category: string;
@@ -223,10 +228,13 @@ export function mapPlaidTransaction(
   }
 
   const mapped = isTransfer
-    ? { category: "Transfers (internal)", subCategory: "Credit Card Payments" as string | null }
+    ? {
+        category: INTERNAL_TRANSFER_CATEGORY,
+        subCategory: CREDIT_CARD_PAYMENT_SUBCATEGORY,
+      }
     : mapPlaidCategory(txn);
 
-  return {
+  const base = {
     externalId: `plaid-${txn.transaction_id}`,
     date: txn.date,
     name: txn.name,
@@ -238,4 +246,24 @@ export function mapPlaidTransaction(
     isTransfer,
     pending: txn.pending ?? false,
   };
+
+  const resolved = resolveInternalTransfer({
+    category: base.category,
+    subCategory: base.subCategory,
+    name: base.name,
+    merchantName: base.merchantName,
+    pfcDetailed: txn.personal_finance_category?.detailed ?? null,
+  });
+
+  if (resolved) {
+    return {
+      ...base,
+      category: resolved.category,
+      subCategory: resolved.subCategory,
+      transactionType: resolved.transactionType,
+      isTransfer: resolved.isTransfer,
+    };
+  }
+
+  return base;
 }
