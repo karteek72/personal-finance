@@ -1,5 +1,6 @@
 {
   "currentAge": 29,
+  "isDefaultAge": false,
   "currentNetWorth": "86145.04",
   "monthlySpend": "4200.00",
   "monthlyInvest": "2100.00",

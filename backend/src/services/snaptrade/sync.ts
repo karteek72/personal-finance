@@ -12,7 +12,7 @@ import { AppError } from "../../lib/errors.js";
 import { formatMoneyAmount, formatOptionPremium } from "../../lib/money.js";
 import { createLogger } from "../../lib/logger.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
-import { refreshFireProfile } from "../investment-analytics.js";
+import { refreshFireProfile, repairNonContributionInvestmentTxns } from "../investment-analytics.js";
 import {
   effectiveAssetType,
   isOccOptionTicker,
@@ -21,6 +21,7 @@ import {
   parseOccOptionTicker,
   resolveOptionPremiumPerShare,
 } from "../holdings-mapper.js";
+import { mapSnaptradeActivityType } from "../investment-txn-classify.js";
 import { getSnaptradeClient, resolveSnaptradeRedirectUri } from "./client.js";
 import { getSnaptradeCredentials } from "./user-store.js";
 
@@ -293,20 +294,6 @@ function daysAgoIso(days: number): string {
 function parseMoney(value: number | string | null | undefined): string {
   if (value == null || value === "") return "0.00";
   return formatMoneyAmount(value);
-}
-
-function mapActivityType(
-  raw: string | null | undefined,
-): "buy" | "sell" | "dividend" | "contribution" | "fee" {
-  const t = (raw ?? "").toUpperCase();
-  if (t === "BUY" || t === "REI") return "buy";
-  if (t === "SELL") return "sell";
-  if (t.includes("DIVIDEND")) return "dividend";
-  if (t === "CONTRIBUTION" || t === "WITHDRAWAL" || t === "TRANSFER") {
-    return "contribution";
-  }
-  if (t === "FEE" || t === "TAX") return "fee";
-  return "buy";
 }
 
 async function upsertSecurity(
@@ -660,24 +647,45 @@ export async function syncSnaptradeForUser(
             activity.description?.trim() ||
             `${activity.type ?? "Activity"}${ticker ? ` ${ticker}` : ""}`;
 
-          await db
+          const txnType = mapSnaptradeActivityType(activity.type);
+          const txnValues = {
+            userId,
+            accountId: accountDbId,
+            securityId,
+            externalId: `snaptrade:${externalId}`,
+            date,
+            name,
+            type: txnType,
+            quantity: activity.units != null ? parseMoney(activity.units) : null,
+            price:
+              activity.price != null ? parseMoney(activity.price) : null,
+            amount,
+            fees: parseMoney(activity.fee ?? 0),
+          };
+
+          const inserted = await db
             .insert(investmentTransactions)
-            .values({
-              userId,
-              accountId: accountDbId,
-              securityId,
-              externalId: `snaptrade:${externalId}`,
-              date,
-              name,
-              type: mapActivityType(activity.type),
-              quantity: activity.units != null ? parseMoney(activity.units) : null,
-              price:
-                activity.price != null ? parseMoney(activity.price) : null,
-              amount,
-              fees: parseMoney(activity.fee ?? 0),
+            .values(txnValues)
+            .onConflictDoUpdate({
+              target: [
+                investmentTransactions.accountId,
+                investmentTransactions.externalId,
+              ],
+              set: {
+                name: txnValues.name,
+                type: txnValues.type,
+                date: txnValues.date,
+                securityId: txnValues.securityId,
+                quantity: txnValues.quantity,
+                price: txnValues.price,
+                amount: txnValues.amount,
+                fees: txnValues.fees,
+              },
             })
-            .onConflictDoNothing();
-          activitiesAdded += 1;
+            .returning({ id: investmentTransactions.id });
+          if (inserted.length > 0) {
+            activitiesAdded += 1;
+          }
         }
       } catch (error) {
         log.warn(
@@ -692,6 +700,7 @@ export async function syncSnaptradeForUser(
 
   const repairedSecurities = await repairMisclassifiedOptionSecurities(db);
   const repairedHoldings = await repairOptionHoldingsCostBasis(db, userId);
+  const repairedTxns = await repairNonContributionInvestmentTxns([userId]);
 
   await refreshFireProfile(userId);
 
@@ -704,6 +713,7 @@ export async function syncSnaptradeForUser(
       activitiesAdded,
       repairedSecurities,
       repairedHoldings,
+      repairedTxns,
     },
     "snaptrade user synced",
   );

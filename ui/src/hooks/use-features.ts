@@ -1,8 +1,10 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api-client";
+import { readAuthSession } from "@/lib/auth-session";
+import { useAuthStore } from "@/stores/auth-store";
 
 /**
  * Hooks for the demo-dataset feature endpoints (wealth, planning, insights,
@@ -23,6 +25,62 @@ export function useInvestments() {
 
 export function useFire() {
   return useQuery({ queryKey: ["fire"], queryFn: () => api.getFire() });
+}
+
+export function usePatchFire() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.patchFire,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["fire"], data);
+      queryClient.invalidateQueries({ queryKey: ["analytics-profile"] });
+    },
+  });
+}
+
+export function useAnalyticsProfile() {
+  return useQuery({
+    queryKey: ["analytics-profile"],
+    queryFn: () => api.getAnalyticsProfile(),
+  });
+}
+
+export function useUserProfile() {
+  return useQuery({
+    queryKey: ["user-profile"],
+    queryFn: () => api.getUserProfile(),
+    retry: 1,
+  });
+}
+
+export function usePatchUserProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.patchUserProfile,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["user-profile"], data);
+      const { user, ...analytics } = data;
+      queryClient.setQueryData(["analytics-profile"], analytics);
+      queryClient.invalidateQueries({ queryKey: ["fire"] });
+      queryClient.setQueryData(["auth", "me"], { user });
+      const session = readAuthSession();
+      if (session) {
+        useAuthStore.getState().setSession({ ...session, user: data.user });
+      }
+    },
+  });
+}
+
+export function usePatchAnalyticsProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.patchAnalyticsProfile,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["analytics-profile"], data);
+      queryClient.invalidateQueries({ queryKey: ["fire"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+    },
+  });
 }
 
 export function useBudgets() {

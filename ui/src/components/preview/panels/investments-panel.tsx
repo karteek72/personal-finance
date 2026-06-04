@@ -45,7 +45,7 @@ export function InvestmentsPanel() {
   const hasHoldings = positions.length > 0;
 
   const behavioralAlerts = investments?.behavioralAlerts ?? [];
-  const monthlyComparison = investments?.monthlyComparison ?? null;
+  const monthlyActivity = investments?.monthlyActivity ?? null;
 
   return (
     <div className="space-y-5">
@@ -133,9 +133,9 @@ export function InvestmentsPanel() {
 
         {activeTab === "behavioral" && (
           <div className="space-y-3">
-            {behavioralAlerts.length === 0 && !monthlyComparison ? (
+            {behavioralAlerts.length === 0 && !monthlyActivity ? (
               <p className="px-1 py-4 text-center text-sm text-text-muted">
-                No behavioral insights yet. Sync investment activity and bank transactions to see patterns here.
+                No behavioral insights yet. Sync your brokerage to see portfolio health and trading-style patterns.
               </p>
             ) : null}
             {behavioralAlerts.map((alert, i) => (
@@ -158,26 +158,29 @@ export function InvestmentsPanel() {
               </div>
             ))}
 
-            {monthlyComparison ? (
+            {monthlyActivity ? (
               <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
-                <p className="mb-2 text-sm font-semibold text-text">Investment vs. spending this month</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-[var(--radius-sm)] bg-success/10 p-3">
-                    <p className="text-xs text-text-muted">Invested</p>
-                    <p className="text-lg font-extrabold text-success">
-                      {fmt(Number.parseFloat(monthlyComparison.monthlyInvest))}
+                <p className="mb-1 text-sm font-semibold text-text">Cash deployed this month</p>
+                <p className="mb-3 text-[10px] text-text-muted">
+                  Transfers in plus new purchases (options at contract cost, not inflated trade notional).
+                </p>
+                <p className="text-2xl font-extrabold text-success">
+                  {fmt(Number.parseFloat(monthlyActivity.totalDeployed))}
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="rounded-[var(--radius-sm)] bg-surface-raised p-3">
+                    <p className="text-xs text-text-muted">Contributions</p>
+                    <p className="text-sm font-bold text-text">
+                      {fmt(Number.parseFloat(monthlyActivity.cashContributions))}
                     </p>
                   </div>
                   <div className="rounded-[var(--radius-sm)] bg-surface-raised p-3">
-                    <p className="text-xs text-text-muted">Spent dining</p>
-                    <p className="text-lg font-extrabold text-text">
-                      {fmt(Number.parseFloat(monthlyComparison.diningSpend))}
+                    <p className="text-xs text-text-muted">New buys</p>
+                    <p className="text-sm font-bold text-text">
+                      {fmt(Number.parseFloat(monthlyActivity.purchaseDeployments))}
                     </p>
                   </div>
                 </div>
-                {monthlyComparison.summary ? (
-                  <p className="mt-2 text-xs text-text-muted">{monthlyComparison.summary}</p>
-                ) : null}
               </div>
             ) : null}
           </div>

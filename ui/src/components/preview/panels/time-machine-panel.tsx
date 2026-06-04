@@ -74,15 +74,48 @@ export function TimeMachinePanel() {
         <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-4">
           <p className="text-sm font-bold text-text">Your brokerage history</p>
           <p className="mt-2 text-sm text-text-muted">
-            Over the last {investmentHistory.lookbackYears} years you contributed{" "}
+            Over the last {investmentHistory.lookbackYears} years you deployed{" "}
             <strong className="text-text">
               ${Number.parseFloat(investmentHistory.totalContributed).toLocaleString()}
             </strong>{" "}
-            across {investmentHistory.transactionCount} investment transactions — estimated worth{" "}
+            of cash into investments ({investmentHistory.buyTransactionCount} buys
+            {investmentHistory.transactionCount > investmentHistory.buyTransactionCount
+              ? ` plus ${investmentHistory.transactionCount - investmentHistory.buyTransactionCount} deposits`
+              : ""}
+            ). That&apos;s actual cash out the door — not contract notional or
+            account transfers.
+          </p>
+          <p className="mt-2 text-sm text-text-muted">
+            Current portfolio value:{" "}
             <strong className="text-text">
-              ${Number.parseFloat(investmentHistory.estimatedValueToday).toLocaleString()}
-            </strong>{" "}
-            today based on current portfolio growth.
+              ${Number.parseFloat(investmentHistory.currentPortfolioValue).toLocaleString()}
+            </strong>
+            {Number.parseFloat(investmentHistory.estimatedValueToday) >
+            Number.parseFloat(investmentHistory.totalContributed) ? (
+              <>
+                . If your past contributions grew at the same rate as today&apos;s
+                holdings, they&apos;d be worth about{" "}
+                <strong className="text-text">
+                  $
+                  {Number.parseFloat(
+                    investmentHistory.estimatedValueToday,
+                  ).toLocaleString()}
+                </strong>
+                .
+              </>
+            ) : null}
+          </p>
+        </div>
+      ) : null}
+
+      {HABITS.length === 0 && investmentHistory ? (
+        <div className="rounded-[var(--radius-lg)] border border-dashed border-border bg-surface/50 p-4">
+          <p className="text-sm font-bold text-text">Spending habits</p>
+          <p className="mt-2 text-sm text-text-muted">
+            The &quot;what if you&apos;d invested instead&quot; section needs
+            categorized spending from your linked bank and card accounts. Import
+            statements or connect Plaid — we&apos;ll detect coffee, dining,
+            rideshare, and subscriptions automatically.
           </p>
         </div>
       ) : null}

@@ -24,6 +24,7 @@ import {
   insightRoutes,
 } from "./routes/transactions.js";
 import { wealthRoutes } from "./routes/wealth.js";
+import { userRoutes } from "./routes/user.js";
 import { planningRoutes } from "./routes/planning.js";
 import { insightRoutesV2 } from "./routes/insights.js";
 import { protectRoutes } from "./routes/protect.js";
@@ -107,6 +108,7 @@ async function main(): Promise<void> {
   await app.register(transactionRoutes, { prefix: "/api/v1" });
   await app.register(insightRoutes, { prefix: "/api/v1" });
   await app.register(wealthRoutes, { prefix: "/api/v1" });
+  await app.register(userRoutes, { prefix: "/api/v1" });
   await app.register(planningRoutes, { prefix: "/api/v1" });
   await app.register(insightRoutesV2, { prefix: "/api/v1" });
   await app.register(protectRoutes, { prefix: "/api/v1" });

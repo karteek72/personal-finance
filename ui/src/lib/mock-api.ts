@@ -34,6 +34,10 @@ import type {
   CreditDebtSummary,
   DnaResponse,
   FireResponse,
+  UserProfileResponse,
+  UserProfilePatch,
+  AnalyticsProfileResponse,
+  FireProfilePatch,
   ForecastResponse,
   HouseholdInsightsResponse,
   HouseholdMember,
@@ -968,9 +972,122 @@ export async function getRecurring(): Promise<RecurringResponse> {
   return recurringData as RecurringResponse;
 }
 
+let mockFireState: FireResponse = { ...(fireData as FireResponse) };
+
+let mockUserProfile: UserProfileResponse = {
+  user: {
+    id: "mock-user",
+    email: "demo@spendflow.app",
+    displayName: "Demo User",
+    createdAt: new Date().toISOString(),
+  },
+  currentAge: mockFireState.currentAge,
+  isDefaultAge: mockFireState.isDefaultAge ?? false,
+  householdSize: 2,
+  annualGrossIncome: "120000.00",
+  targetRetirementAge: 55,
+  employmentStatus: "employed",
+  riskTolerance: "moderate",
+  withdrawalRate: mockFireState.withdrawalRate,
+  realReturn: mockFireState.realReturn,
+  hasLinkedAccounts: true,
+  currentNetWorth: mockFireState.currentNetWorth,
+  monthlySpend: mockFireState.monthlySpend,
+  monthlyInvest: mockFireState.monthlyInvest,
+};
+
+let mockAnalyticsProfile: AnalyticsProfileResponse = {
+  currentAge: mockUserProfile.currentAge,
+  isDefaultAge: mockUserProfile.isDefaultAge,
+  householdSize: mockUserProfile.householdSize,
+  annualGrossIncome: mockUserProfile.annualGrossIncome,
+  targetRetirementAge: mockUserProfile.targetRetirementAge,
+  employmentStatus: mockUserProfile.employmentStatus,
+  riskTolerance: mockUserProfile.riskTolerance,
+  withdrawalRate: mockUserProfile.withdrawalRate,
+  realReturn: mockUserProfile.realReturn,
+  hasLinkedAccounts: mockUserProfile.hasLinkedAccounts,
+  currentNetWorth: mockUserProfile.currentNetWorth,
+  monthlySpend: mockUserProfile.monthlySpend,
+  monthlyInvest: mockUserProfile.monthlyInvest,
+};
+
+export async function getUserProfile(): Promise<UserProfileResponse> {
+  await delay();
+  return mockUserProfile;
+}
+
+export async function patchUserProfile(
+  patch: UserProfilePatch,
+): Promise<UserProfileResponse> {
+  await delay();
+  mockUserProfile = {
+    ...mockUserProfile,
+    ...patch,
+    user: {
+      ...mockUserProfile.user,
+      displayName:
+        patch.displayName != null
+          ? patch.displayName
+          : mockUserProfile.user.displayName,
+    },
+    annualGrossIncome:
+      patch.annualGrossIncome !== undefined
+        ? patch.annualGrossIncome == null
+          ? null
+          : patch.annualGrossIncome.toFixed(2)
+        : mockUserProfile.annualGrossIncome,
+    isDefaultAge:
+      patch.currentAge != null ? false : mockUserProfile.isDefaultAge,
+  };
+  const { user: _user, ...analytics } = mockUserProfile;
+  mockAnalyticsProfile = analytics;
+  mockFireState = {
+    ...mockFireState,
+    currentAge: mockUserProfile.currentAge,
+    isDefaultAge: mockUserProfile.isDefaultAge,
+    withdrawalRate: mockUserProfile.withdrawalRate,
+    realReturn: mockUserProfile.realReturn,
+  };
+  return mockUserProfile;
+}
+
+export async function getAnalyticsProfile(): Promise<AnalyticsProfileResponse> {
+  await delay();
+  return mockAnalyticsProfile;
+}
+
+export async function patchAnalyticsProfile(
+  patch: FireProfilePatch,
+): Promise<AnalyticsProfileResponse> {
+  await delay();
+  mockAnalyticsProfile = {
+    ...mockAnalyticsProfile,
+    ...patch,
+    isDefaultAge:
+      patch.currentAge != null ? false : mockAnalyticsProfile.isDefaultAge,
+  };
+  mockFireState = {
+    ...mockFireState,
+    ...patch,
+    isDefaultAge: mockAnalyticsProfile.isDefaultAge,
+  };
+  return mockAnalyticsProfile;
+}
+
 export async function getFire(): Promise<FireResponse> {
   await delay();
-  return fireData as FireResponse;
+  return mockFireState;
+}
+
+export async function patchFire(patch: FireProfilePatch): Promise<FireResponse> {
+  await delay();
+  mockFireState = {
+    ...mockFireState,
+    ...patch,
+    isDefaultAge: patch.currentAge != null ? false : mockFireState.isDefaultAge,
+  };
+  return mockFireState;
 }
 
 export async function getWellness(): Promise<WellnessResponse> {

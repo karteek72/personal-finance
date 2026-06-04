@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/drilldown-drawer";
 import { AccountBalanceSummary } from "@/components/accounts/account-balance-summary";
 import { WrappedBanner } from "@/components/preview/wrapped-banner";
+import { ProfileSetupBanner } from "@/components/profile/profile-setup-banner";
 import { useSummary } from "@/hooks/use-summary";
 import {
   analyticsDateRange,
@@ -85,6 +86,8 @@ function DashboardContent({
 
         {/* ── Wrapped (seasonal) ────────────────────────────────── */}
         <WrappedBanner />
+
+        <ProfileSetupBanner />
 
         {/* ── Net Savings hero ──────────────────────────────────── */}
         <div

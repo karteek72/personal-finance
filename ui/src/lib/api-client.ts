@@ -17,6 +17,10 @@ import type {
   DeleteAccountResponse,
   DnaResponse,
   FireResponse,
+  UserProfileResponse,
+  UserProfilePatch,
+  AnalyticsProfileResponse,
+  FireProfilePatch,
   ForecastResponse,
   HouseholdInsightsResponse,
   HouseholdInviteAcceptResponse,
@@ -126,14 +130,29 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok && response.status !== 202) {
     const body: unknown = await response.json().catch(() => null);
-    const message =
-      typeof body === "object" &&
-      body !== null &&
-      "error" in body &&
-      typeof (body as { error?: { message?: string } }).error?.message ===
-        "string"
-        ? (body as { error: { message: string } }).error.message
-        : `Request failed with status ${response.status}`;
+    let message = `Request failed with status ${response.status}`;
+    if (typeof body === "object" && body !== null) {
+      const nested = (body as { error?: { message?: string } }).error?.message;
+      const topLevel = (body as { message?: string }).message;
+      if (typeof nested === "string" && nested.length > 0) {
+        message = nested;
+      } else if (typeof topLevel === "string" && topLevel.length > 0) {
+        message = topLevel;
+      }
+      const details = (body as { error?: { details?: unknown } }).error?.details;
+      if (details && typeof details === "object" && message === "Invalid request body") {
+        const fieldSummary = Object.entries(details as Record<string, unknown>)
+          .flatMap(([field, errs]) =>
+            Array.isArray(errs)
+              ? errs.map((e) => `${field}: ${String(e)}`)
+              : [],
+          )
+          .join("; ");
+        if (fieldSummary) {
+          message = fieldSummary;
+        }
+      }
+    }
     throw new Error(message);
   }
 
@@ -681,6 +700,45 @@ export const api = {
   getFire(): Promise<FireResponse> {
     if (USE_MOCKS) return mockApi.getFire();
     return fetchJson<FireResponse>("/wealth/fire");
+  },
+
+  patchFire(patch: FireProfilePatch): Promise<FireResponse> {
+    if (USE_MOCKS) return mockApi.patchFire(patch);
+    return fetchJson<FireResponse>("/wealth/fire", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+  },
+
+  getAnalyticsProfile(): Promise<AnalyticsProfileResponse> {
+    if (USE_MOCKS) return mockApi.getAnalyticsProfile();
+    return fetchJson<AnalyticsProfileResponse>("/user/analytics-profile");
+  },
+
+  getUserProfile(): Promise<UserProfileResponse> {
+    if (USE_MOCKS) return mockApi.getUserProfile();
+    return fetchJson<UserProfileResponse>("/user/profile");
+  },
+
+  patchUserProfile(patch: UserProfilePatch): Promise<UserProfileResponse> {
+    if (USE_MOCKS) return mockApi.patchUserProfile(patch);
+    return fetchJson<UserProfileResponse>("/user/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+  },
+
+  patchAnalyticsProfile(
+    patch: FireProfilePatch,
+  ): Promise<AnalyticsProfileResponse> {
+    if (USE_MOCKS) return mockApi.patchAnalyticsProfile(patch);
+    return fetchJson<AnalyticsProfileResponse>("/user/analytics-profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
   },
 
   getImportFormats(): Promise<ImportFormatsResponse> {

@@ -208,8 +208,10 @@
     "lookbackYears": 3,
     "totalContributed": "75600.00",
     "estimatedValueToday": "89200.00",
+    "currentPortfolioValue": "86145.04",
     "monthlyAverageInvest": "2100.00",
-    "transactionCount": 36
+    "transactionCount": 36,
+    "buyTransactionCount": 34
   },
-  "monthlyComparison": null
+  "monthlyActivity": null
 }

@@ -10,7 +10,7 @@ import { formatMoneyAmount, roundPercent } from "../lib/money.js";
 import {
   buildInvestmentBehavioralAlerts,
   buildInvestmentHistorySummary,
-  buildInvestmentMonthlyComparison,
+  buildInvestmentMonthlyActivity,
 } from "./investment-analytics.js";
 import {
   aggregateStockPositions,
@@ -72,14 +72,15 @@ export interface InvestmentsResponse {
     lookbackYears: number;
     totalContributed: string;
     estimatedValueToday: string;
+    currentPortfolioValue: string;
     monthlyAverageInvest: string;
     transactionCount: number;
+    buyTransactionCount: number;
   } | null;
-  monthlyComparison: {
-    monthlyInvest: string;
-    diningSpend: string;
-    ratio: number | null;
-    summary: string | null;
+  monthlyActivity: {
+    cashContributions: string;
+    purchaseDeployments: string;
+    totalDeployed: string;
   } | null;
 }
 
@@ -185,7 +186,7 @@ export async function getInvestments(
   const totalGainLoss = portfolioValue - totalCostBasis;
   const behavioralAlerts = await buildInvestmentBehavioralAlerts(ctx.userIds);
   const investmentHistory = await buildInvestmentHistorySummary(ctx.userIds);
-  const monthlyComparison = await buildInvestmentMonthlyComparison(ctx.userIds);
+  const monthlyActivity = await buildInvestmentMonthlyActivity(ctx.userIds);
 
   const accountBalanceTotal = investmentAccounts.reduce(
     (sum, account) => sum + Number.parseFloat(account.balanceCurrent ?? "0"),
@@ -216,7 +217,7 @@ export async function getInvestments(
     holdings: positions.map(toLegacyHolding),
     behavioralAlerts,
     investmentHistory,
-    monthlyComparison,
+    monthlyActivity,
   };
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "@/lib/api-client";
@@ -106,6 +107,14 @@ export function UserMenu() {
             <p className="truncate text-sm font-semibold text-text">{fullName}</p>
             <p className="truncate text-xs text-text-muted">{user.email}</p>
           </div>
+          <Link
+            href="/profile"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-semibold text-text transition-colors hover:bg-bg"
+          >
+            Profile & analytics
+          </Link>
           {hasSession ? (
             <button
               type="button"

@@ -175,8 +175,22 @@ Backed by the demo dataset (Drizzle tables + derived rollups). All scoped to the
 | Method | Path | Response |
 |--------|------|----------|
 | GET | `/wealth/net-worth` | `NetWorthResponse` — current totals + monthly snapshot trend + asset/liability breakdown |
-| GET | `/wealth/investments` | `InvestmentsResponse` — `positions` (per-account rows), `stockAggregates` (cross-account rollup), `optionPositions`, `portfolioBreakdown`, behavioral alerts, `investmentHistory`, `monthlyComparison` |
-| GET | `/wealth/fire` | `FireResponse` — age, net worth, monthly spend/invest, withdrawal rate, real return (computed live from accounts + investment activity; `404` only when no accounts) |
+| GET | `/wealth/investments` | `InvestmentsResponse` — `positions`, `stockAggregates`, `optionPositions`, `portfolioBreakdown`, `behavioralAlerts` (portfolio health + trading-style), `investmentHistory`, `monthlyActivity` (cash deployed this month) |
+| GET | `/wealth/fire` | `FireResponse` — age (`isDefaultAge` true until user saves age; default 35), net worth, monthly spend/invest, withdrawal rate, real return (computed live from accounts + investment activity; `404` only when no accounts) |
+| PATCH | `/wealth/fire` | `FireProfilePatch` body (`currentAge`, `withdrawalRate`, `realReturn` — at least one) → `FireResponse` |
+
+---
+
+## User profile
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/user/profile` | `UserProfileResponse` — identity (name, email) + analytics preferences + live account-derived totals when linked |
+| PATCH | `/user/profile` | `UserProfilePatch` body (at least one field) → `UserProfileResponse` |
+| GET | `/user/analytics-profile` | Same analytics fields as above without `user` (deprecated alias) |
+| PATCH | `/user/analytics-profile` | FIRE subset: `currentAge`, `withdrawalRate`, `realReturn` (deprecated alias) |
+
+`UserProfilePatch` fields: `displayName`, `currentAge`, `householdSize`, `annualGrossIncome`, `targetRetirementAge`, `employmentStatus` (`employed` \| `self_employed` \| `retired` \| `student` \| `other`), `riskTolerance` (`conservative` \| `moderate` \| `aggressive`), `withdrawalRate`, `realReturn`.
 
 ---
 

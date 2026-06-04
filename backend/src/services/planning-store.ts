@@ -15,11 +15,21 @@ import {
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
 import { detectRecurringFromTransactions } from "./detect-recurring.js";
+import { deriveLifestyleHabitsFromTransactions } from "./lifestyle-habits.js";
 import {
   computeFireProfileInputs,
   refreshFireProfile,
 } from "./investment-analytics.js";
 import { resolveHouseholdContext } from "./household-access.js";
+import {
+  getAnalyticsProfile,
+  updateAnalyticsProfile,
+  type AnalyticsProfileResponse,
+  type FireProfilePatch,
+} from "./user-profile-store.js";
+
+export type { AnalyticsProfileResponse, FireProfilePatch };
+export { getAnalyticsProfile, updateAnalyticsProfile };
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MONTH_LABELS = [
@@ -377,6 +387,16 @@ export async function getRecurring(userId: string): Promise<RecurringResponse> {
         .where(inArray(lifestyleHabits.userId, ctx.userIds))
     : [];
 
+  const habits =
+    habitRows.length > 0
+      ? habitRows.map((h) => ({
+          id: h.label.toLowerCase().replace(/\s+/g, "-"),
+          emoji: h.emoji,
+          label: h.label,
+          monthly: formatMoneyAmount(h.monthlyAmount),
+        }))
+      : await deriveLifestyleHabitsFromTransactions(ctx.userIds);
+
   return {
     monthlyTotal: formatMoneyAmount(monthlyTotal),
     annualTotal: formatMoneyAmount(monthlyTotal * 12),
@@ -396,23 +416,34 @@ export async function getRecurring(userId: string): Promise<RecurringResponse> {
           fixable: true,
         },
       ],
-      habits: habitRows.map((h) => ({
-        id: h.label.toLowerCase().replace(/\s+/g, "-"),
-        emoji: h.emoji,
-        label: h.label,
-        monthly: formatMoneyAmount(h.monthlyAmount),
-      })),
+      habits,
     },
   };
 }
 
 export interface FireResponse {
   currentAge: number;
+  /** True when age is still the system default (35) — user should set their real age. */
+  isDefaultAge: boolean;
   currentNetWorth: string;
   monthlySpend: string;
   monthlyInvest: string;
   withdrawalRate: number;
   realReturn: number;
+}
+
+export async function updateFireProfile(
+  userId: string,
+  patch: FireProfilePatch,
+): Promise<FireResponse | null> {
+  const ctx = await resolveHouseholdContext(userId);
+  const { hasActiveAccounts } = await resolveActiveAccountScope(ctx.userIds);
+  if (!hasActiveAccounts) {
+    return null;
+  }
+
+  await updateAnalyticsProfile(userId, patch);
+  return getFire(userId);
 }
 
 export async function getFire(userId: string): Promise<FireResponse | null> {
@@ -431,6 +462,7 @@ export async function getFire(userId: string): Promise<FireResponse | null> {
 
   return {
     currentAge: live.currentAge,
+    isDefaultAge: live.isDefaultAge,
     currentNetWorth: live.currentNetWorth,
     monthlySpend: live.monthlySpend,
     monthlyInvest: live.monthlyInvest,

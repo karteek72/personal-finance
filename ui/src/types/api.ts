@@ -530,14 +530,15 @@ export interface InvestmentsResponse {
     lookbackYears: number;
     totalContributed: string;
     estimatedValueToday: string;
+    currentPortfolioValue: string;
     monthlyAverageInvest: string;
     transactionCount: number;
+    buyTransactionCount: number;
   } | null;
-  monthlyComparison: {
-    monthlyInvest: string;
-    diningSpend: string;
-    ratio: number | null;
-    summary: string | null;
+  monthlyActivity: {
+    cashContributions: string;
+    purchaseDeployments: string;
+    totalDeployed: string;
   } | null;
 }
 
@@ -600,11 +601,60 @@ export interface RecurringResponse {
 
 export interface FireResponse {
   currentAge: number;
+  /** True until the user saves their age (system default is 35). */
+  isDefaultAge: boolean;
   currentNetWorth: string;
   monthlySpend: string;
   monthlyInvest: string;
   withdrawalRate: number;
   realReturn: number;
+}
+
+export type EmploymentStatus =
+  | "employed"
+  | "self_employed"
+  | "retired"
+  | "student"
+  | "other";
+
+export type RiskTolerance = "conservative" | "moderate" | "aggressive";
+
+export interface UserProfilePatch {
+  displayName?: string;
+  currentAge?: number;
+  householdSize?: number | null;
+  annualGrossIncome?: number | null;
+  targetRetirementAge?: number | null;
+  employmentStatus?: EmploymentStatus | null;
+  riskTolerance?: RiskTolerance | null;
+  withdrawalRate?: number;
+  realReturn?: number;
+}
+
+export interface UserProfileResponse {
+  user: User;
+  currentAge: number;
+  isDefaultAge: boolean;
+  householdSize: number | null;
+  annualGrossIncome: string | null;
+  targetRetirementAge: number | null;
+  employmentStatus: EmploymentStatus | null;
+  riskTolerance: RiskTolerance | null;
+  withdrawalRate: number;
+  realReturn: number;
+  hasLinkedAccounts: boolean;
+  currentNetWorth: string | null;
+  monthlySpend: string | null;
+  monthlyInvest: string | null;
+}
+
+/** @deprecated Use UserProfileResponse fields without user */
+export type AnalyticsProfileResponse = Omit<UserProfileResponse, "user">;
+
+export interface FireProfilePatch {
+  currentAge?: number;
+  withdrawalRate?: number;
+  realReturn?: number;
 }
 
 export interface WellnessResponse {

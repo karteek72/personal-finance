@@ -186,8 +186,8 @@ export function holdingMarketValue(input: {
   let institution = Number.parseFloat(input.institutionValue ?? "0");
   if (isOption && institution > 0 && price > 0 && qty > 0) {
     const expected = qty * price * multiplier;
-    // Legacy sync stored price×qty without ×100.
-    if (institution < expected * 0.9) {
+    // Legacy sync stored price×qty without ×100, or broker sent contract notional.
+    if (institution < expected * 0.9 || institution > expected * 1.1) {
       institution = 0;
     }
   }

@@ -474,6 +474,7 @@ export const fireProfiles = pgTable("fire_profiles", {
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
   currentAge: integer("current_age").notNull(),
+  ageUserSet: boolean("age_user_set").notNull().default(false),
   currentNetWorth: numeric("current_net_worth", {
     precision: 14,
     scale: 2,
@@ -485,6 +486,11 @@ export const fireProfiles = pgTable("fire_profiles", {
   }).notNull(),
   withdrawalRate: numeric("withdrawal_rate", { precision: 5, scale: 2 }).notNull(),
   realReturn: numeric("real_return", { precision: 5, scale: 2 }).notNull(),
+  householdSize: integer("household_size"),
+  annualGrossIncome: numeric("annual_gross_income", { precision: 14, scale: 2 }),
+  targetRetirementAge: integer("target_retirement_age"),
+  employmentStatus: text("employment_status"),
+  riskTolerance: text("risk_tolerance"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
