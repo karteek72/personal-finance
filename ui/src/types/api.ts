@@ -448,6 +448,9 @@ export interface InvestmentHolding {
   value: string;
   gainLoss: string;
   gainLossPercent: number;
+  underlyingTicker?: string | null;
+  optionType?: string | null;
+  expirationLabel?: string | null;
 }
 
 export interface InvestmentsResponse {
@@ -470,6 +473,12 @@ export interface InvestmentsResponse {
     estimatedValueToday: string;
     monthlyAverageInvest: string;
     transactionCount: number;
+  } | null;
+  monthlyComparison: {
+    monthlyInvest: string;
+    diningSpend: string;
+    ratio: number | null;
+    summary: string | null;
   } | null;
 }
 

@@ -61,12 +61,10 @@ export function ForecastPanel() {
   const minBalance = Number.parseFloat(
     data?.minBalance ?? String(Math.min(...FORECAST.map((d) => d.projectedBalance))),
   );
-  const lowestDay = data?.lowestDay ?? "Jun 9";
-  const nextClearDate = data?.nextClearDate ?? "Jun 14";
-  const comfortFloor = data ? Number.parseFloat(data.comfortFloor) : 2500;
-  const recommendation =
-    data?.recommendation ??
-    "A bill and your typical weekend dining surge collide on Jun 7. Moving $150 of discretionary spend to next week keeps every day above your $2,500 comfort floor.";
+  const lowestDay = data?.lowestDay ?? "—";
+  const nextClearDate = data?.nextClearDate ?? "—";
+  const comfortFloor = data ? Number.parseFloat(data.comfortFloor) : 0;
+  const recommendation = data?.recommendation;
 
   return (
     <div className="space-y-5">
@@ -135,11 +133,15 @@ export function ForecastPanel() {
       </div>
 
       {/* Recommendation */}
-      <div className="rounded-[var(--radius-md)] border border-warning/30 bg-warning/5 p-4">
-        <p className="text-sm font-bold text-text">🌂 Plan ahead for the dip</p>
-        <p className="mt-1 text-sm text-text-muted">{recommendation}</p>
-        <p className="mt-1 text-[11px] text-text-muted">Comfort floor: {money(comfortFloor)}</p>
-      </div>
+      {recommendation ? (
+        <div className="rounded-[var(--radius-md)] border border-warning/30 bg-warning/5 p-4">
+          <p className="text-sm font-bold text-text">🌂 Plan ahead for the dip</p>
+          <p className="mt-1 text-sm text-text-muted">{recommendation}</p>
+          {comfortFloor > 0 ? (
+            <p className="mt-1 text-[11px] text-text-muted">Comfort floor: {money(comfortFloor)}</p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

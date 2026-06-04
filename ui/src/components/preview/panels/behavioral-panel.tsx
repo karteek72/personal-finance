@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 
 import {
-  FeatureEmptyState,
   FeaturePanelLoading,
 } from "@/components/preview/feature-empty-state";
 import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
@@ -38,8 +37,26 @@ export function BehavioralPanel() {
   const { data, isLoading } = useBehavioral();
   const [tags, setTags] = useState<Record<string, ReasonId>>({});
 
+  const reasonTotals: Record<string, number> = useMemo(
+    () =>
+      Object.fromEntries(
+        (data?.reasons ?? []).map((r) => [r.id, Number.parseFloat(r.total)]),
+      ),
+    [data?.reasons],
+  );
+
+  const breakdown = useMemo(
+    () =>
+      REASONS.map((r) => ({ ...r, total: reasonTotals[r.id] ?? 0 })).sort(
+        (a, b) => b.total - a.total,
+      ),
+    [reasonTotals],
+  );
+
   if (!gate.ready) return gate.node;
   if (isLoading) return <FeaturePanelLoading />;
+
+  const setTag = (txnId: string, reason: ReasonId) => setTags((t) => ({ ...t, [txnId]: reason }));
 
   const tagInbox: Txn[] = (data?.taggedTransactions ?? []).map((t) => ({
     id: t.id,
@@ -50,16 +67,10 @@ export function BehavioralPanel() {
     defaultReason: t.reasonId as ReasonId,
   }));
 
-  const setTag = (txnId: string, reason: ReasonId) => setTags((t) => ({ ...t, [txnId]: reason }));
-
   const archetype = data?.archetype ?? "—";
   const creepMonths = data?.creep.months ?? [];
   const income = (data?.creep.income ?? []).map((v) => Number.parseFloat(v));
   const spending = (data?.creep.spending ?? []).map((v) => Number.parseFloat(v));
-
-  const reasonTotals: Record<string, number> = Object.fromEntries(
-    (data?.reasons ?? []).map((r) => [r.id, Number.parseFloat(r.total)]),
-  );
 
   const challenges = (data?.challenges ?? []).map((c) => ({
     title: c.title,
@@ -83,14 +94,7 @@ export function BehavioralPanel() {
     (reasonTotals.stress ?? 0) + (reasonTotals.bored ?? 0) + (reasonTotals.impulse ?? 0);
   const totalSpend = Object.values(reasonTotals).reduce((a, b) => a + b, 0);
   const emotionalPct = totalSpend > 0 ? Math.round((emotionalTotal / totalSpend) * 100) : 0;
-
-  const breakdown = useMemo(
-    () =>
-      REASONS.map((r) => ({ ...r, total: reasonTotals[r.id] ?? 0 })).sort(
-        (a, b) => b.total - a.total,
-      ),
-    [reasonTotals],
-  );
+  const topReasons = breakdown.filter((b) => b.total > 0).slice(0, 3);
   const maxReason = Math.max(...breakdown.map((b) => b.total), 1);
 
   return (
@@ -99,14 +103,19 @@ export function BehavioralPanel() {
       <div className="rounded-[var(--radius-lg)] p-5" style={{ background: "var(--gradient-hero)" }}>
         <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Your spending archetype</p>
         <p className="mt-1 text-3xl font-extrabold text-white">{archetype}</p>
-        <p className="mt-1 text-sm text-white/70">
-          Dining &amp; experiences drive 38% of your discretionary spend. You value memories over things. Cost: $14,200/yr — 11% above the median for your income bracket.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">Dining</span>
-          <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">Travel</span>
-          <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">Entertainment</span>
-        </div>
+        {topReasons.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {topReasons.map((r) => (
+              <span key={r.id} className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">
+                {r.label}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-white/70">
+            Tag transactions with reasons to refine your spending personality.
+          </p>
+        )}
       </div>
 
       {/* Lifestyle creep chart */}
@@ -159,7 +168,14 @@ export function BehavioralPanel() {
         <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Emotional spending this month</p>
         <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">{emotionalPct}%</p>
         <p className="mt-1 text-sm text-white/70">
-          {money(emotionalTotal)} of your {money(totalSpend)} discretionary spend was tagged <strong>stress</strong>, <strong>bored</strong>, or <strong>impulse</strong>. Late-night stress orders are your #1 trigger.
+          {totalSpend > 0 ? (
+            <>
+              {money(emotionalTotal)} of your {money(totalSpend)} discretionary spend was tagged{" "}
+              <strong>stress</strong>, <strong>bored</strong>, or <strong>impulse</strong>.
+            </>
+          ) : (
+            "Tag recent purchases to see how much of your spend is emotional."
+          )}
         </p>
       </div>
 
@@ -225,13 +241,6 @@ export function BehavioralPanel() {
               ))}
             </div>
           </div>
-
-          <div className="rounded-[var(--radius-md)] border border-danger/30 bg-danger/5 p-4">
-            <p className="text-sm font-bold text-text">Pattern detected</p>
-            <p className="mt-1 text-sm text-text-muted">
-              Your stress spending happens 78% of the time between 9pm–1am. A 10-minute &ldquo;cool-off&rdquo; reminder on late-night checkouts could save an estimated <strong>$310/mo</strong>.
-            </p>
-          </div>
         </div>
       </div>
 
@@ -284,22 +293,6 @@ export function BehavioralPanel() {
         <button className="w-full rounded-[var(--radius-md)] border border-dashed border-border py-3 text-sm text-text-muted transition hover:border-primary hover:text-primary">
           + Start a new challenge
         </button>
-      </div>
-
-      {/* Counterfactual */}
-      <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
-        <p className="text-sm font-semibold text-text mb-2">True cost calculator</p>
-        <div className="space-y-2">
-          {[
-            { habit: "Daily coffee ($6)", annual: "$2,190", tenYear: "$27,000 if invested at 7% return" },
-            { habit: "Food delivery (avg $35/order, 4x/wk)", annual: "$7,280", tenYear: "$91,000 if invested" },
-          ].map((item) => (
-            <div key={item.habit} className="rounded-[var(--radius-sm)] bg-surface-raised p-3">
-              <p className="text-xs font-semibold text-text">{item.habit}</p>
-              <p className="text-xs text-text-muted mt-0.5">{item.annual}/yr · {item.tenYear}</p>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

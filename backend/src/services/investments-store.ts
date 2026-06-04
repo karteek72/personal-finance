@@ -10,6 +10,7 @@ import { formatMoneyAmount, roundPercent } from "../lib/money.js";
 import {
   buildInvestmentBehavioralAlerts,
   buildInvestmentHistorySummary,
+  buildInvestmentMonthlyComparison,
 } from "./investment-analytics.js";
 import { resolveHouseholdContext } from "./household-access.js";
 
@@ -24,6 +25,9 @@ export interface InvestmentHolding {
   value: string;
   gainLoss: string;
   gainLossPercent: number;
+  underlyingTicker?: string | null;
+  optionType?: string | null;
+  expirationLabel?: string | null;
 }
 
 export interface InvestmentsResponse {
@@ -46,6 +50,12 @@ export interface InvestmentsResponse {
     estimatedValueToday: string;
     monthlyAverageInvest: string;
     transactionCount: number;
+  } | null;
+  monthlyComparison: {
+    monthlyInvest: string;
+    diningSpend: string;
+    ratio: number | null;
+    summary: string | null;
   } | null;
 }
 
@@ -71,6 +81,22 @@ function holdingMarketValue(input: {
   }
 
   return { value: cost, unitPrice: basis, cost };
+}
+
+function parseOptionSector(sector: string | null): {
+  optionType: string | null;
+  underlyingTicker: string | null;
+  expirationLabel: string | null;
+} {
+  if (!sector) {
+    return { optionType: null, underlyingTicker: null, expirationLabel: null };
+  }
+  const parts = sector.split(" · ");
+  return {
+    optionType: parts[0] ?? null,
+    underlyingTicker: parts[1] ?? null,
+    expirationLabel: parts[2]?.replace(/^exp /, "") ?? null,
+  };
 }
 
 export async function getInvestments(
@@ -118,6 +144,8 @@ export async function getInvestments(
     });
     portfolioValue += value;
     totalCostBasis += cost;
+    const optionMeta =
+      row.assetType === "option" ? parseOptionSector(row.sector) : null;
     return {
       ticker: row.ticker,
       name: row.name,
@@ -129,6 +157,13 @@ export async function getInvestments(
       value: formatMoneyAmount(value),
       gainLoss: formatMoneyAmount(value - cost),
       gainLossPercent: cost > 0 ? roundPercent(((value - cost) / cost) * 100) : 0,
+      ...(optionMeta
+        ? {
+            underlyingTicker: optionMeta.underlyingTicker,
+            optionType: optionMeta.optionType,
+            expirationLabel: optionMeta.expirationLabel,
+          }
+        : {}),
     };
   });
   mapped.sort((a, b) => Number.parseFloat(b.value) - Number.parseFloat(a.value));
@@ -136,6 +171,7 @@ export async function getInvestments(
   const totalGainLoss = portfolioValue - totalCostBasis;
   const behavioralAlerts = await buildInvestmentBehavioralAlerts(ctx.userIds);
   const investmentHistory = await buildInvestmentHistorySummary(ctx.userIds);
+  const monthlyComparison = await buildInvestmentMonthlyComparison(ctx.userIds);
 
   const accountBalanceTotal = investmentAccounts.reduce(
     (sum, account) => sum + Number.parseFloat(account.balanceCurrent ?? "0"),
@@ -162,6 +198,7 @@ export async function getInvestments(
     holdings: mapped,
     behavioralAlerts,
     investmentHistory,
+    monthlyComparison,
   };
 }
 

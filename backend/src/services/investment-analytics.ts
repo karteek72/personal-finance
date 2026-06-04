@@ -19,6 +19,7 @@ const DINING_CATEGORIES = new Set([
   "Food & Drink",
   "Restaurants",
   "Dining",
+  "Dining & Restaurants",
   "Coffee Shops",
 ]);
 
@@ -34,6 +35,13 @@ export interface InvestmentHistorySummary {
   estimatedValueToday: string;
   monthlyAverageInvest: string;
   transactionCount: number;
+}
+
+export interface InvestmentMonthlyComparison {
+  monthlyInvest: string;
+  diningSpend: string;
+  ratio: number | null;
+  summary: string | null;
 }
 
 export interface FireProfileInputs {
@@ -159,6 +167,41 @@ export async function sumDiningSpendLastMonth(userIds: string[]): Promise<number
     }
   }
   return dining;
+}
+
+function currentMonthStartIso(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+}
+
+export async function buildInvestmentMonthlyComparison(
+  userIds: string[],
+): Promise<InvestmentMonthlyComparison | null> {
+  const monthStart = currentMonthStartIso();
+  const monthlyInvest = await sumInvestmentContributions(userIds, monthStart);
+  const diningSpend = await sumDiningSpendLastMonth(userIds);
+
+  if (monthlyInvest <= 0 && diningSpend <= 0) {
+    return null;
+  }
+
+  const ratio =
+    diningSpend > 0 && monthlyInvest > 0 ? monthlyInvest / diningSpend : null;
+
+  let summary: string | null = null;
+  if (ratio != null) {
+    summary =
+      ratio >= 1
+        ? `Invest-to-dine ratio: ${ratio.toFixed(2)} — you're investing more than dining this month.`
+        : `Invest-to-dine ratio: ${ratio.toFixed(2)} — dining outpaces investing this month.`;
+  }
+
+  return {
+    monthlyInvest: formatMoneyAmount(monthlyInvest),
+    diningSpend: formatMoneyAmount(diningSpend),
+    ratio,
+    summary,
+  };
 }
 
 export async function buildInvestmentBehavioralAlerts(

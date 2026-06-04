@@ -39,14 +39,102 @@ interface SnaptradePositionInstrument {
   symbol?: string | null;
   description?: string | null;
   currency?: { code?: string } | null;
+  kind?: string | null;
+  option_type?: string | null;
+  strike_price?: string | number | null;
+  expiration_date?: string | null;
+  underlying?: SnaptradePositionInstrument | null;
 }
 
 interface SnaptradePosition {
+  /** Legacy shape (pre-v4 positions payload) */
   symbol?: SnaptradePositionInstrument | null;
+  /** Current SnapTrade positions API shape */
+  instrument?: SnaptradePositionInstrument | null;
   units?: number | string | null;
   price?: number | string | null;
   average_purchase_price?: number | string | null;
+  cost_basis?: number | string | null;
   open_pnl?: number | string | null;
+}
+
+function resolvePositionInstrument(
+  position: SnaptradePosition,
+): SnaptradePositionInstrument | null {
+  return position.instrument ?? position.symbol ?? null;
+}
+
+function resolvePositionTicker(position: SnaptradePosition): string | null {
+  const instrument = resolvePositionInstrument(position);
+  const ticker =
+    instrument?.symbol?.trim() || instrument?.description?.trim() || null;
+  return ticker;
+}
+
+function mapSnaptradeAssetType(kind: string | null | undefined): string {
+  switch ((kind ?? "").toLowerCase()) {
+    case "option":
+      return "option";
+    case "etf":
+      return "etf";
+    case "mutual_fund":
+      return "mutual_fund";
+    case "cryptocurrency":
+    case "crypto":
+      return "crypto";
+    case "bond":
+      return "bond";
+    case "adr":
+    case "stock":
+    default:
+      return "equity";
+  }
+}
+
+function formatOptionExpiration(iso: string): string {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function buildSecurityMetadata(instrument: SnaptradePositionInstrument): {
+  name: string;
+  assetType: string;
+  sector: string | null;
+} {
+  const assetType = mapSnaptradeAssetType(instrument.kind);
+  if (assetType !== "option") {
+    return {
+      name: instrument.description?.trim() || instrument.symbol?.trim() || "Unknown",
+      assetType,
+      sector: null,
+    };
+  }
+
+  const underlying =
+    instrument.underlying?.symbol?.trim() ??
+    instrument.symbol?.trim().split(/\s+/)[0] ??
+    "?";
+  const underlyingName = instrument.underlying?.description?.trim();
+  const optionType = instrument.option_type === "PUT" ? "Put" : "Call";
+  const strike =
+    instrument.strike_price != null && instrument.strike_price !== ""
+      ? `$${instrument.strike_price}`
+      : "";
+  const expiration = instrument.expiration_date
+    ? formatOptionExpiration(instrument.expiration_date)
+    : "";
+
+  const name = underlyingName
+    ? `${underlyingName} — ${strike} ${optionType}${expiration ? ` · ${expiration}` : ""}`
+    : `${underlying} ${strike} ${optionType}${expiration ? ` · ${expiration}` : ""}`;
+
+  const sector = `${optionType} · ${underlying}${expiration ? ` · exp ${expiration}` : ""}`;
+
+  return { name, assetType, sector };
 }
 
 interface SnaptradeActivity {
@@ -89,14 +177,18 @@ function mapActivityType(
 
 async function upsertSecurity(
   db: ReturnType<typeof getDb>,
-  ticker: string,
-  name: string,
-  currentPrice?: string,
+  input: {
+    ticker: string;
+    name: string;
+    assetType: string;
+    sector?: string | null;
+    currentPrice?: string;
+  },
 ): Promise<string> {
-  const normalized = ticker.toUpperCase().slice(0, 32);
+  const normalized = input.ticker.toUpperCase().slice(0, 32);
   const price =
-    currentPrice && Number.parseFloat(currentPrice) > 0
-      ? formatMoneyAmount(currentPrice)
+    input.currentPrice && Number.parseFloat(input.currentPrice) > 0
+      ? formatMoneyAmount(input.currentPrice)
       : undefined;
 
   const [existing] = await db
@@ -106,12 +198,15 @@ async function upsertSecurity(
     .limit(1);
 
   if (existing) {
-    if (price) {
-      await db
-        .update(securities)
-        .set({ currentPrice: price, asOf: new Date() })
-        .where(eq(securities.id, existing.id));
-    }
+    await db
+      .update(securities)
+      .set({
+        name: input.name.slice(0, 200) || normalized,
+        assetType: input.assetType,
+        sector: input.sector ?? null,
+        ...(price ? { currentPrice: price, asOf: new Date() } : {}),
+      })
+      .where(eq(securities.id, existing.id));
     return existing.id;
   }
 
@@ -119,8 +214,9 @@ async function upsertSecurity(
     .insert(securities)
     .values({
       ticker: normalized,
-      name: name.slice(0, 200) || normalized,
-      assetType: "equity",
+      name: input.name.slice(0, 200) || normalized,
+      assetType: input.assetType,
+      sector: input.sector ?? null,
       currentPrice: price ?? "0",
     })
     .returning();
@@ -342,21 +438,27 @@ export async function syncSnaptradeForUser(
           : (data?.results ?? data?.positions ?? []);
 
         for (const position of results) {
-          const ticker =
-            position.symbol?.symbol?.trim() ||
-            position.symbol?.description?.trim();
+          const ticker = resolvePositionTicker(position);
           if (!ticker) continue;
 
-          const securityId = await upsertSecurity(
-            db,
+          const instrument = resolvePositionInstrument(position);
+          if (!instrument) continue;
+
+          const metadata = buildSecurityMetadata(instrument);
+          const securityId = await upsertSecurity(db, {
             ticker,
-            position.symbol?.description ?? ticker,
-            parseMoney(position.price ?? 0),
-          );
+            name: metadata.name,
+            assetType: metadata.assetType,
+            sector: metadata.sector,
+            currentPrice: parseMoney(position.price ?? 0),
+          });
 
           const quantity = parseMoney(position.units ?? 0);
           const costBasis = parseMoney(
-            position.average_purchase_price ?? position.price ?? 0,
+            position.cost_basis ??
+              position.average_purchase_price ??
+              position.price ??
+              0,
           );
           const priceNum = Number.parseFloat(parseMoney(position.price ?? 0));
           const qtyNum = Number.parseFloat(quantity);
@@ -408,12 +510,21 @@ export async function syncSnaptradeForUser(
           const ticker = activity.symbol?.symbol?.trim();
           let securityId: string | null = null;
           if (ticker) {
-            securityId = await upsertSecurity(
-              db,
+            const metadata = activity.symbol
+              ? buildSecurityMetadata(activity.symbol)
+              : {
+                  name: ticker,
+                  assetType: "equity",
+                  sector: null,
+                };
+            securityId = await upsertSecurity(db, {
               ticker,
-              activity.symbol?.description ?? ticker,
-              activity.price != null ? parseMoney(activity.price) : undefined,
-            );
+              name: activity.description?.trim() ?? metadata.name,
+              assetType: metadata.assetType,
+              sector: metadata.sector,
+              currentPrice:
+                activity.price != null ? parseMoney(activity.price) : undefined,
+            });
           }
 
           const amount = parseMoney(activity.amount ?? 0);

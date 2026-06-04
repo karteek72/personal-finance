@@ -304,7 +304,7 @@ export const securities = pgTable("securities", {
   id: uuid("id").primaryKey().defaultRandom(),
   ticker: text("ticker").notNull().unique(),
   name: text("name").notNull(),
-  assetType: text("asset_type").notNull(), // equity | etf | mutual_fund | bond | crypto
+  assetType: text("asset_type").notNull(), // equity | etf | mutual_fund | bond | crypto | option
   sector: text("sector"),
   currentPrice: numeric("current_price", { precision: 18, scale: 4 }).notNull(),
   currencyCode: text("currency_code").notNull().default("USD"),

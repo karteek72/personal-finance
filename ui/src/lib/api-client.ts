@@ -91,7 +91,7 @@ function parseImportErrorBody(
   return new ImportApiError(`Request failed (${status})`, status);
 }
 
-const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== "false";
+const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === "true";
 
 function getBaseUrl(): string {
   return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";

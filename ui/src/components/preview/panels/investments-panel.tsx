@@ -17,15 +17,47 @@ interface Holding {
   shares: number;
   costBasis: number;
   currentPrice: number;
-  sector: string;
+  assetType: string;
+  sector: string | null;
+  underlyingTicker?: string | null;
+  optionType?: string | null;
+  expirationLabel?: string | null;
 }
 
 function fmt(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 }
 
+function fmtPremium(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+}
+
 function pct(cost: number, current: number) {
+  if (cost <= 0) return "0.0";
   return (((current - cost) / cost) * 100).toFixed(1);
+}
+
+function isOption(assetType: string) {
+  return assetType === "option";
+}
+
+function assetTypeLabel(assetType: string): string {
+  const labels: Record<string, string> = {
+    equity: "Stock",
+    etf: "ETF",
+    mutual_fund: "Mutual fund",
+    bond: "Bond",
+    crypto: "Crypto",
+    option: "Option",
+  };
+  return labels[assetType] ?? assetType;
+}
+
+function holdingBadge(h: Holding): string {
+  if (isOption(h.assetType)) {
+    return (h.underlyingTicker ?? h.ticker.split(/\s+/)[0] ?? h.ticker).slice(0, 4);
+  }
+  return h.ticker.slice(0, 4);
 }
 
 export function InvestmentsPanel() {
@@ -48,10 +80,15 @@ export function InvestmentsPanel() {
     shares: h.quantity,
     costBasis: Number.parseFloat(h.costBasis),
     currentPrice: Number.parseFloat(h.currentPrice),
-    sector: h.sector ?? h.assetType,
+    assetType: h.assetType,
+    sector: h.sector,
+    underlyingTicker: h.underlyingTicker,
+    optionType: h.optionType,
+    expirationLabel: h.expirationLabel,
   }));
 
   const behavioralAlerts = investments?.behavioralAlerts ?? [];
+  const monthlyComparison = investments?.monthlyComparison ?? null;
 
   return (
     <div className="space-y-5">
@@ -117,26 +154,67 @@ export function InvestmentsPanel() {
 
         {activeTab === "portfolio" && (
           <div className="space-y-2">
+            {holdings.length === 0 ? (
+              <p className="px-1 py-4 text-center text-sm text-text-muted">
+                {investmentAccounts.length > 0
+                  ? "No positions stored yet. Sync your brokerage from Accounts — holdings appear after sync completes."
+                  : "No holdings synced yet. Connect a brokerage and run sync to see positions here."}
+              </p>
+            ) : null}
             {holdings.map((h) => {
               const value = h.shares * h.currentPrice;
               const gain = h.currentPrice - h.costBasis;
               const gainP = pct(h.costBasis, h.currentPrice);
               const positive = gain >= 0;
+              const option = isOption(h.assetType);
               return (
                 <div
-                  key={h.ticker}
+                  key={`${h.ticker}-${h.name}`}
                   className="flex items-center gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-3.5"
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-surface-raised font-bold text-xs text-text">
-                    {h.ticker}
+                  <div
+                    className={`flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-[var(--radius-sm)] font-bold text-text ${
+                      option ? "bg-warning/15 ring-1 ring-warning/30" : "bg-surface-raised"
+                    }`}
+                  >
+                    <span className="text-[10px] leading-none">{holdingBadge(h)}</span>
+                    {option ? (
+                      <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide text-warning">
+                        opt
+                      </span>
+                    ) : null}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-text">{h.name}</p>
-                    <p className="text-xs text-text-muted">
-                      {h.shares} shares · {h.sector}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="truncate text-sm font-semibold text-text">{h.name}</p>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                          option
+                            ? "bg-warning/10 text-warning"
+                            : "bg-surface-raised text-text-muted"
+                        }`}
+                      >
+                        {assetTypeLabel(h.assetType)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-text-muted">
+                      {option ? (
+                        <>
+                          {h.shares} contract{h.shares === 1 ? "" : "s"}
+                          {h.optionType ? ` · ${h.optionType}` : ""}
+                          {h.expirationLabel ? ` · exp ${h.expirationLabel}` : ""}
+                          {" · "}
+                          {fmtPremium(h.currentPrice)} premium
+                        </>
+                      ) : (
+                        <>
+                          {h.shares} share{h.shares === 1 ? "" : "s"}
+                          {h.sector ? ` · ${h.sector}` : ` · ${assetTypeLabel(h.assetType)}`}
+                        </>
+                      )}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="shrink-0 text-right">
                     <p className="text-sm font-bold text-text">{fmt(value)}</p>
                     <p className={`text-xs font-semibold ${positive ? "text-success" : "text-danger"}`}>
                       {positive ? "+" : ""}{gainP}%
@@ -150,6 +228,11 @@ export function InvestmentsPanel() {
 
         {activeTab === "behavioral" && (
           <div className="space-y-3">
+            {behavioralAlerts.length === 0 && !monthlyComparison ? (
+              <p className="px-1 py-4 text-center text-sm text-text-muted">
+                No behavioral insights yet. Sync investment activity and bank transactions to see patterns here.
+              </p>
+            ) : null}
             {behavioralAlerts.map((alert, i) => (
               <div
                 key={i}
@@ -170,20 +253,28 @@ export function InvestmentsPanel() {
               </div>
             ))}
 
-            <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
-              <p className="text-sm font-semibold text-text mb-2">Investment vs. spending this month</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-[var(--radius-sm)] bg-success/10 p-3">
-                  <p className="text-xs text-text-muted">Invested</p>
-                  <p className="text-lg font-extrabold text-success">$800</p>
+            {monthlyComparison ? (
+              <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
+                <p className="mb-2 text-sm font-semibold text-text">Investment vs. spending this month</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-[var(--radius-sm)] bg-success/10 p-3">
+                    <p className="text-xs text-text-muted">Invested</p>
+                    <p className="text-lg font-extrabold text-success">
+                      {fmt(Number.parseFloat(monthlyComparison.monthlyInvest))}
+                    </p>
+                  </div>
+                  <div className="rounded-[var(--radius-sm)] bg-surface-raised p-3">
+                    <p className="text-xs text-text-muted">Spent dining</p>
+                    <p className="text-lg font-extrabold text-text">
+                      {fmt(Number.parseFloat(monthlyComparison.diningSpend))}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-[var(--radius-sm)] bg-surface-raised p-3">
-                  <p className="text-xs text-text-muted">Spent dining</p>
-                  <p className="text-lg font-extrabold text-text">$487</p>
-                </div>
+                {monthlyComparison.summary ? (
+                  <p className="mt-2 text-xs text-text-muted">{monthlyComparison.summary}</p>
+                ) : null}
               </div>
-              <p className="mt-2 text-xs text-text-muted">Invest-to-dine ratio: 1.64 — good balance.</p>
-            </div>
+            ) : null}
           </div>
         )}
       </div>

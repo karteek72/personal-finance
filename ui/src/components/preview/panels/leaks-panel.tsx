@@ -119,6 +119,9 @@ export function LeaksPanel() {
           <p className="px-1 text-[11px] text-text-muted">
             The real cost of a habit isn&apos;t the monthly bill — it&apos;s what that money becomes if invested. Below: annual cost and 10-year opportunity cost at 7%.
           </p>
+          {habits.length === 0 ? (
+            <p className="px-1 text-xs text-text-muted">No recurring habits detected yet.</p>
+          ) : null}
           {habits.map((h) => (
             <div key={h.id} className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
               <div className="mb-2 flex items-center justify-between">
@@ -141,12 +144,18 @@ export function LeaksPanel() {
               </div>
             </div>
           ))}
-          <div className="rounded-[var(--radius-md)] border border-primary/30 bg-primary-soft/40 p-4">
-            <p className="text-sm font-bold text-text">If you redirected just your coffee habit…</p>
-            <p className="mt-1 text-sm text-text-muted">
-              {money(132)}/mo invested for 30 years becomes <strong className="text-primary">{money(Math.round(fv(132, 30)))}</strong>. Small leaks, big ocean.
-            </p>
-          </div>
+          {habits.length > 0 ? (
+            <div className="rounded-[var(--radius-md)] border border-primary/30 bg-primary-soft/40 p-4">
+              <p className="text-sm font-bold text-text">
+                If you redirected your {habits[0]!.label.toLowerCase()} habit…
+              </p>
+              <p className="mt-1 text-sm text-text-muted">
+                {money(habits[0]!.monthly)}/mo invested for 30 years becomes{" "}
+                <strong className="text-primary">{money(Math.round(fv(habits[0]!.monthly, 30)))}</strong>.
+                Small leaks, big ocean.
+              </p>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
