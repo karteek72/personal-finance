@@ -15,7 +15,18 @@ import {
   detectImportFormat,
   isAllowedImportExtension,
 } from "../services/import/detect-format.js";
-import { previewImportBatch, confirmImportBatch } from "../services/import/process-import-batch.js";
+import {
+  computeImportBatchSummary,
+  fileCanReplace,
+  fileCanRetryParse,
+} from "../services/import/import-batch-summary.js";
+import {
+  previewImportBatch,
+  confirmImportBatch,
+  retryImportFile,
+  retryAllFailedImportFiles,
+  replaceImportFile,
+} from "../services/import/process-import-batch.js";
 import {
   getAccountLinkSuggestions,
   mergeImportAccountIntoPlaid,
@@ -341,9 +352,12 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
         status: importFiles.status,
         errorMessage: importFiles.errorMessage,
         parsedPreview: importFiles.parsedPreview,
+        contentEncrypted: importFiles.contentEncrypted,
       })
       .from(importFiles)
       .where(eq(importFiles.batchId, batchId));
+
+    const summary = computeImportBatchSummary(files);
 
     return {
       batch: {
@@ -357,6 +371,13 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
         createdAt: batch.createdAt.toISOString(),
         completedAt: batch.completedAt?.toISOString() ?? null,
       },
+      summary: {
+        ...summary,
+        canRetryFailed: files.some((f) =>
+          fileCanRetryParse(f.status, f.contentEncrypted),
+        ),
+        canConfirm: summary.ready > 0,
+      },
       files: files.map((f) => ({
         id: f.id,
         filename: f.filename,
@@ -364,6 +385,8 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
         byteSize: f.byteSize,
         status: f.status,
         errorMessage: f.errorMessage,
+        canRetry: fileCanRetryParse(f.status, f.contentEncrypted),
+        canReplace: fileCanReplace(f.status),
         preview: buildFilePreviewSummary(
           f.parsedPreview as ImportFilePreviewPayload | null,
         ),
@@ -376,6 +399,7 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
     const { batchId } = request.params as { batchId: string };
     const body = (request.body ?? {}) as {
       accountMappings?: Record<string, string>;
+      fileIds?: string[];
     };
     const db = getDb();
 
@@ -394,15 +418,28 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
     try {
       const result = await confirmImportBatch(batchId, app.config.env, {
         accountMappings: body.accountMappings,
+        fileIds: body.fileIds,
       });
+
+      const [updated] = await db
+        .select({ status: importBatches.status })
+        .from(importBatches)
+        .where(eq(importBatches.id, batchId))
+        .limit(1);
 
       reply.header("Cache-Control", "no-store");
       return {
         batchId,
-        status: "completed" as const,
+        status: (updated?.status === "completed"
+          ? "completed"
+          : "awaiting_confirmation") as "completed" | "awaiting_confirmation",
         txnsInserted: result.txnsInserted,
         txnsSkipped: result.txnsSkipped,
-        message: `Imported ${result.txnsInserted} transactions (${result.txnsSkipped} duplicates skipped).`,
+        filesImported: result.filesImported ?? 0,
+        message:
+          updated?.status === "completed"
+            ? `Imported ${result.txnsInserted} transactions (${result.txnsSkipped} duplicates skipped).`
+            : `Imported ${result.filesImported ?? 0} file(s). ${result.txnsInserted} transactions added (${result.txnsSkipped} duplicates skipped). More files still awaiting confirmation.`,
       };
     } catch (err) {
       const message =
@@ -410,6 +447,157 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
       throw AppError.validation(message);
     }
   });
+
+  app.post("/imports/batches/:batchId/retry-failed", async (request, reply) => {
+    const user = await requireRequestUser(request, app.config.env);
+    const { batchId } = request.params as { batchId: string };
+    const db = getDb();
+
+    const [batch] = await db
+      .select({ id: importBatches.id })
+      .from(importBatches)
+      .where(
+        and(eq(importBatches.id, batchId), eq(importBatches.userId, user.id)),
+      )
+      .limit(1);
+
+    if (!batch) {
+      throw AppError.notFound("Import batch not found.");
+    }
+
+    try {
+      const result = await retryAllFailedImportFiles(batchId, app.config.env);
+      reply.header("Cache-Control", "no-store");
+      return {
+        batchId,
+        retried: result.retried,
+        message: `Retrying ${result.retried} failed file(s).`,
+      };
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not retry failed files.";
+      throw AppError.validation(message);
+    }
+  });
+
+  app.post(
+    "/imports/batches/:batchId/files/:fileId/retry",
+    async (request, reply) => {
+      const user = await requireRequestUser(request, app.config.env);
+      const { batchId, fileId } = request.params as {
+        batchId: string;
+        fileId: string;
+      };
+      const db = getDb();
+
+      const [batch] = await db
+        .select({ id: importBatches.id })
+        .from(importBatches)
+        .where(
+          and(eq(importBatches.id, batchId), eq(importBatches.userId, user.id)),
+        )
+        .limit(1);
+
+      if (!batch) {
+        throw AppError.notFound("Import batch not found.");
+      }
+
+      try {
+        await retryImportFile(batchId, fileId, app.config.env);
+        reply.header("Cache-Control", "no-store");
+        return {
+          batchId,
+          fileId,
+          message: "File parse retried.",
+        };
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Could not retry file.";
+        throw AppError.validation(message);
+      }
+    },
+  );
+
+  app.post(
+    "/imports/batches/:batchId/files/:fileId/replace",
+    async (request, reply) => {
+      const user = await requireRequestUser(request, app.config.env);
+      const { batchId, fileId } = request.params as {
+        batchId: string;
+        fileId: string;
+      };
+      const db = getDb();
+
+      const [batch] = await db
+        .select({ id: importBatches.id })
+        .from(importBatches)
+        .where(
+          and(eq(importBatches.id, batchId), eq(importBatches.userId, user.id)),
+        )
+        .limit(1);
+
+      if (!batch) {
+        throw AppError.notFound("Import batch not found.");
+      }
+
+      const parts = request.parts();
+      let buffer: Buffer | null = null;
+      let filename: string | null = null;
+
+      for await (const part of parts) {
+        if (part.type !== "file") {
+          continue;
+        }
+        buffer = await part.toBuffer();
+        filename = sanitizeImportFilename(part.filename ?? "upload");
+        break;
+      }
+
+      if (!buffer || !filename) {
+        throw AppError.validation("A replacement file is required.");
+      }
+
+      if (!isAllowedImportExtension(filename)) {
+        throw AppError.validation(
+          `Unsupported file type: ${filename}. Use .qfx, .ofx, .csv, or .pdf.`,
+        );
+      }
+
+      if (buffer.length > limits.maxFileBytes) {
+        throw AppError.validation(
+          `File "${filename}" exceeds the ${limits.maxFileBytes} byte limit.`,
+        );
+      }
+
+      const format = detectImportFormat(filename, buffer);
+      if (format === "unknown") {
+        throw AppError.validation(
+          `Could not verify format for "${filename}". Check the file is a valid statement export.`,
+        );
+      }
+
+      try {
+        await replaceImportFile(
+          batchId,
+          fileId,
+          buffer,
+          filename,
+          format,
+          app.config.env,
+        );
+        reply.header("Cache-Control", "no-store");
+        return {
+          batchId,
+          fileId,
+          message: "File replaced and re-parsed.",
+        };
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Could not replace file.";
+        throw AppError.validation(message);
+      }
+    },
+  );
 
   app.get("/imports/link-suggestions", async (request) => {
     const user = await requireRequestUser(request, app.config.env);

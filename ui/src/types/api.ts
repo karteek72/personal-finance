@@ -701,6 +701,18 @@ export interface ImportFilePreviewSummary {
   sampleTransactions: { date: string; name: string; amount: string }[];
 }
 
+export interface ImportBatchSummary {
+  total: number;
+  pending: number;
+  ready: number;
+  failed: number;
+  imported: number;
+  bankingTransactions: number;
+  investmentTransactions: number;
+  canRetryFailed: boolean;
+  canConfirm: boolean;
+}
+
 export interface ImportBatchStatusResponse {
   batch: {
     id: string;
@@ -713,6 +725,7 @@ export interface ImportBatchStatusResponse {
     createdAt: string;
     completedAt: string | null;
   };
+  summary: ImportBatchSummary;
   files: {
     id: string;
     filename: string;
@@ -720,14 +733,17 @@ export interface ImportBatchStatusResponse {
     byteSize: number;
     status: string;
     errorMessage: string | null;
+    canRetry: boolean;
+    canReplace: boolean;
     preview: ImportFilePreviewSummary | null;
   }[];
 }
 
 export interface ImportConfirmResponse {
   batchId: string;
-  status: "completed";
+  status: "completed" | "awaiting_confirmation";
   txnsInserted: number;
   txnsSkipped: number;
+  filesImported: number;
   message: string;
 }

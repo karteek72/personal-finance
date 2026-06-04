@@ -630,6 +630,17 @@ export const api = {
           createdAt: new Date().toISOString(),
           completedAt: null,
         },
+        summary: {
+          total: 1,
+          pending: 1,
+          ready: 0,
+          failed: 0,
+          imported: 0,
+          bankingTransactions: 0,
+          investmentTransactions: 0,
+          canRetryFailed: false,
+          canConfirm: false,
+        },
         files: [],
       });
     }
@@ -638,7 +649,10 @@ export const api = {
 
   confirmImportBatch(
     batchId: string,
-    accountMappings?: Record<string, string>,
+    options?: {
+      accountMappings?: Record<string, string>;
+      fileIds?: string[];
+    },
   ): Promise<ImportConfirmResponse> {
     if (USE_MOCKS) {
       return Promise.resolve({
@@ -646,13 +660,78 @@ export const api = {
         status: "completed",
         txnsInserted: 42,
         txnsSkipped: 3,
+        filesImported: 1,
         message: "Mock import confirmed.",
       });
     }
     return fetchJson<ImportConfirmResponse>(`/imports/batches/${batchId}/confirm`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ accountMappings }),
+      body: JSON.stringify(options ?? {}),
+    });
+  },
+
+  retryFailedImportFiles(batchId: string): Promise<{ batchId: string; retried: number; message: string }> {
+    if (USE_MOCKS) {
+      return Promise.resolve({ batchId, retried: 1, message: "Mock retry." });
+    }
+    return fetchJson(`/imports/batches/${batchId}/retry-failed`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+  },
+
+  retryImportFile(
+    batchId: string,
+    fileId: string,
+  ): Promise<{ batchId: string; fileId: string; message: string }> {
+    if (USE_MOCKS) {
+      return Promise.resolve({ batchId, fileId, message: "Mock retry." });
+    }
+    return fetchJson(`/imports/batches/${batchId}/files/${fileId}/retry`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+  },
+
+  async replaceImportFile(
+    batchId: string,
+    fileId: string,
+    file: File,
+  ): Promise<{ batchId: string; fileId: string; message: string }> {
+    if (USE_MOCKS) {
+      return Promise.resolve({ batchId, fileId, message: "Mock replace." });
+    }
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch(
+      `${getBaseUrl()}/imports/batches/${batchId}/files/${fileId}/replace`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+        body: form,
+      },
+    );
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      throw new Error(body?.error?.message ?? `Replace failed (${response.status})`);
+    }
+    return response.json() as Promise<{ batchId: string; fileId: string; message: string }>;
+  },
+
+  cancelImportBatch(batchId: string): Promise<void> {
+    if (USE_MOCKS) {
+      return Promise.resolve();
+    }
+    return fetch(`${getBaseUrl()}/imports/batches/${batchId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    }).then((response) => {
+      if (!response.ok && response.status !== 204) {
+        throw new Error("Could not cancel import.");
+      }
     });
   },
 

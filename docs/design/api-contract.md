@@ -99,7 +99,11 @@ Multipart upload for QFX/OFX/CSV/PDF statement files. Files encrypted at rest (A
 |--------|------|------|----------|
 | GET | `/imports/formats` | — | `{ formats, limits, consentVersion }` |
 | POST | `/imports/batches` | `multipart/form-data`: `files[]`, `consentAccepted=true` | `{ batchId, status, filesTotal, message }` |
-| GET | `/imports/batches/:batchId` | — | `{ batch, files }` |
+| GET | `/imports/batches/:batchId` | — | `{ batch, summary, files[] }` — per-file status, errors, `canRetry`/`canReplace`, preview |
+| POST | `/imports/batches/:batchId/confirm` | `{ accountMappings?, fileIds? }` | `{ batchId, status, txnsInserted, txnsSkipped, filesImported, message }` |
+| POST | `/imports/batches/:batchId/retry-failed` | — | `{ batchId, retried, message }` |
+| POST | `/imports/batches/:batchId/files/:fileId/retry` | — | `{ batchId, fileId, message }` |
+| POST | `/imports/batches/:batchId/files/:fileId/replace` | `multipart/form-data`: `file` | `{ batchId, fileId, message }` |
 | DELETE | `/imports/batches/:batchId` | — | `204` |
 
 **Limits (defaults, env-configurable):** 10 files, 10 MiB/file, 50 MiB/batch.
