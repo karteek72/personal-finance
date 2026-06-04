@@ -40,6 +40,19 @@
       "value": "3180.00"
     }
   ],
+  "positions": [],
+  "stockAggregates": [],
+  "optionPositions": [],
+  "portfolioBreakdown": {
+    "stocksValue": "63847.70",
+    "optionsValue": "0.00",
+    "otherValue": "10212.40",
+    "stocksSharePercent": 86,
+    "optionsSharePercent": 0,
+    "stockPositionCount": 9,
+    "optionPositionCount": 0,
+    "totalPositionCount": 11
+  },
   "holdings": [
     {
       "ticker": "AAPL",

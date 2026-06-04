@@ -40,6 +40,8 @@ import type {
   HouseholdResponse,
   InflationResponse,
   InvestmentsResponse,
+  InvestmentPosition,
+  StockAggregate,
   MerchantsResponse,
   MoneyFlowResponse,
   NetWorthResponse,
@@ -866,7 +868,94 @@ export async function getNetWorth(): Promise<NetWorthResponse> {
 
 export async function getInvestments(): Promise<InvestmentsResponse> {
   await delay();
-  return investmentsData as InvestmentsResponse;
+  const data = investmentsData as InvestmentsResponse;
+  if (data.positions.length > 0) {
+    return data;
+  }
+
+  const accountByTicker: Record<string, string> = {
+    AAPL: "a1b2c3d4-e5f6-4789-a012-345678901007",
+    VOO: "a1b2c3d4-e5f6-4789-a012-345678901007",
+    MSFT: "a1b2c3d4-e5f6-4789-a012-345678901007",
+    TSLA: "a1b2c3d4-e5f6-4789-a012-345678901007",
+    AMZN: "a1b2c3d4-e5f6-4789-a012-345678901007",
+    VTI: "a1b2c3d4-e5f6-4789-a012-345678901008",
+    VXUS: "a1b2c3d4-e5f6-4789-a012-345678901008",
+    FXAIX: "a1b2c3d4-e5f6-4789-a012-345678901009",
+    VBTLX: "a1b2c3d4-e5f6-4789-a012-345678901009",
+    BTC: "a1b2c3d4-e5f6-4789-a012-345678901010",
+    ETH: "a1b2c3d4-e5f6-4789-a012-345678901010",
+  };
+
+  const accountsById = new Map(
+    data.accounts.map((a) => [a.accountId, a]),
+  );
+
+  const positions: InvestmentPosition[] = data.holdings.map((h, index) => {
+    const accountId =
+      accountByTicker[h.ticker] ?? data.accounts[0]?.accountId ?? "mock-account";
+    const account = accountsById.get(accountId);
+    return {
+      holdingId: `mock-holding-${index}`,
+      accountId,
+      accountName: account?.name ?? "Investment account",
+      institutionName: account?.institutionName ?? "",
+      accountMask: null,
+      ticker: h.ticker,
+      name: h.name,
+      sector: h.sector,
+      assetType: h.assetType,
+      quantity: h.quantity,
+      costBasis: h.costBasis,
+      currentPrice: h.currentPrice,
+      value: h.value,
+      gainLoss: h.gainLoss,
+      gainLossPercent: h.gainLossPercent,
+      underlyingTicker: h.underlyingTicker,
+      optionType: h.optionType,
+      expirationLabel: h.expirationLabel,
+    };
+  });
+
+  const stockAggregates: StockAggregate[] = data.holdings
+    .filter((h) => h.assetType !== "option")
+    .map((h) => {
+      const accountId =
+        accountByTicker[h.ticker] ?? data.accounts[0]?.accountId ?? "mock-account";
+      const account = accountsById.get(accountId);
+      const totalCost = (h.quantity * Number.parseFloat(h.costBasis)).toFixed(2);
+      return {
+        ticker: h.ticker,
+        name: h.name,
+        sector: h.sector,
+        assetType: h.assetType,
+        totalQuantity: h.quantity,
+        currentPrice: h.currentPrice,
+        totalValue: h.value,
+        totalCost,
+        gainLoss: h.gainLoss,
+        gainLossPercent: h.gainLossPercent,
+        accountCount: 1,
+        lots: [
+          {
+            accountId,
+            accountName: account?.name ?? "Investment account",
+            quantity: h.quantity,
+            value: h.value,
+            costBasis: h.costBasis,
+          },
+        ],
+      };
+    });
+
+  const optionPositions = positions.filter((p) => p.assetType === "option");
+
+  return {
+    ...data,
+    positions,
+    stockAggregates,
+    optionPositions,
+  };
 }
 
 export async function getBudgets(): Promise<BudgetsResponse> {

@@ -4,61 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 
 import {
-  FeatureEmptyState,
   FeaturePanelLoading,
 } from "@/components/preview/feature-empty-state";
 import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
+import { HoldingsPortfolioSection } from "@/components/preview/panels/holdings-portfolio-section";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useInvestments } from "@/hooks/use-features";
-
-interface Holding {
-  ticker: string;
-  name: string;
-  shares: number;
-  costBasis: number;
-  currentPrice: number;
-  assetType: string;
-  sector: string | null;
-  underlyingTicker?: string | null;
-  optionType?: string | null;
-  expirationLabel?: string | null;
-}
-
-function fmt(n: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
-}
-
-function fmtPremium(n: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-}
-
-function pct(cost: number, current: number) {
-  if (cost <= 0) return "0.0";
-  return (((current - cost) / cost) * 100).toFixed(1);
-}
-
-function isOption(assetType: string) {
-  return assetType === "option";
-}
-
-function assetTypeLabel(assetType: string): string {
-  const labels: Record<string, string> = {
-    equity: "Stock",
-    etf: "ETF",
-    mutual_fund: "Mutual fund",
-    bond: "Bond",
-    crypto: "Crypto",
-    option: "Option",
-  };
-  return labels[assetType] ?? assetType;
-}
-
-function holdingBadge(h: Holding): string {
-  if (isOption(h.assetType)) {
-    return (h.underlyingTicker ?? h.ticker.split(/\s+/)[0] ?? h.ticker).slice(0, 4);
-  }
-  return h.ticker.slice(0, 4);
-}
 
 export function InvestmentsPanel() {
   const [activeTab, setActiveTab] = useState<"portfolio" | "behavioral">("portfolio");
@@ -69,23 +20,29 @@ export function InvestmentsPanel() {
   if (!gate.ready) return gate.node;
   if (isLoading) return <FeaturePanelLoading />;
 
+  function fmt(n: number) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+  }
+
   const investmentAccounts = (data?.accounts ?? []).filter((a) => a.type === "investment");
   const portfolioValue = investments?.portfolioValue
     ? Number.parseFloat(investments.portfolioValue)
     : investmentAccounts.reduce((s, a) => s + Number.parseFloat(a.balanceCurrent ?? "0"), 0);
 
-  const holdings: Holding[] = (investments?.holdings ?? []).map((h) => ({
-    ticker: h.ticker,
-    name: h.name,
-    shares: h.quantity,
-    costBasis: Number.parseFloat(h.costBasis),
-    currentPrice: Number.parseFloat(h.currentPrice),
-    assetType: h.assetType,
-    sector: h.sector,
-    underlyingTicker: h.underlyingTicker,
-    optionType: h.optionType,
-    expirationLabel: h.expirationLabel,
-  }));
+  const positions = investments?.positions ?? [];
+  const stockAggregates = investments?.stockAggregates ?? [];
+  const optionPositions = investments?.optionPositions ?? [];
+  const portfolioBreakdown = investments?.portfolioBreakdown ?? {
+    stocksValue: "0",
+    optionsValue: "0",
+    stocksSharePercent: 0,
+    optionsSharePercent: 0,
+    stockPositionCount: 0,
+    optionPositionCount: 0,
+    totalPositionCount: 0,
+    otherValue: "0",
+  };
+  const hasHoldings = positions.length > 0;
 
   const behavioralAlerts = investments?.behavioralAlerts ?? [];
   const monthlyComparison = investments?.monthlyComparison ?? null;
@@ -153,77 +110,25 @@ export function InvestmentsPanel() {
         </div>
 
         {activeTab === "portfolio" && (
-          <div className="space-y-2">
-            {holdings.length === 0 ? (
-              <p className="px-1 py-4 text-center text-sm text-text-muted">
-                {investmentAccounts.length > 0
-                  ? "No positions stored yet. Sync your brokerage from Accounts — holdings appear after sync completes."
-                  : "No holdings synced yet. Connect a brokerage and run sync to see positions here."}
-              </p>
-            ) : null}
-            {holdings.map((h) => {
-              const value = h.shares * h.currentPrice;
-              const gain = h.currentPrice - h.costBasis;
-              const gainP = pct(h.costBasis, h.currentPrice);
-              const positive = gain >= 0;
-              const option = isOption(h.assetType);
-              return (
-                <div
-                  key={`${h.ticker}-${h.name}`}
-                  className="flex items-center gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-3.5"
-                >
-                  <div
-                    className={`flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-[var(--radius-sm)] font-bold text-text ${
-                      option ? "bg-warning/15 ring-1 ring-warning/30" : "bg-surface-raised"
-                    }`}
-                  >
-                    <span className="text-[10px] leading-none">{holdingBadge(h)}</span>
-                    {option ? (
-                      <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide text-warning">
-                        opt
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="truncate text-sm font-semibold text-text">{h.name}</p>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                          option
-                            ? "bg-warning/10 text-warning"
-                            : "bg-surface-raised text-text-muted"
-                        }`}
-                      >
-                        {assetTypeLabel(h.assetType)}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-text-muted">
-                      {option ? (
-                        <>
-                          {h.shares} contract{h.shares === 1 ? "" : "s"}
-                          {h.optionType ? ` · ${h.optionType}` : ""}
-                          {h.expirationLabel ? ` · exp ${h.expirationLabel}` : ""}
-                          {" · "}
-                          {fmtPremium(h.currentPrice)} premium
-                        </>
-                      ) : (
-                        <>
-                          {h.shares} share{h.shares === 1 ? "" : "s"}
-                          {h.sector ? ` · ${h.sector}` : ` · ${assetTypeLabel(h.assetType)}`}
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold text-text">{fmt(value)}</p>
-                    <p className={`text-xs font-semibold ${positive ? "text-success" : "text-danger"}`}>
-                      {positive ? "+" : ""}{gainP}%
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          hasHoldings ? (
+            <HoldingsPortfolioSection
+              positions={positions}
+              stockAggregates={stockAggregates}
+              optionPositions={optionPositions}
+              portfolioBreakdown={portfolioBreakdown}
+              accountOptions={investmentAccounts.map((a) => ({
+                id: a.id,
+                name: a.name,
+                mask: a.mask,
+              }))}
+            />
+          ) : (
+            <p className="px-1 py-4 text-center text-sm text-text-muted">
+              {investmentAccounts.length > 0
+                ? "No positions stored yet. Sync your brokerage from Accounts — holdings appear after sync completes."
+                : "No holdings synced yet. Connect a brokerage and run sync to see positions here."}
+            </p>
+          )
         )}
 
         {activeTab === "behavioral" && (

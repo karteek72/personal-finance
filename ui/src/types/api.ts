@@ -437,6 +437,61 @@ export interface NetWorthResponse {
   trend: { month: string; netWorth: string }[];
 }
 
+export interface InvestmentPosition {
+  holdingId: string;
+  accountId: string;
+  accountName: string;
+  institutionName: string;
+  accountMask: string | null;
+  ticker: string;
+  name: string;
+  sector: string | null;
+  assetType: string;
+  quantity: number;
+  costBasis: string;
+  currentPrice: string;
+  value: string;
+  gainLoss: string;
+  gainLossPercent: number;
+  underlyingTicker?: string | null;
+  optionType?: string | null;
+  expirationLabel?: string | null;
+}
+
+export interface StockAggregateLot {
+  accountId: string;
+  accountName: string;
+  quantity: number;
+  value: string;
+  costBasis: string;
+}
+
+export interface StockAggregate {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  assetType: string;
+  totalQuantity: number;
+  currentPrice: string;
+  totalValue: string;
+  totalCost: string;
+  gainLoss: string;
+  gainLossPercent: number;
+  accountCount: number;
+  lots: StockAggregateLot[];
+}
+
+export interface PortfolioBreakdown {
+  stocksValue: string;
+  optionsValue: string;
+  otherValue: string;
+  stocksSharePercent: number;
+  optionsSharePercent: number;
+  stockPositionCount: number;
+  optionPositionCount: number;
+  totalPositionCount: number;
+}
+
 export interface InvestmentHolding {
   ticker: string;
   name: string;
@@ -466,6 +521,10 @@ export interface InvestmentsResponse {
     value: string;
   }[];
   holdings: InvestmentHolding[];
+  positions: InvestmentPosition[];
+  stockAggregates: StockAggregate[];
+  optionPositions: InvestmentPosition[];
+  portfolioBreakdown: PortfolioBreakdown;
   behavioralAlerts: { type: string; title: string; desc: string }[];
   investmentHistory: {
     lookbackYears: number;

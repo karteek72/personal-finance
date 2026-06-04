@@ -14,6 +14,11 @@ import {
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
 import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
+import {
+  holdingMarketValue,
+  isOptionAssetType,
+  parseOptionSector,
+} from "./holdings-mapper.js";
 
 const DINING_CATEGORIES = new Set([
   "Food & Drink",
@@ -59,22 +64,11 @@ function monthsAgo(months: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function holdingMarketValue(input: {
-  quantity: string;
-  costBasis: string;
-  institutionValue: string | null;
-  currentPrice: string;
-}): number {
-  const qty = Number.parseFloat(input.quantity);
-  if (qty <= 0) return 0;
-
-  const institution = Number.parseFloat(input.institutionValue ?? "0");
-  if (institution > 0) return institution;
-
-  const price = Number.parseFloat(input.currentPrice);
-  if (price > 0) return qty * price;
-
-  return qty * Number.parseFloat(input.costBasis);
+function parseExpirationDate(label: string | null): Date | null {
+  if (!label) return null;
+  const parsed = Date.parse(label);
+  if (Number.isNaN(parsed)) return null;
+  return new Date(parsed);
 }
 
 export async function sumInvestmentContributions(
@@ -216,6 +210,8 @@ export async function buildInvestmentBehavioralAlerts(
       costBasis: holdings.costBasis,
       institutionValue: holdings.institutionValue,
       ticker: securities.ticker,
+      sector: securities.sector,
+      assetType: securities.assetType,
       currentPrice: securities.currentPrice,
     })
     .from(holdings)
@@ -223,31 +219,94 @@ export async function buildInvestmentBehavioralAlerts(
     .where(inArray(holdings.userId, userIds));
 
   let portfolioValue = 0;
-  const byTicker = new Map<string, number>();
+  let stocksValue = 0;
+  let optionsValue = 0;
+  const stockByTicker = new Map<string, number>();
+  const optionByUnderlying = new Map<string, number>();
+  let expiringOptionCount = 0;
+  const now = new Date();
+  const expiringThresholdMs = 30 * 24 * 60 * 60 * 1000;
+
   for (const row of holdingRows) {
     const value = holdingMarketValue({
       quantity: row.quantity,
       costBasis: row.costBasis,
       institutionValue: row.institutionValue,
       currentPrice: row.currentPrice,
-    });
+    }).value;
     portfolioValue += value;
-    byTicker.set(row.ticker, (byTicker.get(row.ticker) ?? 0) + value);
+
+    if (isOptionAssetType(row.assetType)) {
+      optionsValue += value;
+      const meta = parseOptionSector(row.sector);
+      const underlying = meta.underlyingTicker ?? row.ticker.split(/\s+/)[0] ?? row.ticker;
+      optionByUnderlying.set(
+        underlying,
+        (optionByUnderlying.get(underlying) ?? 0) + value,
+      );
+      const exp = parseExpirationDate(meta.expirationLabel);
+      if (exp && exp.getTime() - now.getTime() <= expiringThresholdMs && exp >= now) {
+        expiringOptionCount += 1;
+      }
+    } else {
+      stocksValue += value;
+      stockByTicker.set(row.ticker, (stockByTicker.get(row.ticker) ?? 0) + value);
+    }
   }
 
-  if (portfolioValue > 0) {
-    const ranked = [...byTicker.entries()].sort((a, b) => b[1] - a[1]);
+  if (stocksValue > 0) {
+    const ranked = [...stockByTicker.entries()].sort((a, b) => b[1] - a[1]);
     const [topTicker, topValue] = ranked[0] ?? [];
     if (topTicker && topValue) {
-      const share = (topValue / portfolioValue) * 100;
+      const share = (topValue / stocksValue) * 100;
       if (share > 30) {
         alerts.push({
           type: "warning",
-          title: "Concentration risk",
-          desc: `${topTicker} is ${Math.round(share)}% of your portfolio — consider diversifying.`,
+          title: "Stock concentration",
+          desc: `${topTicker} is ${Math.round(share)}% of your stock & ETF holdings — consider diversifying equity exposure.`,
         });
       }
     }
+  }
+
+  if (portfolioValue > 0 && optionsValue > 0) {
+    const optionsShare = (optionsValue / portfolioValue) * 100;
+    if (optionsShare > 35) {
+      alerts.push({
+        type: "warning",
+        title: "High options exposure",
+        desc: `Options are ${Math.round(optionsShare)}% of portfolio value (${formatMoneyAmount(optionsValue)}). Options carry leverage and time-decay risk distinct from stocks.`,
+      });
+    } else if (optionsShare > 15) {
+      alerts.push({
+        type: "info",
+        title: "Options allocation",
+        desc: `Options represent ${Math.round(optionsShare)}% of portfolio value. Monitor expirations and underlying concentration separately from stocks.`,
+      });
+    }
+  }
+
+  if (optionByUnderlying.size > 0 && optionsValue > 0) {
+    const ranked = [...optionByUnderlying.entries()].sort((a, b) => b[1] - a[1]);
+    const [topUnderlying, topValue] = ranked[0] ?? [];
+    if (topUnderlying && topValue) {
+      const share = (topValue / optionsValue) * 100;
+      if (share > 40) {
+        alerts.push({
+          type: "warning",
+          title: "Options tied to one name",
+          desc: `${topUnderlying} underlies ${Math.round(share)}% of your options value — single-name derivative risk.`,
+        });
+      }
+    }
+  }
+
+  if (expiringOptionCount > 0) {
+    alerts.push({
+      type: "info",
+      title: "Options expiring soon",
+      desc: `${expiringOptionCount} option position${expiringOptionCount === 1 ? "" : "s"} expire within 30 days — review roll or close decisions.`,
+    });
   }
 
   const monthlyInvest = await averageMonthlyInvestment(userIds, 3);
@@ -330,7 +389,7 @@ export async function buildInvestmentHistorySummary(
       costBasis: row.costBasis,
       institutionValue: row.institutionValue,
       currentPrice: row.currentPrice,
-    });
+    }).value;
     totalCost +=
       Number.parseFloat(row.quantity) * Number.parseFloat(row.costBasis);
   }

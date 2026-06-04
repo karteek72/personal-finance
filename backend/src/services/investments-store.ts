@@ -12,8 +12,24 @@ import {
   buildInvestmentHistorySummary,
   buildInvestmentMonthlyComparison,
 } from "./investment-analytics.js";
+import {
+  aggregateStockPositions,
+  buildPortfolioBreakdown,
+  mapHoldingRow,
+  type InvestmentPosition,
+  type PortfolioBreakdown,
+  type StockAggregate,
+} from "./holdings-mapper.js";
 import { resolveHouseholdContext } from "./household-access.js";
 
+export type {
+  InvestmentPosition,
+  PortfolioBreakdown,
+  StockAggregate,
+  StockAggregateLot,
+} from "./holdings-mapper.js";
+
+/** @deprecated Use InvestmentPosition — kept for backward compatibility */
 export interface InvestmentHolding {
   ticker: string;
   name: string;
@@ -42,6 +58,14 @@ export interface InvestmentsResponse {
     subtype: string | null;
     value: string;
   }>;
+  /** Per-account positions (stocks and options) */
+  positions: InvestmentPosition[];
+  /** Stocks/ETFs/mutual funds rolled up by ticker across accounts */
+  stockAggregates: StockAggregate[];
+  /** All option positions (each contract series is its own row) */
+  optionPositions: InvestmentPosition[];
+  portfolioBreakdown: PortfolioBreakdown;
+  /** Flat list without account context — same as positions minus account fields */
   holdings: InvestmentHolding[];
   behavioralAlerts: Array<{ type: string; title: string; desc: string }>;
   investmentHistory: {
@@ -59,43 +83,21 @@ export interface InvestmentsResponse {
   } | null;
 }
 
-function holdingMarketValue(input: {
-  quantity: string;
-  costBasis: string;
-  institutionValue: string | null;
-  currentPrice: string;
-}): { value: number; unitPrice: number; cost: number } {
-  const qty = Number.parseFloat(input.quantity);
-  const basis = Number.parseFloat(input.costBasis);
-  const cost = qty * basis;
-
-  const institution = Number.parseFloat(input.institutionValue ?? "0");
-  if (institution > 0) {
-    const unitPrice = qty > 0 ? institution / qty : basis;
-    return { value: institution, unitPrice, cost };
-  }
-
-  const price = Number.parseFloat(input.currentPrice);
-  if (price > 0) {
-    return { value: qty * price, unitPrice: price, cost };
-  }
-
-  return { value: cost, unitPrice: basis, cost };
-}
-
-function parseOptionSector(sector: string | null): {
-  optionType: string | null;
-  underlyingTicker: string | null;
-  expirationLabel: string | null;
-} {
-  if (!sector) {
-    return { optionType: null, underlyingTicker: null, expirationLabel: null };
-  }
-  const parts = sector.split(" · ");
+function toLegacyHolding(position: InvestmentPosition): InvestmentHolding {
   return {
-    optionType: parts[0] ?? null,
-    underlyingTicker: parts[1] ?? null,
-    expirationLabel: parts[2]?.replace(/^exp /, "") ?? null,
+    ticker: position.ticker,
+    name: position.name,
+    sector: position.sector,
+    assetType: position.assetType,
+    quantity: position.quantity,
+    costBasis: position.costBasis,
+    currentPrice: position.currentPrice,
+    value: position.value,
+    gainLoss: position.gainLoss,
+    gainLossPercent: position.gainLossPercent,
+    underlyingTicker: position.underlyingTicker,
+    optionType: position.optionType,
+    expirationLabel: position.expirationLabel,
   };
 }
 
@@ -116,8 +118,20 @@ export async function getInvestments(
       ),
     );
 
+  const accountMeta = new Map(
+    investmentAccounts.map((a) => [
+      a.id,
+      {
+        name: a.name,
+        institutionName: a.institutionName,
+        mask: a.mask,
+      },
+    ]),
+  );
+
   const holdingRows = await db
     .select({
+      holdingId: holdings.id,
       accountId: holdings.accountId,
       quantity: holdings.quantity,
       costBasis: holdings.costBasis,
@@ -132,41 +146,41 @@ export async function getInvestments(
     .innerJoin(securities, eq(holdings.securityId, securities.id))
     .where(inArray(holdings.userId, ctx.userIds));
 
-  let portfolioValue = 0;
-  let totalCostBasis = 0;
-  const mapped: InvestmentHolding[] = holdingRows.map((row) => {
-    const qty = Number.parseFloat(row.quantity);
-    const { value, unitPrice, cost } = holdingMarketValue({
+  const positions: InvestmentPosition[] = holdingRows.map((row) => {
+    const account = accountMeta.get(row.accountId);
+    return mapHoldingRow({
+      holdingId: row.holdingId,
+      accountId: row.accountId,
+      accountName: account?.name ?? "Investment account",
+      institutionName: account?.institutionName ?? "",
+      accountMask: account?.mask ?? null,
       quantity: row.quantity,
       costBasis: row.costBasis,
       institutionValue: row.institutionValue,
-      currentPrice: row.currentPrice,
-    });
-    portfolioValue += value;
-    totalCostBasis += cost;
-    const optionMeta =
-      row.assetType === "option" ? parseOptionSector(row.sector) : null;
-    return {
       ticker: row.ticker,
       name: row.name,
       sector: row.sector,
       assetType: row.assetType,
-      quantity: qty,
-      costBasis: formatMoneyAmount(Number.parseFloat(row.costBasis)),
-      currentPrice: formatMoneyAmount(unitPrice),
-      value: formatMoneyAmount(value),
-      gainLoss: formatMoneyAmount(value - cost),
-      gainLossPercent: cost > 0 ? roundPercent(((value - cost) / cost) * 100) : 0,
-      ...(optionMeta
-        ? {
-            underlyingTicker: optionMeta.underlyingTicker,
-            optionType: optionMeta.optionType,
-            expirationLabel: optionMeta.expirationLabel,
-          }
-        : {}),
-    };
+      currentPrice: row.currentPrice,
+    });
   });
-  mapped.sort((a, b) => Number.parseFloat(b.value) - Number.parseFloat(a.value));
+
+  positions.sort(
+    (a, b) => Number.parseFloat(b.value) - Number.parseFloat(a.value),
+  );
+
+  const optionPositions = positions.filter((p) => p.assetType === "option");
+  const stockAggregates = aggregateStockPositions(positions);
+  const portfolioBreakdown = buildPortfolioBreakdown(positions);
+
+  let portfolioValue = positions.reduce(
+    (sum, p) => sum + Number.parseFloat(p.value),
+    0,
+  );
+  let totalCostBasis = positions.reduce(
+    (sum, p) => sum + p.quantity * Number.parseFloat(p.costBasis),
+    0,
+  );
 
   const totalGainLoss = portfolioValue - totalCostBasis;
   const behavioralAlerts = await buildInvestmentBehavioralAlerts(ctx.userIds);
@@ -195,7 +209,11 @@ export async function getInvestments(
       subtype: a.subtype,
       value: formatMoneyAmount(a.balanceCurrent ?? "0"),
     })),
-    holdings: mapped,
+    positions,
+    stockAggregates,
+    optionPositions,
+    portfolioBreakdown,
+    holdings: positions.map(toLegacyHolding),
     behavioralAlerts,
     investmentHistory,
     monthlyComparison,
