@@ -3,6 +3,8 @@ import { AppError } from "../lib/errors.js";
 import { requireRequestUser } from "../lib/auth-http.js";
 import { deleteAccount, getAccount } from "../services/account-store.js";
 import { syncPlaidItem } from "../services/plaid/sync.js";
+import { syncTellerEnrollment } from "../services/teller/sync.js";
+import { syncSnaptradeForUser } from "../services/snaptrade/sync.js";
 import { listAccounts } from "../services/transaction-store.js";
 
 export const accountRoutes: FastifyPluginAsync = async (app) => {
@@ -36,62 +38,93 @@ export const accountRoutes: FastifyPluginAsync = async (app) => {
       throw AppError.forbidden("Only the account owner can sync this account");
     }
 
-    if (!account.plaidItemId) {
-      throw AppError.notPlaidAccount();
-    }
-
     const env = app.config.env;
-    const itemDbId = account.plaidItemId;
     const operationId = request.id;
 
-    request.log.info(
-      {
-        operation: "plaid.sync_item",
-        operationId,
-        stage: "queued",
-        userId: user.id,
-        userEmail: user.email,
-        accountId,
-        accountName: account.name,
-        accountMask: account.mask,
-        itemDbId,
-        institutionName: account.institutionName,
-        trigger: "api_account_sync",
-      },
-      "Plaid account sync accepted — background sync queued",
-    );
+    if (account.plaidItemId) {
+      const itemDbId = account.plaidItemId;
 
-    void syncPlaidItem(itemDbId, env, {
-      operationId,
-      trigger: "api_account_sync",
-      requestId: request.id,
-    }).catch((error: unknown) => {
-      request.log.error(
+      request.log.info(
         {
-          err: error,
           operation: "plaid.sync_item",
           operationId,
+          stage: "queued",
           userId: user.id,
-          userEmail: user.email,
           accountId,
-          accountName: account.name,
           itemDbId,
-          stage: "failed",
+          trigger: "api_account_sync",
         },
-        "Plaid account background sync failed",
+        "Plaid account sync accepted — background sync queued",
       );
-    });
 
-    return reply.status(202).send({
-      status: "started",
-      itemId: itemDbId,
-      institutionName: account.institutionName,
-      accountsSynced: 1,
-      added: 0,
-      modified: 0,
-      removed: 0,
-      message:
-        "Sync started in the background. This account will update shortly.",
-    });
+      void syncPlaidItem(itemDbId, env, {
+        operationId,
+        trigger: "api_account_sync",
+        requestId: request.id,
+      }).catch((error: unknown) => {
+        request.log.error(
+          { err: error, operationId, userId: user.id, accountId, itemDbId },
+          "Plaid account background sync failed",
+        );
+      });
+
+      return reply.status(202).send({
+        status: "started",
+        itemId: itemDbId,
+        institutionName: account.institutionName,
+        accountsSynced: 1,
+        added: 0,
+        modified: 0,
+        removed: 0,
+        message:
+          "Sync started in the background. This account will update shortly.",
+      });
+    }
+
+    if (account.tellerEnrollmentId) {
+      const enrollmentDbId = account.tellerEnrollmentId;
+
+      void syncTellerEnrollment(enrollmentDbId, env).catch((error: unknown) => {
+        request.log.error(
+          { err: error, userId: user.id, accountId, enrollmentDbId },
+          "Teller account background sync failed",
+        );
+      });
+
+      return reply.status(202).send({
+        status: "started",
+        itemId: enrollmentDbId,
+        institutionName: account.institutionName,
+        accountsSynced: 1,
+        added: 0,
+        modified: 0,
+        removed: 0,
+        message:
+          "Sync started in the background. This account will update shortly.",
+      });
+    }
+
+    if (account.source === "snaptrade") {
+      void syncSnaptradeForUser(user.id, env).catch((error: unknown) => {
+        request.log.error(
+          { err: error, userId: user.id, accountId },
+          "SnapTrade account background sync failed",
+        );
+      });
+
+      return reply.status(202).send({
+        status: "started",
+        itemId: account.snaptradeConnectionId ?? account.id,
+        institutionName: account.institutionName,
+        accountsSynced: 1,
+        added: 0,
+        modified: 0,
+        removed: 0,
+        message:
+          "Brokerage sync started in the background. Holdings will update shortly.",
+      });
+    }
+
+    throw AppError.notSyncableAccount();
   });
 };

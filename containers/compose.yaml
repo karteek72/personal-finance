@@ -73,7 +73,7 @@ services:
       postgres:
         condition: service_healthy
     env_file:
-      - .env
+      - ../.env
     extra_hosts:
       - "host.containers.internal:host-gateway"
     environment:
@@ -126,7 +126,7 @@ services:
       api:
         condition: service_started
     env_file:
-      - .env
+      - ../.env
     extra_hosts:
       - "host.containers.internal:host-gateway"
     environment:

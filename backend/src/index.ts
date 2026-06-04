@@ -14,7 +14,10 @@ import { householdRoutes } from "./routes/households.js";
 import { healthRoutes } from "./routes/health.js";
 import { accountRoutes } from "./routes/accounts.js";
 import { liabilityRoutes } from "./routes/liabilities.js";
+import { connectionRoutes } from "./routes/connections.js";
 import { plaidRoutes } from "./routes/plaid.js";
+import { snaptradeRoutes } from "./routes/snaptrade.js";
+import { tellerRoutes } from "./routes/teller.js";
 import { plaidWebhookRoutes } from "./routes/webhooks-plaid.js";
 import {
   transactionRoutes,
@@ -96,7 +99,10 @@ async function main(): Promise<void> {
   await app.register(healthRoutes, { prefix: "/api/v1" });
   await app.register(accountRoutes, { prefix: "/api/v1" });
   await app.register(liabilityRoutes, { prefix: "/api/v1" });
+  await app.register(connectionRoutes, { prefix: "/api/v1" });
   await app.register(plaidRoutes, { prefix: "/api/v1" });
+  await app.register(tellerRoutes, { prefix: "/api/v1" });
+  await app.register(snaptradeRoutes, { prefix: "/api/v1" });
   await app.register(plaidWebhookRoutes, { prefix: "/api/v1" });
   await app.register(transactionRoutes, { prefix: "/api/v1" });
   await app.register(insightRoutes, { prefix: "/api/v1" });

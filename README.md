@@ -150,23 +150,24 @@ spendflow/
 - Redis 7
 - Plaid developer account ([sign up free](https://dashboard.plaid.com/signup))
 
-### Backend
+### Environment (single file)
 
 ```bash
-cd backend
-cp .env.example .env          # fill in DATABASE_URL, REDIS_URL, PLAID_* vars
-npm install
-npm run db:migrate
-npm run dev                   # starts on :4000
+cp .env.example .env    # repo root — backend, UI, and Podman all read this file
 ```
 
-### Web UI
+### Backend + UI (from repo root)
 
 ```bash
-cd ui
-cp .env.local.example .env.local   # set NEXT_PUBLIC_API_URL and NEXT_PUBLIC_PLAID_ENV
-npm install
-npm run dev                         # starts on :3002
+npm install --prefix backend && npm install --prefix ui
+npm run db:migrate
+
+# Full dev stack (Postgres + Redis in Podman, API + UI on host):
+npm run dev
+
+# Or API / UI only (infra already running):
+npm run dev:api
+npm run dev:ui
 ```
 
 ### Demo data (mock seed)
@@ -174,19 +175,27 @@ npm run dev                         # starts on :3002
 Load deterministic fixtures from [`mock/`](mock/) into Postgres (see [`mock/README.md`](mock/README.md)):
 
 ```bash
-cd backend
+npm run db:migrate   # if needed
 npm run db:seed
+# npm run db:seed -- --no-reset   # upsert without deleting seed users first
 ```
 
-Use with `AUTH_ALLOW_DEV_USER=true` and `NEXT_PUBLIC_USE_MOCKS=false` to exercise the real API and UI.
+Regenerate JSON fixtures from the generator:
+
+```bash
+npm run db:gen-mock
+```
+
+Use with `AUTH_ALLOW_DEV_USER=true` and `NEXT_PUBLIC_USE_MOCKS=false` in root `.env` to exercise the real API and UI (dev user: `personal@spendflow.local`).
 
 ### Database migrations
 
 ```bash
-cd backend
-npm run db:generate    # generate migration from schema changes
-npm run db:migrate     # apply migrations
+npm run db:generate    # drizzle-kit: new SQL from schema changes
+npm run db:migrate     # apply backend/drizzle/*.sql (custom runner)
 ```
+
+`db:generate` uses Drizzle Kit; `db:migrate` uses the project migrator in `backend/src/db/migrate.ts` (not `drizzle-kit migrate`).
 
 ### Containers (Podman)
 

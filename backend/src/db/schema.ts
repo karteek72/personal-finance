@@ -27,6 +27,62 @@ export const users = pgTable(
   ],
 );
 
+export const tellerEnrollments = pgTable(
+  "teller_enrollments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tellerEnrollmentId: text("teller_enrollment_id").notNull(),
+    accessTokenEncrypted: text("access_token_encrypted").notNull(),
+    institutionName: text("institution_name"),
+    status: text("status").notNull().default("active"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("teller_enrollments_teller_enrollment_id_idx").on(
+      table.tellerEnrollmentId,
+    ),
+  ],
+);
+
+export const snaptradeUsers = pgTable("snaptrade_users", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  snaptradeUserId: text("snaptrade_user_id").notNull(),
+  userSecretEncrypted: text("user_secret_encrypted").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const snaptradeConnections = pgTable(
+  "snaptrade_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    authorizationId: text("authorization_id").notNull(),
+    brokerageName: text("brokerage_name"),
+    status: text("status").notNull().default("active"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("snaptrade_connections_authorization_id_idx").on(
+      table.authorizationId,
+    ),
+  ],
+);
+
 export const plaidItems = pgTable("plaid_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -55,6 +111,16 @@ export const accounts = pgTable(
       onDelete: "set null",
     }),
     plaidAccountId: text("plaid_account_id"),
+    tellerEnrollmentId: uuid("teller_enrollment_id").references(
+      () => tellerEnrollments.id,
+      { onDelete: "set null" },
+    ),
+    tellerAccountId: text("teller_account_id"),
+    snaptradeConnectionId: uuid("snaptrade_connection_id").references(
+      () => snaptradeConnections.id,
+      { onDelete: "set null" },
+    ),
+    snaptradeAccountId: text("snaptrade_account_id"),
     name: text("name").notNull(),
     officialName: text("official_name"),
     type: text("type").notNull(), // depository | credit
@@ -62,7 +128,7 @@ export const accounts = pgTable(
     mask: text("mask").notNull(),
     institutionName: text("institution_name").notNull(),
     currencyCode: text("currency_code").notNull().default("USD"),
-    source: text("source").notNull().default("import"), // import | plaid
+    source: text("source").notNull().default("import"), // import | plaid | teller | snaptrade
     balanceCurrent: numeric("balance_current", { precision: 12, scale: 2 }),
     balanceAvailable: numeric("balance_available", { precision: 12, scale: 2 }),
     status: text("status").notNull().default("active"),
@@ -74,6 +140,10 @@ export const accounts = pgTable(
   },
   (table) => [
     uniqueIndex("accounts_plaid_account_id_idx").on(table.plaidAccountId),
+    uniqueIndex("accounts_teller_account_id_idx").on(table.tellerAccountId),
+    uniqueIndex("accounts_snaptrade_account_id_idx").on(
+      table.snaptradeAccountId,
+    ),
   ],
 );
 

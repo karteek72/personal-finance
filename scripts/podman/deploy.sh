@@ -23,12 +23,10 @@ done
 
 spendflow_load_env
 
-if [[ ! -f "${SPENDFLOW_CONTAINERS_DIR}/.env" && ! -f "${SPENDFLOW_REPO_ROOT}/.env" ]]; then
-  echo "error: create ${SPENDFLOW_CONTAINERS_DIR}/.env from env.example (or use repo root .env)" >&2
+if [[ ! -f "$(spendflow_root_env_file)" ]]; then
+  echo "error: create $(spendflow_root_env_file) from .env.example" >&2
   exit 1
 fi
-
-touch "${SPENDFLOW_CONTAINERS_DIR}/.env"
 spendflow_ensure_jwt_secret
 spendflow_ensure_encryption_key
 spendflow_export_compose_runtime_env

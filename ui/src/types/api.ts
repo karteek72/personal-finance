@@ -50,8 +50,10 @@ export interface Account {
   institutionName: string;
   lastSyncedAt: string | null;
   status: "active" | "error" | "reauth_required";
-  source?: "import" | "plaid";
+  source?: "import" | "plaid" | "teller" | "snaptrade";
+  connectionProvider?: "plaid" | "teller" | "snaptrade" | "import";
   plaidItemId?: string | null;
+  tellerEnrollmentId?: string | null;
   memberId?: string | null;
   memberName?: string | null;
   memberColor?: string | null;
@@ -162,6 +164,47 @@ export interface CategoryTotal {
 export interface CategoryTrend {
   name: string;
   months: { month: string; amount: string }[];
+}
+
+export type ConnectionProviderId = "plaid" | "teller" | "snaptrade";
+
+export interface ConnectionProviderOption {
+  id: ConnectionProviderId;
+  label: string;
+  description: string;
+  accountTypes: ("depository" | "credit" | "investment")[];
+  enabled: boolean;
+}
+
+export interface ConnectionProvidersResponse {
+  providers: ConnectionProviderOption[];
+}
+
+export interface TellerConnectConfig {
+  applicationId: string;
+  environment: "sandbox" | "development" | "production";
+  products: string[];
+}
+
+export interface TellerExchangeResponse {
+  enrollmentId: string;
+  institutionName: string;
+  accountsSynced: number;
+  transactionsAdded: number;
+  message: string;
+}
+
+export interface SnaptradePortalResponse {
+  redirectUri: string;
+}
+
+export interface SnaptradeCompleteResponse {
+  status: string;
+  connectionsSynced: number;
+  accountsSynced: number;
+  holdingsUpdated: number;
+  activitiesAdded: number;
+  message: string;
 }
 
 export interface PlaidExchangeResponse {

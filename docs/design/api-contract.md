@@ -39,6 +39,44 @@ HTTP status codes: `200` success, `201` created, `204` no content, `400` validat
 
 ---
 
+## Account connections
+
+Users choose a provider when linking accounts. The UI calls `GET /connections/providers` to see which integrations are enabled server-side.
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/connections/providers` | `{ providers: ConnectionProvider[] }` — `id`: `plaid` \| `teller` \| `snaptrade`, `enabled`, `accountTypes` |
+
+`Account.source` and `Account.connectionProvider`: `import` \| `plaid` \| `teller` \| `snaptrade`.
+
+---
+
+## Teller (banking & credit cards)
+
+Teller Connect runs in the browser; the UI exchanges the enrollment `accessToken` on the backend. API calls use mTLS client certificates in `development`/`production` (`TELLER_CERT_PATH`, `TELLER_KEY_PATH`); sandbox does not require certs.
+
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| GET | `/teller/config` | — | `{ applicationId, environment, products }` for Teller Connect |
+| POST | `/teller/exchange` | `{ accessToken, enrollmentId, institutionName? }` | `{ enrollmentId, institutionName, accountsSynced, transactionsAdded, message }` |
+| GET | `/teller/enrollments` | — | `{ items }` |
+| POST | `/teller/enrollments/:enrollmentId/sync` | — | sync result |
+| DELETE | `/teller/enrollments/:enrollmentId` | — | `204` |
+
+---
+
+## SnapTrade (brokerage)
+
+Connection Portal URL is generated server-side; after the user finishes linking, call `POST /snaptrade/complete` (or open `/accounts/snaptrade/callback` with `SNAPTRADE_REDIRECT_URI`).
+
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| POST | `/snaptrade/portal-url` | `{ broker?, reconnectAuthorizationId? }` | `{ redirectUri }` |
+| POST | `/snaptrade/complete` | — | `{ status, connectionsSynced, accountsSynced, holdingsUpdated, activitiesAdded, message }` |
+| POST | `/snaptrade/sync` | — | `202` — background sync all SnapTrade connections |
+
+---
+
 ## Plaid
 
 | Method | Path | Body | Response |
@@ -86,7 +124,7 @@ Requires `PLAID_PRODUCTS=transactions,liabilities`. Existing items must be re-li
 |--------|------|------|----------|
 | GET | `/accounts` | — | `{ accounts: Account[] }` (includes liability detail when available) |
 | DELETE | `/accounts/:accountId` | — | `{ id, name, mask, transactionsDeleted, plaidItemDisconnected }` — cascades transactions; when the last account on a Plaid item is removed, calls Plaid `itemRemove` and deletes the item |
-| POST | `/accounts/:accountId/sync` | — | `{ status: "queued" }` |
+| POST | `/accounts/:accountId/sync` | — | `202` for Plaid, Teller, or SnapTrade-linked accounts |
 | POST | `/plaid/sync` | — | `{ queued: number }` (sync all items) |
 
 ---

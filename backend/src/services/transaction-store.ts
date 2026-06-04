@@ -48,6 +48,15 @@ export async function listAccounts(userId: string) {
         lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
         status: (row.status ?? "active") as "active" | "error" | "reauth_required",
         source: row.source ?? "import",
+        connectionProvider:
+          row.source === "plaid" ||
+          row.source === "teller" ||
+          row.source === "snaptrade"
+            ? (row.source as "plaid" | "teller" | "snaptrade")
+            : row.source === "import"
+              ? "import"
+              : undefined,
+        tellerEnrollmentId: row.tellerEnrollmentId,
         memberId: member?.memberId ?? null,
         memberName: member?.memberName ?? null,
         memberColor: member?.memberColor ?? null,

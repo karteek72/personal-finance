@@ -18,7 +18,7 @@ export type PlaidTransactionInsert = {
   transactionType: "expense" | "income" | "transfer";
   isTransfer: boolean;
   pending: boolean;
-  source: "plaid";
+  source: "plaid" | "teller";
 };
 
 type PlaidRowWithFingerprint = PlaidTransactionInsert & {

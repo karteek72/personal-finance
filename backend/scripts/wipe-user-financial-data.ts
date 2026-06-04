@@ -7,9 +7,8 @@
  *
  * With a single user in the DB, email can be omitted.
  */
-import { config as loadDotenv } from "dotenv";
+import { loadRootEnv } from "../src/config/load-root-env.js";
 import { eq, sql } from "drizzle-orm";
-import { resolve } from "node:path";
 import { loadEnv } from "../src/config/env.js";
 import { closeDb, getDb } from "../src/db/client.js";
 import { runMigrations } from "../src/db/migrate.js";
@@ -17,8 +16,7 @@ import { accounts, households, plaidItems, transactions, users } from "../src/db
 import { disconnectPlaidItem } from "../src/services/plaid/disconnect-item.js";
 import { purgeDerivedFinancialData } from "../src/services/purge-derived-financial-data.js";
 
-loadDotenv({ path: resolve(process.cwd(), "../.env") });
-loadDotenv({ path: resolve(process.cwd(), ".env") });
+loadRootEnv();
 
 async function resolveTargetUser(emailArg?: string) {
   const db = getDb();

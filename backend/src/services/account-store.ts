@@ -1,9 +1,10 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Env } from "../config/env.js";
 import { getDb } from "../db/client.js";
-import { accounts, transactions } from "../db/schema.js";
+import { accounts, snaptradeConnections, transactions } from "../db/schema.js";
 import { resolveHouseholdContext } from "./household-access.js";
 import { disconnectPlaidItem } from "./plaid/disconnect-item.js";
+import { deleteTellerEnrollment } from "./teller/enrollment-store.js";
 import { purgeDerivedFinancialData } from "./purge-derived-financial-data.js";
 
 export interface DeleteAccountResult {
@@ -53,6 +54,8 @@ export async function deleteAccount(
     .where(eq(transactions.accountId, accountId));
 
   const plaidItemId = account.plaidItemId;
+  const tellerEnrollmentId = account.tellerEnrollmentId;
+  const snaptradeConnectionId = account.snaptradeConnectionId;
 
   await db.delete(accounts).where(eq(accounts.id, accountId));
 
@@ -74,6 +77,40 @@ export async function deleteAccount(
         userId,
         env,
       );
+    }
+  }
+
+  if (tellerEnrollmentId) {
+    const [remainingTeller] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.tellerEnrollmentId, tellerEnrollmentId),
+          eq(accounts.userId, userId),
+        ),
+      );
+
+    if ((remainingTeller?.count ?? 0) === 0) {
+      await deleteTellerEnrollment(tellerEnrollmentId, userId);
+    }
+  }
+
+  if (snaptradeConnectionId) {
+    const [remainingSnap] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.snaptradeConnectionId, snaptradeConnectionId),
+          eq(accounts.userId, userId),
+        ),
+      );
+
+    if ((remainingSnap?.count ?? 0) === 0) {
+      await db
+        .delete(snaptradeConnections)
+        .where(eq(snaptradeConnections.id, snaptradeConnectionId));
     }
   }
 

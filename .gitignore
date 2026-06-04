@@ -31,6 +31,8 @@ coverage/
 
 # Podman / Compose local overrides
 compose.override.yaml
+# Legacy — use repo root .env only
+backend/.env
 containers/.env
 containers/deploy.env
 containers/cloudflared/credentials.json

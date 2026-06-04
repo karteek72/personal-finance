@@ -10,8 +10,7 @@ cp containers/deploy.env.example containers/deploy.env
 # Edit SPENDFLOW_HOST=192.168.68.100 and public URLs if needed
 
 # 2. Secrets (Plaid, JWT, Google)
-cp containers/env.example containers/.env
-# Or symlink: ln -sf ../.env containers/.env
+cp .env.example .env   # repo root (compose loads ../.env)
 
 # 3. Build and start
 ./scripts/podman/build.sh
@@ -75,8 +74,8 @@ podman logs -f spendflow-worker
 Postgres and Redis run in Podman on the shared `spendflow-net` network with named volumes (`spendflow-pgdata`, `spendflow-redisdata`) so data survives container restarts. API and UI run with `npm run dev` on your machine so logs are easy to read.
 
 ```bash
-# One-time: secrets in containers/.env (from env.example)
-cp containers/env.example containers/.env
+# One-time: secrets in repo root .env (from .env.example)
+cp .env.example .env
 
 # Start Postgres + Redis + API + UI, then stream logs (Ctrl+C stops tail only)
 ./scripts/podman/dev.sh

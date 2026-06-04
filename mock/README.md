@@ -9,7 +9,6 @@ seeded-RNG script so the two stay numerically identical.
 Everything here is **generated** — do not hand-edit. Regenerate with:
 
 ```bash
-cd backend
 npm run db:gen-mock     # writes mock/*.json AND ui/src/mocks/*.json
 ```
 
@@ -57,7 +56,6 @@ aggregated/formatted) that the UI mock-api serves directly.
 From repo root (Postgres running, `.env` with `DATABASE_URL`):
 
 ```bash
-cd backend
 npm run db:seed
 ```
 
@@ -74,7 +72,7 @@ Options:
 AUTH_ALLOW_DEV_USER=true
 ```
 
-**UI** (`ui/.env.local`):
+**UI** (same root `.env`):
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
@@ -82,7 +80,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3002
 NEXT_PUBLIC_USE_MOCKS=false
 ```
 
-Restart `npm run dev` in both `backend/` and `ui/`. The API attaches requests to
+Restart `npm run dev` (or `npm run dev:api` / `npm run dev:ui`). The API attaches requests to
 `personal@spendflow.local` when dev auth is enabled.
 
 ## UI mock-mode (no backend / shareable demo)
@@ -90,7 +88,7 @@ Restart `npm run dev` in both `backend/` and `ui/`. The API attaches requests to
 For a zero-backend, shareable build (e.g. validating the idea with reviewers via a URL), set:
 
 ```env
-# ui/.env.local
+# root .env
 NEXT_PUBLIC_USE_MOCKS=true
 ```
 

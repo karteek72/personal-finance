@@ -2,7 +2,7 @@
  * Audit remaining data for a user email.
  * Usage: npx tsx scripts/audit-user-data.ts karteek.chenna@gmail.com
  */
-import { config as loadDotenv } from "dotenv";
+import { loadRootEnv } from "../src/config/load-root-env.js";
 import { eq, inArray, sql } from "drizzle-orm";
 import { resolve } from "node:path";
 import { loadEnv } from "../src/config/env.js";
@@ -27,8 +27,7 @@ import {
 import { resolveHouseholdContext } from "../src/services/household-access.js";
 import { getActiveAccountIds } from "../src/services/active-account-scope.js";
 
-loadDotenv({ path: resolve(process.cwd(), "../.env") });
-loadDotenv({ path: resolve(process.cwd(), ".env") });
+loadRootEnv();
 loadEnv();
 
 async function countForUser(

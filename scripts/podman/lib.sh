@@ -112,27 +112,28 @@ spendflow_ensure_podman() {
   exit 1
 }
 
+spendflow_root_env_file() {
+  echo "$(spendflow_repo_root)/.env"
+}
+
 spendflow_load_env() {
-  local root containers
+  local root containers root_env
   root="$(spendflow_repo_root)"
   containers="${root}/containers"
+  root_env="$(spendflow_root_env_file)"
 
   export SPENDFLOW_REPO_ROOT="${root}"
   export SPENDFLOW_CONTAINERS_DIR="${containers}"
 
-  if [[ -f "${root}/.env" ]]; then
-    set -a
-    # shellcheck disable=SC1091
-    source "${root}/.env"
-    set +a
+  if [[ ! -f "${root_env}" ]]; then
+    echo "error: missing ${root_env} — copy from .env.example" >&2
+    exit 1
   fi
-  if [[ -f "${containers}/.env" ]]; then
-    set -a
-    # shellcheck disable=SC1091
-    source "${containers}/.env"
-    set +a
-  fi
-  # deploy.env last — CORS_ORIGINS and public URLs must win over dev .env
+  set -a
+  # shellcheck disable=SC1091
+  source "${root_env}"
+  set +a
+  # deploy.env last — host ports and public URLs override dev defaults
   if [[ -f "${containers}/deploy.env" ]]; then
     set -a
     # shellcheck disable=SC1091
@@ -189,8 +190,9 @@ spendflow_ensure_jwt_secret() {
   fi
   JWT_SECRET="$(openssl rand -hex 32)"
   export JWT_SECRET
-  local env_file="${SPENDFLOW_CONTAINERS_DIR}/.env"
-  if [[ -f "${env_file}" ]] && grep -q '^JWT_SECRET=' "${env_file}" 2>/dev/null; then
+  local env_file
+  env_file="$(spendflow_root_env_file)"
+  if grep -q '^JWT_SECRET=' "${env_file}" 2>/dev/null; then
     return 0
   fi
   echo "JWT_SECRET=${JWT_SECRET}" >>"${env_file}"
@@ -203,12 +205,13 @@ spendflow_ensure_encryption_key() {
     return 0
   fi
   if ! command -v openssl >/dev/null 2>&1; then
-    echo "error: ENCRYPTION_KEY missing. Set in containers/.env or install openssl." >&2
+    echo "error: ENCRYPTION_KEY missing. Set in repo root .env or install openssl." >&2
     return 1
   fi
   ENCRYPTION_KEY="$(openssl rand -hex 32)"
   export ENCRYPTION_KEY
-  local env_file="${SPENDFLOW_CONTAINERS_DIR}/.env"
+  local env_file
+  env_file="$(spendflow_root_env_file)"
   touch "${env_file}"
   if grep -qE '^[[:space:]]*ENCRYPTION_KEY=' "${env_file}" 2>/dev/null; then
     spendflow_sed_inplace "${env_file}" "s/^[[:space:]]*ENCRYPTION_KEY=.*/ENCRYPTION_KEY=${ENCRYPTION_KEY}/"
@@ -246,7 +249,8 @@ spendflow_prepare_postgres() {
 spendflow_write_container_env_var() {
   local key="$1"
   local value="$2"
-  local env_file="${SPENDFLOW_CONTAINERS_DIR}/.env"
+  local env_file
+  env_file="$(spendflow_root_env_file)"
 
   touch "${env_file}"
   if grep -qE "^[[:space:]]*${key}=" "${env_file}" 2>/dev/null; then
@@ -281,6 +285,8 @@ spendflow_export_compose_runtime_env() {
   export SPENDFLOW_UI_PUBLIC_URL SPENDFLOW_API_PUBLIC_URL
   export PLAID_CLIENT_ID PLAID_SECRET PLAID_ENV PLAID_PRODUCTS PLAID_COUNTRY_CODES PLAID_REDIRECT_URI
   export GOOGLE_CLIENT_ID GOOGLE_CLIENT_IDS GOOGLE_SECRET_KEY AUTH_ALLOW_DEV_USER
+  export TELLER_APPLICATION_ID TELLER_ENV TELLER_CERT_PATH TELLER_KEY_PATH
+  export SNAPTRADE_CLIENT_ID SNAPTRADE_CONSUMER_KEY SNAPTRADE_CLIENT_SECRET SNAPTRADE_REDIRECT_URI
 }
 
 spendflow_wait_container_healthy() {
@@ -327,25 +333,22 @@ spendflow_dev_logs_dir() {
 }
 
 spendflow_load_dev_env() {
-  local root containers
+  local root containers root_env
   root="$(spendflow_repo_root)"
   containers="${root}/containers"
+  root_env="$(spendflow_root_env_file)"
 
   export SPENDFLOW_REPO_ROOT="${root}"
   export SPENDFLOW_CONTAINERS_DIR="${containers}"
 
-  if [[ -f "${root}/.env" ]]; then
-    set -a
-    # shellcheck disable=SC1091
-    source "${root}/.env"
-    set +a
+  if [[ ! -f "${root_env}" ]]; then
+    echo "error: missing ${root_env} — copy from .env.example" >&2
+    exit 1
   fi
-  if [[ -f "${containers}/.env" ]]; then
-    set -a
-    # shellcheck disable=SC1091
-    source "${containers}/.env"
-    set +a
-  fi
+  set -a
+  # shellcheck disable=SC1091
+  source "${root_env}"
+  set +a
 
   export SPENDFLOW_DEV_API_PORT="${SPENDFLOW_DEV_API_PORT:-4000}"
   export SPENDFLOW_DEV_UI_PORT="${SPENDFLOW_DEV_UI_PORT:-3002}"
@@ -366,7 +369,6 @@ spendflow_load_dev_env() {
   export NEXT_PUBLIC_USE_MOCKS="${NEXT_PUBLIC_USE_MOCKS:-false}"
   export NEXT_PUBLIC_GOOGLE_CLIENT_ID="${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-${GOOGLE_CLIENT_ID:-}}"
 
-  touch "${containers}/.env"
   spendflow_ensure_jwt_secret
 }
 
@@ -468,6 +470,8 @@ spendflow_dev_start_api() {
     export DATABASE_URL PORT NODE_ENV AUTH_ALLOW_DEV_USER CORS_ORIGIN CORS_ORIGINS APP_URL REDIS_URL
     export JWT_SECRET PLAID_CLIENT_ID PLAID_SECRET PLAID_ENV PLAID_PRODUCTS PLAID_COUNTRY_CODES
     export PLAID_REDIRECT_URI ENCRYPTION_KEY GOOGLE_CLIENT_ID GOOGLE_CLIENT_IDS GOOGLE_SECRET_KEY
+    export TELLER_APPLICATION_ID TELLER_ENV TELLER_CERT_PATH TELLER_KEY_PATH
+    export SNAPTRADE_CLIENT_ID SNAPTRADE_CONSUMER_KEY SNAPTRADE_CLIENT_SECRET SNAPTRADE_REDIRECT_URI
     npm run dev >>"${log_file}" 2>&1
   ) &
   echo $! >"${pid_file}"

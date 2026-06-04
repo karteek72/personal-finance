@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import Link from "next/link";
 
-import { PlaidLinkButton } from "@/components/plaid/plaid-link-button";
+import { ConnectAccountButton } from "@/components/accounts/connect-account-button";
 import { AsyncPanel } from "@/components/ui/async-panel";
 import { Card } from "@/components/ui/card";
 import { IconButton, SyncIcon, TrashIcon } from "@/components/ui/icon-button";
@@ -62,9 +62,17 @@ function AccountStatusIcon({ account }: { account: Account }) {
       </span>
     );
   }
-  if (account.source === "plaid") {
+  if (
+    account.source === "plaid" ||
+    account.source === "teller" ||
+    account.source === "snaptrade"
+  ) {
+    const title =
+      account.source === "snaptrade"
+        ? "Live — synced from your brokerage"
+        : "Live — synced from your bank";
     return (
-      <span title="Live — synced from your bank" className={STATUS_ICON_WRAP}>
+      <span title={title} className={STATUS_ICON_WRAP}>
         <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 ring-2 ring-white/40" />
       </span>
     );
@@ -131,7 +139,7 @@ function AccountTile({
   onReconnectError,
 }: AccountTileProps) {
   const needsReconnect =
-    account.source === "plaid" &&
+    (account.source === "plaid" || account.source === "teller") &&
     (account.status === "reauth_required" || account.status === "error");
   return (
     <article className="overflow-hidden rounded-[var(--radius-card)] card-shadow">
@@ -155,7 +163,9 @@ function AccountTile({
               </span>
             ) : null}
             <AccountStatusIcon account={account} />
-            {account.source === "plaid" ? (
+            {account.source === "plaid" ||
+            account.source === "teller" ||
+            account.source === "snaptrade" ? (
               <IconButton
                 label={`Sync ${account.name}`}
                 onClick={() => onSync(account)}
@@ -209,25 +219,37 @@ function AccountTile({
           <p className="mt-3 text-[11px] opacity-70">
             Synced {new Date(account.lastSyncedAt).toLocaleDateString()}
           </p>
-        ) : account.source === "plaid" ? (
+        ) : account.source === "plaid" ||
+          account.source === "teller" ||
+          account.source === "snaptrade" ? (
           <p className="mt-3 text-[11px] opacity-70">Not synced yet</p>
         ) : null}
       </div>
 
-      {needsReconnect && account.plaidItemId ? (
+      {needsReconnect ? (
         <div className="flex flex-col gap-2 border-t border-border/60 bg-surface px-4 py-3">
           <p className="text-xs text-text-muted">
             {account.status === "error"
               ? "This connection was revoked or failed. Reconnect to resume syncing."
-              : "Your bank login expired or needs attention. Reconnect to keep balances current."}
+              : "Your login expired or needs attention. Reconnect to keep balances current."}
           </p>
-          <PlaidLinkButton
-            label="Reconnect account"
-            itemId={account.plaidItemId}
-            onSuccess={onReconnectSuccess}
-            onError={onReconnectError}
-            className="w-full justify-center py-2 text-sm"
-          />
+          {account.plaidItemId ? (
+            <ConnectAccountButton
+              label="Reconnect with Plaid"
+              itemId={account.plaidItemId}
+              onSuccess={onReconnectSuccess}
+              onError={onReconnectError}
+              className="w-full justify-center py-2 text-sm"
+            />
+          ) : account.tellerEnrollmentId ? (
+            <ConnectAccountButton
+              label="Reconnect with Teller"
+              tellerEnrollmentId={account.tellerEnrollmentId}
+              onSuccess={onReconnectSuccess}
+              onError={onReconnectError}
+              className="w-full justify-center py-2 text-sm"
+            />
+          ) : null}
         </div>
       ) : null}
 
@@ -303,21 +325,34 @@ export function AccountsView() {
   useEffect(() => {
     function handleOAuthMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== "spendflow:plaid-oauth-success") return;
 
-      notifications.push(
-        "success",
-        "Bank linked",
-        "Your account is connected. Transactions will sync shortly.",
-        "plaid-link",
-      );
-      syncHelpers.invalidateFinancialQueries();
-      void refetch();
+      if (event.data?.type === "spendflow:plaid-oauth-success") {
+        notifications.push(
+          "success",
+          "Bank linked",
+          "Your account is connected. Transactions will sync shortly.",
+          "account-connect",
+        );
+        syncHelpers.invalidateFinancialQueries();
+        void refetch();
+        return;
+      }
+
+      if (event.data?.type === "spendflow:snaptrade-success") {
+        notifications.push(
+          "success",
+          "Brokerage linked",
+          "Your investment accounts are syncing.",
+          "account-connect",
+        );
+        syncHelpers.invalidateFinancialQueries();
+        void refetch();
+      }
     }
 
     window.addEventListener("message", handleOAuthMessage);
     return () => window.removeEventListener("message", handleOAuthMessage);
-  }, [queryClient, refetch]);
+  }, [queryClient, refetch, syncHelpers]);
 
   function handleConnected() {
     notifications.push(
@@ -481,7 +516,7 @@ export function AccountsView() {
                 <SyncIcon className={syncingAll ? "animate-spin" : undefined} />
               </IconButton>
             ) : null}
-            <PlaidLinkButton
+            <ConnectAccountButton
               variant="icon"
               label="Add account"
               onSuccess={handleConnected}
@@ -490,7 +525,7 @@ export function AccountsView() {
                   "error",
                   "Could not link account",
                   message,
-                  "plaid-link",
+                  "account-connect",
                 );
               }}
             />
@@ -516,7 +551,10 @@ export function AccountsView() {
             Link your bank or card to see balances and transactions here.
           </p>
           <div className="mt-5 flex justify-center">
-            <PlaidLinkButton label="Connect your first account" onSuccess={handleConnected} />
+            <ConnectAccountButton
+              label="Connect your first account"
+              onSuccess={handleConnected}
+            />
           </div>
         </Card>
       ) : null}
@@ -591,7 +629,7 @@ export function AccountsView() {
             );
           })}
 
-          <PlaidLinkButton
+          <ConnectAccountButton
             label="Add another account"
             variant="dashed"
             onSuccess={handleConnected}

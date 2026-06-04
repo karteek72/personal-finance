@@ -31,8 +31,8 @@ echo "    Host bind: ${SPENDFLOW_HOST}:${SPENDFLOW_UI_PORT} (UI), :${SPENDFLOW_A
 echo "    DATABASE_URL host: $(echo "${DATABASE_URL}" | sed -E 's#(postgresql://[^@]+@)[^/]+#\1<host>#')"
 echo "    REDIS_URL: ${REDIS_URL}"
 
-if [[ ! -f "${SPENDFLOW_CONTAINERS_DIR}/.env" && ! -f "${SPENDFLOW_REPO_ROOT}/.env" ]]; then
-  fail "missing ${SPENDFLOW_CONTAINERS_DIR}/.env (copy from containers/env.example)"
+if [[ ! -f "$(spendflow_root_env_file)" ]]; then
+  fail "missing $(spendflow_root_env_file) (copy from .env.example)"
 fi
 
 if [[ -z "${JWT_SECRET:-}" || "${#JWT_SECRET}" -lt 16 ]]; then

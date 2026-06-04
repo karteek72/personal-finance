@@ -7,6 +7,8 @@ export type NotificationKind = "info" | "success" | "error" | "progress";
 export type NotificationSource =
   | "plaid-sync"
   | "plaid-link"
+  | "account-connect"
+  | "snaptrade-connect"
   | "import"
   | "household"
   | "insight"

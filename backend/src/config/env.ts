@@ -1,18 +1,22 @@
-import { config as loadDotenv } from "dotenv";
 import { z } from "zod";
-import { resolve } from "node:path";
 import { getRootLogger } from "../lib/logger.js";
+import { loadRootEnv } from "./load-root-env.js";
 
-loadDotenv({ path: resolve(process.cwd(), "../.env") });
-loadDotenv({ path: resolve(process.cwd(), ".env") });
+loadRootEnv();
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().default(4000),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   CORS_ORIGINS: z.string().optional(),
-  PLAID_CLIENT_ID: z.string().min(1),
-  PLAID_SECRET: z.string().min(1),
+  PLAID_CLIENT_ID: z.preprocess(
+    (value) => (value === "" || value === undefined ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+  PLAID_SECRET: z.preprocess(
+    (value) => (value === "" || value === undefined ? undefined : value),
+    z.string().min(1).optional(),
+  ),
   PLAID_ENV: z.enum(["sandbox", "development", "production"]).default("sandbox"),
   PLAID_PRODUCTS: z.string().default("transactions"),
   PLAID_COUNTRY_CODES: z.string().default("US"),
@@ -40,6 +44,37 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === "true")),
+  TELLER_APPLICATION_ID: z.preprocess(
+    (value) => (value === "" || value === undefined ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+  TELLER_ENV: z
+    .enum(["sandbox", "development", "production"])
+    .default("sandbox"),
+  TELLER_CERT_PATH: z.preprocess(
+    (value) => (value === "" || value === undefined ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+  TELLER_KEY_PATH: z.preprocess(
+    (value) => (value === "" || value === undefined ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+  SNAPTRADE_CLIENT_ID: z.preprocess(
+    (value) => (value === "" || value === undefined ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+  SNAPTRADE_CONSUMER_KEY: z.preprocess(
+    (value) => {
+      if (value !== "" && value !== undefined) return value;
+      const legacy = process.env.SNAPTRADE_CLIENT_SECRET;
+      return legacy === "" || legacy === undefined ? undefined : legacy;
+    },
+    z.string().min(1).optional(),
+  ),
+  SNAPTRADE_REDIRECT_URI: z.preprocess(
+    (value) => (value === "" || value === undefined ? undefined : value),
+    z.string().url().optional(),
+  ),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -61,7 +96,7 @@ export function loadEnv(): Env {
   ) {
     getRootLogger().fatal(
       {},
-      "ENCRYPTION_KEY is required when NODE_ENV=production (set in containers/.env; generate with: openssl rand -hex 32)",
+      "ENCRYPTION_KEY is required when NODE_ENV=production (set in repo root .env; generate with: openssl rand -hex 32)",
     );
     throw new Error("ENCRYPTION_KEY is required in production");
   }
@@ -72,10 +107,35 @@ export function loadEnv(): Env {
   ) {
     getRootLogger().fatal(
       {},
-      "REDIS_URL is required when NODE_ENV=production (set in containers/.env; e.g. redis://redis:6379)",
+      "REDIS_URL is required when NODE_ENV=production (set in repo root .env; e.g. redis://redis:6379)",
     );
     throw new Error("REDIS_URL is required in production");
   }
 
+  const hasPlaid = Boolean(env.PLAID_CLIENT_ID && env.PLAID_SECRET);
+  const hasTeller = Boolean(env.TELLER_APPLICATION_ID);
+  const hasSnaptrade = Boolean(
+    env.SNAPTRADE_CLIENT_ID && env.SNAPTRADE_CONSUMER_KEY,
+  );
+
+  if (!hasPlaid && !hasTeller && !hasSnaptrade) {
+    getRootLogger().warn(
+      {},
+      "No account link providers configured (set Plaid, Teller, and/or SnapTrade env vars)",
+    );
+  }
+
   return env;
+}
+
+export function isPlaidConfigured(env: Env): boolean {
+  return Boolean(env.PLAID_CLIENT_ID && env.PLAID_SECRET);
+}
+
+export function isTellerConfigured(env: Env): boolean {
+  return Boolean(env.TELLER_APPLICATION_ID);
+}
+
+export function isSnaptradeConfigured(env: Env): boolean {
+  return Boolean(env.SNAPTRADE_CLIENT_ID && env.SNAPTRADE_CONSUMER_KEY);
 }

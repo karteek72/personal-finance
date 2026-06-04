@@ -31,7 +31,12 @@ import type {
   NetWorthResponse,
   PaginatedTransactions,
   PatternsResponse,
+  ConnectionProvidersResponse,
   PlaidExchangeResponse,
+  SnaptradeCompleteResponse,
+  SnaptradePortalResponse,
+  TellerConnectConfig,
+  TellerExchangeResponse,
   PlaidItemsResponse,
   PlaidSyncAllResponse,
   PlaidSyncResponse,
@@ -519,6 +524,99 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
+    });
+  },
+
+  getConnectionProviders(): Promise<ConnectionProvidersResponse> {
+    if (USE_MOCKS) {
+      return Promise.resolve({
+        providers: [
+          {
+            id: "plaid",
+            label: "Plaid",
+            description: "Banks and credit cards",
+            accountTypes: ["depository", "credit", "investment"],
+            enabled: true,
+          },
+          {
+            id: "teller",
+            label: "Teller",
+            description: "Checking and credit cards",
+            accountTypes: ["depository", "credit"],
+            enabled: true,
+          },
+          {
+            id: "snaptrade",
+            label: "SnapTrade",
+            description: "Brokerage accounts",
+            accountTypes: ["investment"],
+            enabled: true,
+          },
+        ],
+      });
+    }
+    return fetchJson<ConnectionProvidersResponse>("/connections/providers");
+  },
+
+  getTellerConfig(): Promise<TellerConnectConfig> {
+    if (USE_MOCKS) {
+      return Promise.resolve({
+        applicationId: "app_mock",
+        environment: "sandbox",
+        products: ["transactions", "balance"],
+      });
+    }
+    return fetchJson<TellerConnectConfig>("/teller/config");
+  },
+
+  exchangeTellerToken(body: {
+    accessToken: string;
+    enrollmentId: string;
+    institutionName?: string;
+  }): Promise<TellerExchangeResponse> {
+    if (USE_MOCKS) {
+      return Promise.resolve({
+        enrollmentId: "enr_mock",
+        institutionName: body.institutionName ?? "Mock Bank",
+        accountsSynced: 1,
+        transactionsAdded: 0,
+        message: "Mock Teller exchange complete",
+      });
+    }
+    return fetchJson<TellerExchangeResponse>("/teller/exchange", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  createSnaptradePortalUrl(options?: {
+    broker?: string;
+    reconnectAuthorizationId?: string;
+  }): Promise<SnaptradePortalResponse> {
+    if (USE_MOCKS) {
+      return Promise.resolve({ redirectUri: "about:blank" });
+    }
+    return fetchJson<SnaptradePortalResponse>("/snaptrade/portal-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(options ?? {}),
+    });
+  },
+
+  completeSnaptradeConnection(): Promise<SnaptradeCompleteResponse> {
+    if (USE_MOCKS) {
+      return Promise.resolve({
+        status: "completed",
+        connectionsSynced: 1,
+        accountsSynced: 1,
+        holdingsUpdated: 0,
+        activitiesAdded: 0,
+        message: "Mock SnapTrade sync complete",
+      });
+    }
+    return fetchJson<SnaptradeCompleteResponse>("/snaptrade/complete", {
+      method: "POST",
     });
   },
 
