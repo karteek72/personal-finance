@@ -153,6 +153,10 @@ Target brokers for v1 template work.
 | **Robinhood** | Brokerage, Roth, crypto | CSV activity report | PDF monthly stmt | Custom date range report (async, ~2 hr) | P1 — `Trans Code` maps to buy/sell/dividend |
 | **SoFi** | Money (checking/savings), Invest | CSV for **Money only** | PDF for Invest | 2 yr bank CSV; Invest **PDF-only** | P2 bank CSV + **PDF plugin for Invest** |
 | **Coinbase** | Crypto | CSV transaction history (taxes page) | PDF | Per tax year | P2 — `assetType: crypto`; separate from equities |
+| **Bank of America** | Checking (4857), Visa credit (7138/2096), auto loan (8034) | **PDF eStmt** (no QFX) | — | Monthly PDFs | `bofa-checking`, `bofa-credit-card`, `bofa-auto-loan` via `pdftotext -layout` |
+| **American Express** | Credit | CSV (`Date, Description, Amount` + optional extended columns) | — | Full export | `amex-activity`; minimal 3-column export if filename hints `amex` |
+| **Discover** | Credit | CSV (`Trans. Date`, `Post Date`, `Description`, `Amount`, `Category`) | — | Activity download | `discover-activity` |
+| **Citi** | Credit | CSV (`Date`, `Description`, `Debit`, `Credit`, `Category`; preamble may include `Card-7016`) | — | Year-to-date / annual | `citi-card-activity`; long dates (`May 27, 2026`) supported |
 
 ⭐ = primary day/swing trading brokers (user-confirmed).
 
@@ -180,7 +184,11 @@ For 5–10 years of day/swing trade history:
 1. **E*TRADE + Fidelity + Webull** (day-trade core) — CSV first; upload all files; worker batches by account.
 2. **Schwab + Robinhood** — CSV activity reports when needed for swing/retirement accounts.
 3. **SoFi Invest** — PDF monthly statements → `sofi-invest` PDF plugin (no native CSV).
-4. **Coinbase** — CSV per tax year from transaction history export.
+4. **Fidelity / E*TRADE / Webull (historical PDF only)** — client statement PDFs via `pdftotext -layout`:
+   - **E*TRADE** — `etrade-statement`: ACTIVITY section (buys/sells, transfers, RSU).
+   - **Webull** — `webull-statement`: summary trade grid + legacy Apex BOUGHT/SOLD rows.
+   - **Fidelity** — `fidelity-year-end`: pending settlement trades per account; year-end reports rarely include full trade history — prefer Activity CSV when available.
+5. **Coinbase** — CSV per tax year from transaction history export.
 
 ### Coinbase (crypto-specific)
 
@@ -202,7 +210,7 @@ For 5–10 years of day/swing trade history:
 |------|-----------|-----------|
 | **Wave 1** | `fidelity-activity`, `etrade-transactions`, `webull-orders` | **Day-trading core** — highest trade volume |
 | **Wave 2** | `schwab-transactions`, `robinhood-activity`, OFX invest | Secondary brokers + QFX fallback |
-| **Wave 3** | `coinbase-tx-history`, `sofi-checking`, PDF: `sofi-invest`, `etrade`, `webull` | Crypto, SoFi, PDF fallbacks |
+| **Wave 3** | `coinbase-tx-history`, `sofi-checking`, PDF: `sofi-invest`, `etrade-statement`, `webull-statement`, `fidelity-year-end` | Crypto, SoFi, broker PDF fallbacks |
 
 ### Fixture request (Wave 1 first)
 

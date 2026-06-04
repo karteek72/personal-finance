@@ -8,6 +8,11 @@ import {
   parseWebullOrdersCsv,
 } from "./csv-templates.js";
 import { headerIndexMap, normalizeHeader, parseCsvRows } from "./csv-parse.js";
+import {
+  detectIssuerCsv,
+  parseIssuerCsv,
+  rejectFidelityStatementCsv,
+} from "./issuer-csv.js";
 import type { ParsedStatement } from "./types.js";
 
 export type CsvTemplateId =
@@ -100,10 +105,26 @@ export function parseCsvStatement(
   content: string,
   filename: string,
 ): ParsedStatement {
+  const issuerId = detectIssuerCsv(content, filename);
+  if (issuerId) {
+    return parseIssuerCsv(issuerId, content, filename);
+  }
+
+  const rows = parseCsvRows(content);
+  const flat = rows
+    .slice(0, 12)
+    .flat()
+    .join(" ")
+    .toLowerCase();
+  if (flat.includes("beginning mkt value") || flat.includes("symbol/cusip")) {
+    rejectFidelityStatementCsv(content, filename);
+  }
+
   const templateId = detectCsvTemplate(content);
   if (!templateId) {
     throw new Error(
-      `Unsupported CSV format in "${filename}". Expected Fidelity, E*TRADE, Webull, Schwab, Robinhood, Coinbase, or SoFi export.`,
+      `Unsupported CSV format in "${filename}". ` +
+        "Supported: Amex, Discover, Citi card, Fidelity activity, E*TRADE, Webull, Schwab, Robinhood, Coinbase, SoFi.",
     );
   }
 

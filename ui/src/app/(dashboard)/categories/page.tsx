@@ -9,6 +9,7 @@ import { AsyncPanel } from "@/components/ui/async-panel";
 import { PageHeader } from "@/components/ui/page-header";
 import { useCategories } from "@/hooks/use-categories";
 import { useChartData } from "@/hooks/use-chart-data";
+import { analyticsPeriodLabel } from "@/lib/date-ranges";
 import { formatMoney } from "@/lib/format-money";
 
 /* ─── Monthly cash-flow card ─────────────────────────────────────── */
@@ -114,7 +115,7 @@ function MonthlyFlowStrip({ accountId }: MonthlyFlowStripProps) {
   return (
     <section aria-label="Monthly cash flow overview">
       <h3 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-text-muted">
-        Monthly overview
+        {analyticsPeriodLabel()}
         {accountId ? (
           <span className="ml-1.5 font-normal normal-case text-text-muted/70">
             · filtered by account

@@ -82,6 +82,12 @@ async function finalizeBatchAfterPreview(
   return { ready: summary.ready, failed: summary.failed };
 }
 
+/** Fix batch status when all files finished parsing but batch row was not updated. */
+export async function reconcileImportBatchPreview(batchId: string): Promise<void> {
+  const db = getDb();
+  await finalizeBatchAfterPreview(db, batchId);
+}
+
 async function persistStatementsForFile(
   db: ReturnType<typeof getDb>,
   userId: string,
@@ -162,13 +168,24 @@ async function parseBatchFiles(
     files = files.filter((f) => allowed.has(f.id));
   }
 
+  let processed = 0;
   for (const file of files) {
     if (file.status === "preview_ready" || file.status === "parsed") {
+      processed++;
       continue;
     }
 
-    if (file.status === "failed" || file.status === "stored") {
+    if (
+      file.status === "failed" ||
+      file.status === "stored" ||
+      file.status === "parsing"
+    ) {
       await parseImportFileRecord(db, userId, file, env, categoryRules);
+      processed++;
+      await db
+        .update(importBatches)
+        .set({ filesProcessed: processed })
+        .where(eq(importBatches.id, batchId));
     }
   }
 }

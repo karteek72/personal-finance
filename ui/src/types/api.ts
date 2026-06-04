@@ -689,6 +689,17 @@ export interface ImportBatchCreateResponse {
   message: string;
 }
 
+export interface ImportActiveBatchResponse {
+  activeBatchId: string | null;
+  status?: string;
+  filesTotal?: number;
+  createdAt?: string;
+}
+
+export interface ApiErrorDetails {
+  activeBatchId?: string;
+}
+
 export interface ImportFilePreviewSummary {
   accounts: {
     institutionName: string;

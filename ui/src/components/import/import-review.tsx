@@ -48,6 +48,8 @@ export function ImportReview({ batchId, onComplete }: ImportReviewProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
+  const [parsingSlow, setParsingSlow] = useState(false);
+  const parseNotifiedRef = useRef(false);
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const [replaceTargetFileId, setReplaceTargetFileId] = useState<string | null>(
     null,
@@ -90,6 +92,20 @@ export function ImportReview({ batchId, onComplete }: ImportReviewProps) {
       if (timer) clearInterval(timer);
     };
   }, [batchId, poll]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setParsingSlow(true), 45_000);
+    return () => clearTimeout(timer);
+  }, [batchId]);
+
+  useEffect(() => {
+    if (!status || parseNotifiedRef.current) return;
+
+    const terminal = ["awaiting_confirmation", "completed", "failed"];
+    if (!terminal.includes(status.batch.status)) return;
+
+    parseNotifiedRef.current = true;
+  }, [status]);
 
   const readyFiles = useMemo(
     () => status?.files.filter((f) => f.status === "preview_ready") ?? [],
@@ -260,9 +276,92 @@ export function ImportReview({ batchId, onComplete }: ImportReviewProps) {
     return { banking, investment };
   }, [status, selectedFileIds]);
 
+  const processingCard = (
+    files: ImportBatchStatusResponse["files"] | undefined,
+    batch: ImportBatchStatusResponse["batch"] | undefined,
+    summary: ImportBatchStatusResponse["summary"] | undefined,
+  ) => {
+    const currentFile = files?.find((f) => f.status === "parsing");
+    const doneCount =
+      summary !== undefined
+        ? summary.ready + summary.failed + summary.imported
+        : (files?.filter((f) =>
+            ["preview_ready", "failed", "parsed"].includes(f.status),
+          ).length ?? 0);
+
+    return (
+      <Card padding="lg" className="flex flex-col gap-4 border-primary/30">
+        <div>
+          <h2 className="text-base font-semibold text-text">Import status — parsing</h2>
+          <p className="mt-1 text-sm text-text-muted">
+            PDFs take longer than CSV (each file is decrypted and run through{" "}
+            <code className="font-mono text-xs">pdftotext</code>). Status refreshes every
+            few seconds.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span
+            className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"
+            aria-hidden
+          />
+          <div>
+            <p className="text-sm font-medium text-text">
+              {currentFile
+                ? `Parsing: ${currentFile.filename}`
+                : "Preparing next file…"}
+            </p>
+            <p className="text-xs text-text-muted">
+              {batch
+                ? `${doneCount} of ${batch.filesTotal} finished`
+                : "Loading status…"}
+            </p>
+          </div>
+        </div>
+        {files && files.length > 0 ? (
+          <ul className="flex flex-col gap-2">
+            {files.map((file) => (
+              <li
+                key={file.id}
+                className={`flex items-center justify-between rounded-[var(--radius-sm)] border px-3 py-2 text-sm ${
+                  file.status === "parsing"
+                    ? "border-primary/50 bg-primary-soft/15"
+                    : "border-border/80"
+                }`}
+              >
+                <span className="truncate text-text">{file.filename}</span>
+                <span
+                  className={`shrink-0 text-xs font-medium ${statusColor(file.status)}`}
+                >
+                  {statusLabel(file.status)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {parsingSlow ? (
+          <p className="rounded-[var(--radius-sm)] bg-amber-400/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            Large PDF batches can take several minutes. If nothing changes for a long
+            time, use <strong>Discard upload</strong> below and try fewer files, or run{" "}
+            <code className="font-mono">cd backend && npm run dev:worker</code> if Redis
+            is enabled.
+          </p>
+        ) : null}
+        <button
+          type="button"
+          disabled={actionLoading !== null}
+          onClick={() => void handleCancel()}
+          className="inline-flex h-9 w-fit items-center rounded-[var(--radius-sm)] border border-border bg-surface px-3 text-sm text-text-muted transition-colors hover:text-text disabled:opacity-50"
+        >
+          {actionLoading === "cancel" ? "Cancelling…" : "Discard upload"}
+        </button>
+      </Card>
+    );
+  };
+
   if (pollError) {
     return (
-      <Card padding="lg">
+      <Card padding="lg" className="flex flex-col gap-3 border-red-200/80">
+        <h2 className="text-base font-semibold text-text">Import status</h2>
         <p className="text-sm text-red-500" role="alert">
           {pollError}
         </p>
@@ -271,31 +370,20 @@ export function ImportReview({ batchId, onComplete }: ImportReviewProps) {
   }
 
   if (!status) {
-    return (
-      <Card padding="lg">
-        <p className="text-sm text-text-muted">Parsing uploaded files…</p>
-      </Card>
-    );
+    return processingCard(undefined, undefined, undefined);
   }
 
   const { batch, files, summary } = status;
 
   if (batch.status === "processing" || batch.status === "pending") {
-    return (
-      <Card padding="lg" className="flex flex-col gap-2">
-        <p className="text-sm font-medium text-text">Parsing files…</p>
-        <p className="text-xs text-text-muted">
-          {batch.filesProcessed} / {batch.filesTotal} processed
-        </p>
-      </Card>
-    );
+    return processingCard(files, batch, summary);
   }
 
   if (batch.status === "failed" && summary.ready === 0) {
     return (
-      <Card padding="lg" className="flex flex-col gap-4">
+      <Card padding="lg" className="flex flex-col gap-4 border-red-200/60">
         <div>
-          <h2 className="text-base font-semibold text-text">Import failed</h2>
+          <h2 className="text-base font-semibold text-text">Import status — failed</h2>
           <p className="mt-1 text-sm text-red-500" role="alert">
             {batch.errorMessage ?? "All files failed to parse."}
           </p>
@@ -371,7 +459,8 @@ export function ImportReview({ batchId, onComplete }: ImportReviewProps) {
 
   if (batch.status === "completed") {
     return (
-      <Card padding="lg">
+      <Card padding="lg" className="border-emerald-200/60">
+        <h2 className="mb-2 text-base font-semibold text-text">Import status — complete</h2>
         <p className="text-sm text-emerald-600">
           Imported {batch.txnsInserted} transactions
           {batch.txnsSkipped > 0
@@ -388,7 +477,7 @@ export function ImportReview({ batchId, onComplete }: ImportReviewProps) {
   const selectedCount = selectedFileIds.size;
 
   return (
-    <Card padding="lg" className="flex flex-col gap-4">
+    <Card padding="lg" className="flex flex-col gap-4 border-emerald-200/40">
       <input
         ref={replaceInputRef}
         type="file"
@@ -398,7 +487,7 @@ export function ImportReview({ batchId, onComplete }: ImportReviewProps) {
       />
 
       <div>
-        <h2 className="text-base font-semibold text-text">Review import</h2>
+        <h2 className="text-base font-semibold text-text">Import status — ready to confirm</h2>
         <p className="mt-1 text-sm text-text-muted">
           Confirm before transactions are saved to your accounts.
         </p>

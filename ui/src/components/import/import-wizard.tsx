@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ImportReview } from "@/components/import/import-review";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { api } from "@/lib/api-client";
+import { api, ImportApiError } from "@/lib/api-client";
 import { notifications } from "@/lib/notifications";
 import type { ImportFormatsResponse } from "@/types/api";
 
@@ -29,6 +29,42 @@ export function ImportWizard() {
   const [consent, setConsent] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [batchId, setBatchId] = useState<string | null>(null);
+  const [pageAlert, setPageAlert] = useState<{
+    variant: "error" | "info";
+    title: string;
+    message: string;
+  } | null>(null);
+  const [loadingActiveBatch, setLoadingActiveBatch] = useState(true);
+  const reviewRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .getActiveImportBatch()
+      .then((active) => {
+        if (cancelled) return;
+        if (active.activeBatchId) {
+          setBatchId(active.activeBatchId);
+          setPageAlert({
+            variant: "info",
+            title: "Import in progress",
+            message:
+              active.status === "awaiting_confirmation"
+                ? "Your last upload finished parsing. Review results below, confirm import, or discard before starting a new upload."
+                : "Parsing your previous upload. Status updates below.",
+          });
+        }
+      })
+      .catch(() => {
+        /* non-fatal */
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingActiveBatch(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +90,12 @@ export function ImportWizard() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (batchId && reviewRef.current) {
+      reviewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [batchId]);
 
   const limits = formats?.limits;
   const totalBytes = useMemo(
@@ -85,7 +127,7 @@ export function ImportWizard() {
     (list: FileList | null) => {
       if (!list) return;
       setFiles(Array.from(list));
-      setBatchId(null);
+      setPageAlert(null);
     },
     [],
   );
@@ -103,23 +145,33 @@ export function ImportWizard() {
     if (validationError || files.length === 0) return;
 
     setUploading(true);
+    setPageAlert(null);
     try {
       const result = await api.uploadImportBatch(files, consent);
       setBatchId(result.batchId);
-      notifications.push(
-        "success",
-        "Files uploaded securely",
-        result.message,
-        "import",
-      );
+      setPageAlert({
+        variant: "info",
+        title: "Upload received",
+        message: result.message,
+      });
       setFiles([]);
     } catch (err) {
-      notifications.push(
-        "error",
-        "Upload failed",
-        err instanceof Error ? err.message : "Please try again.",
-        "import",
-      );
+      if (err instanceof ImportApiError) {
+        setPageAlert({
+          variant: "error",
+          title: "Cannot start a new upload",
+          message: err.message,
+        });
+        if (err.activeBatchId) {
+          setBatchId(err.activeBatchId);
+        }
+      } else {
+        setPageAlert({
+          variant: "error",
+          title: "Upload failed",
+          message: err instanceof Error ? err.message : "Please try again.",
+        });
+      }
     } finally {
       setUploading(false);
     }
@@ -127,6 +179,22 @@ export function ImportWizard() {
 
   return (
     <div className="flex flex-col gap-5">
+      {pageAlert ? (
+        <Card
+          padding="md"
+          className={
+            pageAlert.variant === "error"
+              ? "border-red-300/80 bg-red-50/40 dark:border-red-900/60 dark:bg-red-950/30"
+              : "border-primary/30 bg-primary-soft/20"
+          }
+        >
+          <p className="text-sm font-semibold text-text">{pageAlert.title}</p>
+          <p className="mt-1 text-sm text-text-muted" role="alert">
+            {pageAlert.message}
+          </p>
+        </Card>
+      ) : null}
+
       <PageHeader
         title="Import history"
         subtitle="Upload statements or broker exports — encrypted in transit and at rest"
@@ -180,7 +248,10 @@ export function ImportWizard() {
           <span className="text-sm font-medium text-text">
             Drag files here or click to browse
           </span>
-          <span className="text-xs text-text-muted">QFX, OFX, CSV, or PDF</span>
+          <span className="text-xs text-text-muted">
+            QFX, OFX, CSV, or PDF — up to 12 files. Bank of America monthly PDFs
+            (checking, savings, credit card) are supported when CSV/QFX are not offered.
+          </span>
           <input
             id="import-files"
             type="file"
@@ -227,9 +298,11 @@ export function ImportWizard() {
           type="button"
           disabled={
             uploading ||
+            loadingActiveBatch ||
             files.length === 0 ||
             !consent ||
-            validationError !== null
+            validationError !== null ||
+            batchId !== null
           }
           onClick={() => void handleUpload()}
           className="inline-flex h-10 items-center justify-center rounded-[var(--radius-sm)] bg-primary px-4 text-sm font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
@@ -238,12 +311,27 @@ export function ImportWizard() {
         </button>
 
         {batchId ? (
-          <ImportReview
-            batchId={batchId}
-            onComplete={() => setBatchId(null)}
-          />
+          <p className="text-xs text-text-muted">
+            Finish or discard the import below before uploading another batch.
+          </p>
         ) : null}
       </Card>
+
+      {batchId ? (
+        <div ref={reviewRef} className="scroll-mt-6">
+          <ImportReview
+            batchId={batchId}
+            onComplete={() => {
+              setBatchId(null);
+              setPageAlert(null);
+            }}
+          />
+        </div>
+      ) : loadingActiveBatch ? (
+        <Card padding="md">
+          <p className="text-sm text-text-muted">Checking for an active import…</p>
+        </Card>
+      ) : null}
 
       <Card padding="md" variant="ghost">
         <p className="text-xs text-text-muted">

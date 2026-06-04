@@ -1,12 +1,25 @@
-/** Rolling window aligned with Plaid's max transaction history (730 days). */
-export function plaidHistoryDateRange(): { from: string; to: string } {
+/** Default dashboard / chart / activity window (statement import friendly). */
+export const DEFAULT_ANALYTICS_MONTHS = 12;
+
+/** Rolling calendar-month window for analytics and transaction views. */
+export function analyticsDateRange(
+  monthsBack = DEFAULT_ANALYTICS_MONTHS,
+): { from: string; to: string } {
   const toDate = new Date();
-  const fromDate = new Date(toDate);
-  fromDate.setUTCDate(fromDate.getUTCDate() - 730);
+  const fromDate = new Date(
+    toDate.getFullYear(),
+    toDate.getMonth() - (monthsBack - 1),
+    1,
+  );
   return {
     from: fromDate.toISOString().slice(0, 10),
     to: toDate.toISOString().slice(0, 10),
   };
+}
+
+/** @deprecated Prefer `analyticsDateRange` — alias for existing call sites. */
+export function plaidHistoryDateRange(): { from: string; to: string } {
+  return analyticsDateRange();
 }
 
 /** Calendar year (used where a YTD view is intentional). */
@@ -17,7 +30,14 @@ export function calendarYearDateRange(year = new Date().getFullYear()): {
   return { from: `${year}-01-01`, to: `${year}-12-31` };
 }
 
-/** Human label for the rolling Plaid history window on the dashboard. */
+/** Human label for the default analytics window on the dashboard. */
+export function analyticsPeriodLabel(
+  months = DEFAULT_ANALYTICS_MONTHS,
+): string {
+  return `Last ${months} months`;
+}
+
+/** @deprecated Prefer `analyticsPeriodLabel`. */
 export function plaidHistoryPeriodLabel(): string {
-  return "Last 24 months";
+  return analyticsPeriodLabel();
 }

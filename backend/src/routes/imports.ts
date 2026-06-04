@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import multipart from "@fastify/multipart";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import {
   getImportLimits,
   sanitizeImportFilename,
@@ -38,6 +38,7 @@ import {
   recordStatementImportConsent,
 } from "../services/import/import-audit.js";
 import { enqueueImportBatch, isRedisConfigured } from "../jobs/queue.js";
+import { kickStaleImportBatchIfNeeded } from "../services/import/kick-stale-import-batch.js";
 
 const CONSENT_VERSION = "statement_import_v1";
 
@@ -64,7 +65,14 @@ const FORMAT_INFO = [
     extensions: [".pdf"],
     description:
       "Monthly statements when CSV/OFX is unavailable. Parsed per institution.",
-    brokers: ["SoFi Invest", "Bank statements (BoFA via CLI)"],
+    brokers: [
+      "Bank of America (checking, savings, credit card, auto loan)",
+      "SoFi Invest",
+      "Fidelity (year-end / pending trades)",
+      "E*TRADE",
+      "Webull",
+      "Amex / Discover / Citi (use CSV)",
+    ],
   },
 ] as const;
 
@@ -164,8 +172,9 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
       .limit(1);
 
     if (active.length > 0) {
-      throw AppError.validation(
-        "An import is already in progress. Wait for it to finish or cancel it.",
+      throw AppError.conflict(
+        "An import is already in progress. Review it below, or cancel it before uploading again.",
+        { activeBatchId: active[0]!.id },
       );
     }
 
@@ -301,12 +310,28 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
       auditCtx,
     );
 
-    const enqueued = await enqueueImportBatch(app.config.env, batch.id);
+    const useQueue =
+      isRedisConfigured(app.config.env) &&
+      app.config.env.NODE_ENV !== "development";
+    const enqueued = useQueue
+      ? await enqueueImportBatch(app.config.env, batch.id)
+      : false;
+
     if (enqueued) {
+      await db
+        .update(importBatches)
+        .set({ status: "processing" })
+        .where(eq(importBatches.id, batch.id));
       request.log.info({ batchId: batch.id }, "import batch queued for parsing");
-    } else if (isRedisConfigured(app.config.env)) {
-      request.log.warn({ batchId: batch.id }, "failed to enqueue import batch");
     } else {
+      await db
+        .update(importBatches)
+        .set({ status: "processing" })
+        .where(eq(importBatches.id, batch.id));
+      request.log.info(
+        { batchId: batch.id, inline: true },
+        "import batch parsing inline",
+      );
       void previewImportBatch(batch.id, app.config.env).catch((err: unknown) => {
         request.log.error({ err, batchId: batch.id }, "inline import preview failed");
       });
@@ -323,6 +348,45 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
         : isRedisConfigured(app.config.env)
           ? "Files received securely. Parsing will start shortly."
           : "Files received securely. Parsing in background (no Redis queue).",
+    };
+  });
+
+  app.get("/imports/batches/active", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
+    const db = getDb();
+
+    const [active] = await db
+      .select({
+        id: importBatches.id,
+        status: importBatches.status,
+        filesTotal: importBatches.filesTotal,
+        createdAt: importBatches.createdAt,
+      })
+      .from(importBatches)
+      .where(
+        and(
+          eq(importBatches.userId, user.id),
+          inArray(importBatches.status, [
+            "pending",
+            "processing",
+            "awaiting_confirmation",
+          ]),
+        ),
+      )
+      .orderBy(desc(importBatches.createdAt))
+      .limit(1);
+
+    if (!active) {
+      return { activeBatchId: null };
+    }
+
+    await kickStaleImportBatchIfNeeded(active.id, app.config.env);
+
+    return {
+      activeBatchId: active.id,
+      status: active.status,
+      filesTotal: active.filesTotal,
+      createdAt: active.createdAt.toISOString(),
     };
   });
 
@@ -343,6 +407,18 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
       throw AppError.notFound("Import batch not found.");
     }
 
+    await kickStaleImportBatchIfNeeded(batchId, app.config.env);
+
+    const [freshBatch] = await db
+      .select()
+      .from(importBatches)
+      .where(
+        and(eq(importBatches.id, batchId), eq(importBatches.userId, user.id)),
+      )
+      .limit(1);
+
+    const activeBatch = freshBatch ?? batch;
+
     const files = await db
       .select({
         id: importFiles.id,
@@ -361,15 +437,15 @@ export const importRoutes: FastifyPluginAsync = async (app) => {
 
     return {
       batch: {
-        id: batch.id,
-        status: batch.status,
-        filesTotal: batch.filesTotal,
-        filesProcessed: batch.filesProcessed,
-        txnsInserted: batch.txnsInserted,
-        txnsSkipped: batch.txnsSkipped,
-        errorMessage: batch.errorMessage,
-        createdAt: batch.createdAt.toISOString(),
-        completedAt: batch.completedAt?.toISOString() ?? null,
+        id: activeBatch.id,
+        status: activeBatch.status,
+        filesTotal: activeBatch.filesTotal,
+        filesProcessed: activeBatch.filesProcessed,
+        txnsInserted: activeBatch.txnsInserted,
+        txnsSkipped: activeBatch.txnsSkipped,
+        errorMessage: activeBatch.errorMessage,
+        createdAt: activeBatch.createdAt.toISOString(),
+        completedAt: activeBatch.completedAt?.toISOString() ?? null,
       },
       summary: {
         ...summary,

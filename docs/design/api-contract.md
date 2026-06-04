@@ -106,7 +106,7 @@ Multipart upload for QFX/OFX/CSV/PDF statement files. Files encrypted at rest (A
 | POST | `/imports/batches/:batchId/files/:fileId/replace` | `multipart/form-data`: `file` | `{ batchId, fileId, message }` |
 | DELETE | `/imports/batches/:batchId` | — | `204` |
 
-**Limits (defaults, env-configurable):** 10 files, 10 MiB/file, 50 MiB/batch.
+**Limits (defaults, env-configurable):** 12 files, 10 MiB/file, 120 MiB/batch.
 
 ---
 

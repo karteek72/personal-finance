@@ -44,10 +44,47 @@ import type {
   WellnessResponse,
   WrappedResponse,
   ImportFormatsResponse,
+  ImportActiveBatchResponse,
   ImportBatchCreateResponse,
   ImportBatchStatusResponse,
   ImportConfirmResponse,
 } from "@/types/api";
+
+/** Thrown when import upload/status API returns an error body. */
+export class ImportApiError extends Error {
+  readonly status: number;
+  readonly activeBatchId?: string;
+
+  constructor(
+    message: string,
+    status: number,
+    details?: { activeBatchId?: string },
+  ) {
+    super(message);
+    this.name = "ImportApiError";
+    this.status = status;
+    this.activeBatchId = details?.activeBatchId;
+  }
+}
+
+function parseImportErrorBody(
+  body: unknown,
+  status: number,
+): ImportApiError {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "error" in body &&
+    typeof (body as { error?: { message?: string; details?: { activeBatchId?: string } } })
+      .error?.message === "string"
+  ) {
+    const err = (body as {
+      error: { message: string; details?: { activeBatchId?: string } };
+    }).error;
+    return new ImportApiError(err.message, status, err.details);
+  }
+  return new ImportApiError(`Request failed (${status})`, status);
+}
 
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== "false";
 
@@ -575,14 +612,21 @@ export const api = {
           },
         ],
         limits: {
-          maxFiles: 10,
+          maxFiles: 12,
           maxFileBytes: 10 * 1024 * 1024,
-          maxBatchBytes: 50 * 1024 * 1024,
+          maxBatchBytes: 120 * 1024 * 1024,
         },
         consentVersion: "statement_import_v1",
       });
     }
     return fetchJson<ImportFormatsResponse>("/imports/formats");
+  },
+
+  getActiveImportBatch(): Promise<ImportActiveBatchResponse> {
+    if (USE_MOCKS) {
+      return Promise.resolve({ activeBatchId: null });
+    }
+    return fetchJson<ImportActiveBatchResponse>("/imports/batches/active");
   },
 
   async uploadImportBatch(
@@ -608,10 +652,8 @@ export const api = {
       body: form,
     });
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: { message?: string };
-      } | null;
-      throw new Error(body?.error?.message ?? `Upload failed (${response.status})`);
+      const body = await response.json().catch(() => null);
+      throw parseImportErrorBody(body, response.status);
     }
     return response.json() as Promise<ImportBatchCreateResponse>;
   },

@@ -1,8 +1,21 @@
-import { plaidHistoryDateRange } from "@/lib/date-ranges";
+import {
+  analyticsDateRange,
+  DEFAULT_ANALYTICS_MONTHS,
+} from "@/lib/date-ranges";
+import type { ChartMonthlyPoint } from "@/types/api";
 
-/** Default analytics range: up to 2 years of Plaid history. */
+/** Default analytics range: rolling last 12 calendar months. */
 export function yearToDateRange(): { from: string; to: string } {
-  return plaidHistoryDateRange();
+  return analyticsDateRange();
+}
+
+/** Keep monthly overview / charts at most N months even if the API returns more. */
+export function sliceLastMonthlyPoints(
+  points: ChartMonthlyPoint[],
+  maxMonths = DEFAULT_ANALYTICS_MONTHS,
+): ChartMonthlyPoint[] {
+  if (points.length <= maxMonths) return points;
+  return points.slice(-maxMonths);
 }
 
 export function formatMonthLabel(month: string): string {

@@ -14,13 +14,13 @@ import { AccountBalanceSummary } from "@/components/accounts/account-balance-sum
 import { WrappedBanner } from "@/components/preview/wrapped-banner";
 import { useSummary } from "@/hooks/use-summary";
 import {
-  plaidHistoryDateRange,
-  plaidHistoryPeriodLabel,
+  analyticsDateRange,
+  analyticsPeriodLabel,
 } from "@/lib/date-ranges";
 import { formatMoney } from "@/lib/format-money";
 
 export default function DashboardPage() {
-  const { from, to } = plaidHistoryDateRange();
+  const { from, to } = analyticsDateRange();
   const {
     data: summary,
     isLoading,
@@ -73,7 +73,7 @@ function DashboardContent({
         {/* ── Period context (greeting lives in TopBar) ─────────── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs font-medium text-text-muted sm:text-sm">
-            {plaidHistoryPeriodLabel()}
+            {analyticsPeriodLabel()}
           </p>
           <Link
             href="/transactions"
@@ -146,7 +146,7 @@ function DashboardContent({
             onClick={() =>
               openDrilldown({
                 title: "Expenses",
-                subtitle: `All expense transactions · ${plaidHistoryPeriodLabel()}`,
+                subtitle: `All expense transactions · ${analyticsPeriodLabel()}`,
                 filters: { type: "expense" },
                 viewAllHref: "/transactions?type=expense",
               })
@@ -173,7 +173,7 @@ function DashboardContent({
             onClick={() =>
               openDrilldown({
                 title: "Income",
-                subtitle: `All income transactions · ${plaidHistoryPeriodLabel()}`,
+                subtitle: `All income transactions · ${analyticsPeriodLabel()}`,
                 filters: { type: "income" },
                 viewAllHref: "/transactions?type=income",
               })
@@ -214,7 +214,7 @@ function DashboardContent({
             onClick={() =>
               openDrilldown({
                 title: summary.topCategory.name,
-                subtitle: `Top spending category · ${plaidHistoryPeriodLabel()}`,
+                subtitle: `Top spending category · ${analyticsPeriodLabel()}`,
                 filters: {
                   category: summary.topCategory.name,
                   type: "expense",

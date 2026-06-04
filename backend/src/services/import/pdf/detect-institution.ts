@@ -1,20 +1,111 @@
 export type PdfInstitutionId =
   | "sofi-invest"
-  | "unknown";
+  | "bofa-credit"
+  | "bofa-depository"
+  | "bofa-auto-loan"
+  | "fidelity"
+  | "etrade"
+  | "webull";
 
 export function detectPdfInstitution(text: string): PdfInstitutionId | null {
-  const head = text.slice(0, 8000);
+  const head = text.slice(0, 12_000);
+
+  if (
+    /Webull Financial LLC|Welcome to your Webull Summary Statement/i.test(head) ||
+    (/Account Number:\s*5MW/i.test(head) && /Apex Clearing/i.test(head))
+  ) {
+    return "webull";
+  }
+
+  if (
+    /Fidelity Brokerage Services|YEAR-END INVESTMENT REPORT|Fidelity Investments/i.test(
+      head,
+    )
+  ) {
+    return "fidelity";
+  }
+
+  if (
+    /CLIENT STATEMENT|E\*TRADE|ETRADE\.COM|Morgan Stanley at Work Self-Directed/i.test(
+      head,
+    )
+  ) {
+    return "etrade";
+  }
 
   if (/SoFi\s+(Securities|Invest)/i.test(head)) {
     return "sofi-invest";
   }
 
+  if (/Bank of America/i.test(head)) {
+    if (isAmexMisfiled(text)) {
+      return null;
+    }
+
+    if (
+      /Loan account status|Loan Interest rate:|Auto Loan|650-\d{10,}/i.test(head) ||
+      (/Account\s*#:\s*650-/i.test(head) && /VOLKSWAGEN|TOYOTA|HONDA|FORD|AUTO/i.test(head))
+    ) {
+      return "bofa-auto-loan";
+    }
+
+    const isDepository =
+      /Advantage Banking|Adv Plus Banking|Relationship Banking|Money Market Savings/i.test(
+        head,
+      ) || /Account number:\s*[\d\s]{8,}/i.test(head);
+
+    if (
+      isDepository ||
+      /\d{2}\/\d{2}\/\d{2}\s+.+\s+-?[\d,]+\.\d{2}/m.test(text.slice(0, 30_000))
+    ) {
+      return "bofa-depository";
+    }
+
+    if (
+      /Account#\s*[\d\s]{12,}\d{4}|Credit Card|Visa\s+Signature|World\s+Mastercard/i.test(
+        head,
+      ) ||
+      /\d{2}\/\d{2}\s+\d{2}\/\d{2}\s+.+\s+\d{4}\s+\d{4}\s+-?[\d,]+\.\d{2}/m.test(
+        text.slice(0, 30_000),
+      )
+    ) {
+      return "bofa-credit";
+    }
+
+    if (/! Account #/i.test(head)) {
+      return "bofa-credit";
+    }
+
+    return "bofa-depository";
+  }
+
   return null;
 }
 
+function isAmexMisfiled(text: string): boolean {
+  return (
+    /American Express/i.test(text) &&
+    !/Bank of America/i.test(text.slice(0, 2000))
+  );
+}
+
 export function pdfInstitutionLabel(id: PdfInstitutionId | null): string {
-  if (id === "sofi-invest") {
-    return "SoFi Invest";
+  switch (id) {
+    case "sofi-invest":
+      return "SoFi Invest";
+    case "bofa-credit":
+      return "Bank of America (credit card)";
+    case "bofa-depository":
+      return "Bank of America (checking/savings)";
+    case "bofa-auto-loan":
+      return "Bank of America (auto loan)";
+    case "fidelity":
+      return "Fidelity";
+    case "etrade":
+      return "E*TRADE";
+    case "webull":
+      return "Webull";
+    default:
+      return "unknown institution";
   }
-  return "unknown institution";
 }

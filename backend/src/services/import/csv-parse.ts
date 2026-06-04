@@ -144,27 +144,40 @@ export function parseDateUs(raw: string): string | null {
 
   const mon = t.match(/^([A-Za-z]{3})\s+(\d{1,2}),?\s+(\d{4})/);
   if (mon) {
-    const months: Record<string, string> = {
-      jan: "01",
-      feb: "02",
-      mar: "03",
-      apr: "04",
-      may: "05",
-      jun: "06",
-      jul: "07",
-      aug: "08",
-      sep: "09",
-      oct: "10",
-      nov: "11",
-      dec: "12",
-    };
-    const m = months[mon[1]!.toLowerCase()];
+    const m = usMonthToNumber(mon[1]!);
     if (m) {
       return `${mon[3]}-${m}-${mon[2]!.padStart(2, "0")}`;
     }
   }
 
+  const longMon = t.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
+  if (longMon) {
+    const m = usMonthToNumber(longMon[1]!);
+    if (m) {
+      return `${longMon[3]}-${m}-${longMon[2]!.padStart(2, "0")}`;
+    }
+  }
+
   return null;
+}
+
+function usMonthToNumber(raw: string): string | null {
+  const key = raw.trim().toLowerCase().slice(0, 3);
+  const months: Record<string, string> = {
+    jan: "01",
+    feb: "02",
+    mar: "03",
+    apr: "04",
+    may: "05",
+    jun: "06",
+    jul: "07",
+    aug: "08",
+    sep: "09",
+    oct: "10",
+    nov: "11",
+    dec: "12",
+  };
+  return months[key] ?? null;
 }
 
 export function maskFromAccountId(raw: string): string {

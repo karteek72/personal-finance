@@ -3,7 +3,15 @@ import {
   pdfInstitutionLabel,
 } from "./pdf/detect-institution.js";
 import { pdfBufferToText } from "./pdf/extract-text.js";
+import {
+  parseBofaAutoLoanText,
+  parseBofaCreditCardText,
+  parseBofaDepositoryText,
+} from "./pdf/bofa-pdf.js";
+import { parseEtradePdfText } from "./pdf/etrade-pdf.js";
+import { parseFidelityPdfText } from "./pdf/fidelity-pdf.js";
 import { parseSofiInvestText } from "./pdf/sofi-invest.js";
+import { parseWebullPdfText } from "./pdf/webull-pdf.js";
 import { parseCsvStatement } from "./parse-csv.js";
 import { parseOfxFile } from "./parse-ofx.js";
 import type { ParsedStatement } from "./types.js";
@@ -51,13 +59,32 @@ export async function parseImportFileAsync(
     }
 
     const institution = detectPdfInstitution(text);
+    if (institution === "fidelity") {
+      return parseFidelityPdfText(text, filename);
+    }
+    if (institution === "etrade") {
+      return parseEtradePdfText(text, filename);
+    }
+    if (institution === "webull") {
+      return [parseWebullPdfText(text, filename)];
+    }
     if (institution === "sofi-invest") {
       return [parseSofiInvestText(text, filename)];
+    }
+    if (institution === "bofa-credit") {
+      return [parseBofaCreditCardText(text, filename)];
+    }
+    if (institution === "bofa-depository") {
+      return [parseBofaDepositoryText(text, filename)];
+    }
+    if (institution === "bofa-auto-loan") {
+      return [parseBofaAutoLoanText(text, filename)];
     }
 
     throw new Error(
       `Unsupported PDF statement (${pdfInstitutionLabel(institution)}). ` +
-        "Supported: SoFi Invest. For other brokers, upload CSV or QFX/OFX exports.",
+        "Supported PDFs: Bank of America, SoFi Invest, Fidelity, E*TRADE, Webull. " +
+        "For Amex, Discover, and Citi use CSV exports.",
     );
   }
 

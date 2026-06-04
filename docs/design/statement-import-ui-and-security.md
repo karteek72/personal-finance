@@ -24,7 +24,7 @@ Accounts page
             "I authorize SpendFlow to process these files containing my
              financial data. Files are encrypted and deleted after parsing."
        └─ Step 4: Upload (drag-and-drop)
-            • 1–10 files per batch
+            • 1–12 files per batch (full year of monthly statements)
             • Per-file and total size limits shown
             • Accepted: .qfx .ofx .csv .pdf
        └─ Step 5: Review detected accounts (post-parse preview)
@@ -42,13 +42,13 @@ Tuned for self-hosted Podman behind reverse proxy. All limits configurable via e
 
 | Limit | Default | Env var | Rationale |
 |-------|---------|---------|-----------|
-| Files per request | **10** | `IMPORT_MAX_FILES` | User uploads monthly batches; repeat for more |
+| Files per request | **12** | `IMPORT_MAX_FILES` | Full year of monthly statements in one upload |
 | Max file size | **10 MiB** | `IMPORT_MAX_FILE_BYTES` | Large PDF statements; CSV trade files |
-| Max batch size | **50 MiB** | `IMPORT_MAX_BATCH_BYTES` | Sum of all files in one request |
+| Max batch size | **120 MiB** | `IMPORT_MAX_BATCH_BYTES` | Sum of all files in one request (12 × 10 MiB) |
 | Requests per hour / user | **6** | (rate limit bucket `import`) | Abuse prevention |
 | Concurrent batches / user | **1** | app logic | Avoid overlapping parses |
 
-**Reverse proxy:** set `client_max_body_size 52m` (nginx) or equivalent ≥ batch limit + overhead.
+**Reverse proxy:** set `client_max_body_size 128m` (nginx) or equivalent ≥ batch limit + overhead.
 
 **Fastify:** `@fastify/multipart` with `limits.fileSize` and pre-check file count before read.
 
@@ -62,7 +62,7 @@ Tuned for self-hosted Podman behind reverse proxy. All limits configurable via e
 |--------|------------|----------|-------------------|
 | QFX / OFX | `.qfx`, `.ofx` | Bank, credit, some brokerage | Fidelity (QFX) |
 | CSV | `.csv` | Broker activity exports | **E*TRADE, Fidelity, Webull** (Wave 1) |
-| PDF | `.pdf` | Monthly statements | Fallback when no CSV |
+| PDF | `.pdf` | Monthly statements | **Bank of America** (checking, savings, credit card), SoFi Invest; more banks planned |
 
 Format is **auto-detected** after upload; user does not pick parser manually. UI shows detected format in review step.
 
@@ -163,9 +163,9 @@ ui/src/components/import/
 ## Environment variables
 
 ```bash
-IMPORT_MAX_FILES=10
+IMPORT_MAX_FILES=12
 IMPORT_MAX_FILE_BYTES=10485760      # 10 MiB
-IMPORT_MAX_BATCH_BYTES=52428800     # 50 MiB
+IMPORT_MAX_BATCH_BYTES=125829120    # 120 MiB
 IMPORT_BLOB_RETENTION_HOURS=24      # purge encrypted upload after parse
 ```
 

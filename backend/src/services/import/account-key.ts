@@ -34,6 +34,29 @@ export function buildInvestmentIdentity(
   };
 }
 
+export function buildCreditIdentity(
+  institutionName: string,
+  accountIdRaw: string,
+  officialName?: string,
+): ParsedAccountIdentity {
+  const mask = maskFromAccountId(accountIdRaw);
+  const display = officialName ?? `${institutionName} ••${mask}`;
+  return {
+    institutionName,
+    accountIdRaw,
+    mask,
+    type: "credit",
+    subtype: "credit_card",
+    officialName: display,
+    currencyCode: "USD",
+    importAccountKey: buildImportAccountKey(
+      institutionName,
+      accountIdRaw,
+      "credit",
+    ),
+  };
+}
+
 export function buildDepositoryIdentity(
   institutionName: string,
   accountIdRaw: string,
