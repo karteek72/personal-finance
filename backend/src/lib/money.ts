@@ -1,3 +1,13 @@
+/** Per-share option premium (E*Trade-style, up to 4 decimal places). */
+export function formatOptionPremium(value: number | string): string {
+  const parsed =
+    typeof value === "string" ? Number.parseFloat(value) : value;
+  if (!Number.isFinite(parsed)) {
+    return "0.0000";
+  }
+  return parsed.toFixed(4);
+}
+
 /** Serialize a currency value for JSON API responses (always 2 decimal places). */
 export function formatMoneyAmount(value: number | string): string {
   const parsed =

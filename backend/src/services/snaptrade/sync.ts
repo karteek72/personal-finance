@@ -9,10 +9,18 @@ import {
   snaptradeConnections,
 } from "../../db/schema.js";
 import { AppError } from "../../lib/errors.js";
-import { formatMoneyAmount } from "../../lib/money.js";
+import { formatMoneyAmount, formatOptionPremium } from "../../lib/money.js";
 import { createLogger } from "../../lib/logger.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
 import { refreshFireProfile } from "../investment-analytics.js";
+import {
+  effectiveAssetType,
+  isOccOptionTicker,
+  isOptionAssetType,
+  OPTION_SHARES_PER_CONTRACT,
+  parseOccOptionTicker,
+  resolveOptionPremiumPerShare,
+} from "../holdings-mapper.js";
 import { getSnaptradeClient, resolveSnaptradeRedirectUri } from "./client.js";
 import { getSnaptradeCredentials } from "./user-store.js";
 
@@ -100,12 +108,62 @@ function formatOptionExpiration(iso: string): string {
   });
 }
 
-function buildSecurityMetadata(instrument: SnaptradePositionInstrument): {
+function resolveCostBasisPerUnit(
+  position: SnaptradePosition,
+  isOption: boolean,
+): string {
+  const qty = Number.parseFloat(parseMoney(position.units ?? 0));
+  const costBasis = Number.parseFloat(parseMoney(position.cost_basis ?? 0));
+  const avgPerContract = Number.parseFloat(
+    parseMoney(position.average_purchase_price ?? 0),
+  );
+
+  if (isOption) {
+    // SnapTrade: average_purchase_price is always per contract (÷100 for per-share).
+    if (avgPerContract > 0) {
+      return formatOptionPremium(
+        avgPerContract / OPTION_SHARES_PER_CONTRACT,
+      );
+    }
+    if (costBasis > 0) {
+      const price = Number.parseFloat(parseMoney(position.price ?? 0));
+      return formatOptionPremium(
+        resolveOptionPremiumPerShare(costBasis, qty, price > 0 ? price : undefined),
+      );
+    }
+    return formatOptionPremium(Number.parseFloat(parseMoney(position.price ?? 0)));
+  }
+
+  if (avgPerContract > 0) return formatMoneyAmount(avgPerContract);
+  return parseMoney(
+    position.cost_basis ?? position.average_purchase_price ?? position.price ?? 0,
+  );
+}
+
+function resolveInstitutionValue(
+  position: SnaptradePosition,
+  isOption: boolean,
+): string {
+  const priceNum = Number.parseFloat(parseMoney(position.price ?? 0));
+  const qtyNum = Number.parseFloat(parseMoney(position.units ?? 0));
+  const multiplier = isOption ? OPTION_SHARES_PER_CONTRACT : 1;
+  return formatMoneyAmount(priceNum * qtyNum * multiplier);
+}
+
+function buildSecurityMetadata(
+  instrument: SnaptradePositionInstrument,
+  ticker: string,
+): {
   name: string;
   assetType: string;
   sector: string | null;
 } {
-  const assetType = mapSnaptradeAssetType(instrument.kind);
+  let assetType = mapSnaptradeAssetType(instrument.kind);
+  if (assetType !== "option" && isOccOptionTicker(ticker)) {
+    assetType = "option";
+  }
+  assetType = effectiveAssetType(assetType, ticker, null);
+
   if (assetType !== "option") {
     return {
       name: instrument.description?.trim() || instrument.symbol?.trim() || "Unknown",
@@ -134,7 +192,83 @@ function buildSecurityMetadata(instrument: SnaptradePositionInstrument): {
 
   const sector = `${optionType} · ${underlying}${expiration ? ` · exp ${expiration}` : ""}`;
 
-  return { name, assetType, sector };
+  return { name, assetType: "option", sector };
+}
+
+async function repairMisclassifiedOptionSecurities(
+  db: ReturnType<typeof getDb>,
+): Promise<number> {
+  const rows = await db
+    .select({ id: securities.id, ticker: securities.ticker })
+    .from(securities)
+    .where(eq(securities.assetType, "equity"));
+
+  let repaired = 0;
+  for (const row of rows) {
+    if (!isOccOptionTicker(row.ticker)) continue;
+
+    const occ = parseOccOptionTicker(row.ticker);
+    if (!occ) continue;
+
+    const sector = `${occ.optionType} · ${occ.underlyingTicker} · exp ${occ.expirationLabel}`;
+    const name = `${occ.underlyingTicker} ${occ.strikeLabel} ${occ.optionType} · ${occ.expirationLabel}`;
+
+    await db
+      .update(securities)
+      .set({
+        assetType: "option",
+        sector,
+        name: name.slice(0, 200),
+      })
+      .where(eq(securities.id, row.id));
+    repaired += 1;
+  }
+
+  return repaired;
+}
+
+/** Fix legacy holdings.cost_basis stored as per-contract instead of per-share premium. */
+async function repairOptionHoldingsCostBasis(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+): Promise<number> {
+  const rows = await db
+    .select({
+      id: holdings.id,
+      quantity: holdings.quantity,
+      costBasis: holdings.costBasis,
+      currentPrice: securities.currentPrice,
+      assetType: securities.assetType,
+      ticker: securities.ticker,
+    })
+    .from(holdings)
+    .innerJoin(securities, eq(holdings.securityId, securities.id))
+    .where(eq(holdings.userId, userId));
+
+  let repaired = 0;
+  for (const row of rows) {
+    if (!isOptionAssetType(row.assetType, row.ticker)) continue;
+
+    const qty = Number.parseFloat(row.quantity);
+    const stored = Number.parseFloat(row.costBasis);
+    const price = Number.parseFloat(row.currentPrice);
+    const perShare = resolveOptionPremiumPerShare(
+      stored,
+      qty,
+      Number.isFinite(price) && price > 0 ? price : undefined,
+    );
+    const next = formatOptionPremium(perShare);
+    const prev = formatOptionPremium(stored);
+    if (next === prev) continue;
+
+    await db
+      .update(holdings)
+      .set({ costBasis: next })
+      .where(eq(holdings.id, row.id));
+    repaired += 1;
+  }
+
+  return repaired;
 }
 
 interface SnaptradeActivity {
@@ -444,7 +578,8 @@ export async function syncSnaptradeForUser(
           const instrument = resolvePositionInstrument(position);
           if (!instrument) continue;
 
-          const metadata = buildSecurityMetadata(instrument);
+          const metadata = buildSecurityMetadata(instrument, ticker);
+          const isOption = isOptionAssetType(metadata.assetType, ticker);
           const securityId = await upsertSecurity(db, {
             ticker,
             name: metadata.name,
@@ -454,15 +589,8 @@ export async function syncSnaptradeForUser(
           });
 
           const quantity = parseMoney(position.units ?? 0);
-          const costBasis = parseMoney(
-            position.cost_basis ??
-              position.average_purchase_price ??
-              position.price ??
-              0,
-          );
-          const priceNum = Number.parseFloat(parseMoney(position.price ?? 0));
-          const qtyNum = Number.parseFloat(quantity);
-          const institutionValue = formatMoneyAmount(priceNum * qtyNum);
+          const costBasis = resolveCostBasisPerUnit(position, isOption);
+          const institutionValue = resolveInstitutionValue(position, isOption);
 
           await db
             .insert(holdings)
@@ -511,10 +639,10 @@ export async function syncSnaptradeForUser(
           let securityId: string | null = null;
           if (ticker) {
             const metadata = activity.symbol
-              ? buildSecurityMetadata(activity.symbol)
+              ? buildSecurityMetadata(activity.symbol, ticker)
               : {
                   name: ticker,
-                  assetType: "equity",
+                  assetType: effectiveAssetType("equity", ticker, null),
                   sector: null,
                 };
             securityId = await upsertSecurity(db, {
@@ -562,6 +690,9 @@ export async function syncSnaptradeForUser(
     await ensureAccountsAssignedToOwner(userId, accountIds);
   }
 
+  const repairedSecurities = await repairMisclassifiedOptionSecurities(db);
+  const repairedHoldings = await repairOptionHoldingsCostBasis(db, userId);
+
   await refreshFireProfile(userId);
 
   log.info(
@@ -571,6 +702,8 @@ export async function syncSnaptradeForUser(
       accountsSynced,
       holdingsUpdated,
       activitiesAdded,
+      repairedSecurities,
+      repairedHoldings,
     },
     "snaptrade user synced",
   );

@@ -15,9 +15,11 @@ import {
 } from "./active-account-scope.js";
 import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
 import {
+  effectiveAssetType,
   holdingMarketValue,
   isOptionAssetType,
-  parseOptionSector,
+  normalizeCostBasisPerUnit,
+  resolveOptionMeta,
 } from "./holdings-mapper.js";
 
 const DINING_CATEGORIES = new Set([
@@ -228,18 +230,36 @@ export async function buildInvestmentBehavioralAlerts(
   const expiringThresholdMs = 30 * 24 * 60 * 60 * 1000;
 
   for (const row of holdingRows) {
+    const qty = Number.parseFloat(row.quantity);
+    const rawPrice = Number.parseFloat(row.currentPrice);
+    const institution =
+      row.institutionValue != null
+        ? Number.parseFloat(row.institutionValue)
+        : null;
+    const assetType = effectiveAssetType(row.assetType, row.ticker, row.sector);
+    const costPerShare = normalizeCostBasisPerUnit({
+      assetType,
+      ticker: row.ticker,
+      quantity: qty,
+      storedCostBasis: Number.parseFloat(row.costBasis),
+      currentPricePerShare: rawPrice > 0 ? rawPrice : undefined,
+    });
+
     const value = holdingMarketValue({
       quantity: row.quantity,
-      costBasis: row.costBasis,
+      costBasis: formatMoneyAmount(costPerShare),
       institutionValue: row.institutionValue,
       currentPrice: row.currentPrice,
+      assetType,
+      ticker: row.ticker,
     }).value;
     portfolioValue += value;
 
-    if (isOptionAssetType(row.assetType)) {
+    if (isOptionAssetType(assetType, row.ticker)) {
       optionsValue += value;
-      const meta = parseOptionSector(row.sector);
-      const underlying = meta.underlyingTicker ?? row.ticker.split(/\s+/)[0] ?? row.ticker;
+      const meta = resolveOptionMeta(assetType, row.ticker, row.sector, row.ticker);
+      const underlying =
+        meta.underlyingTicker ?? row.ticker.split(/\s+/)[0] ?? row.ticker;
       optionByUnderlying.set(
         underlying,
         (optionByUnderlying.get(underlying) ?? 0) + value,
@@ -375,6 +395,8 @@ export async function buildInvestmentHistorySummary(
       quantity: holdings.quantity,
       costBasis: holdings.costBasis,
       institutionValue: holdings.institutionValue,
+      ticker: securities.ticker,
+      assetType: securities.assetType,
       currentPrice: securities.currentPrice,
     })
     .from(holdings)
@@ -384,14 +406,16 @@ export async function buildInvestmentHistorySummary(
   let portfolioValue = 0;
   let totalCost = 0;
   for (const row of holdingRows) {
-    portfolioValue += holdingMarketValue({
+    const mv = holdingMarketValue({
       quantity: row.quantity,
       costBasis: row.costBasis,
       institutionValue: row.institutionValue,
       currentPrice: row.currentPrice,
-    }).value;
-    totalCost +=
-      Number.parseFloat(row.quantity) * Number.parseFloat(row.costBasis);
+      assetType: row.assetType,
+      ticker: row.ticker,
+    });
+    portfolioValue += mv.value;
+    totalCost += mv.cost;
   }
 
   const growthMultiple =

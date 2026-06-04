@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 
 import type {
   InvestmentPosition,
@@ -8,8 +8,27 @@ import type {
 } from "@/types/api";
 
 type HoldingsView = "account" | "stocks" | "options";
-type SortKey = "value" | "gain" | "name" | "quantity";
 type SortDir = "asc" | "desc";
+
+type OptionSortKey = "ticker" | "expiration" | "contracts" | "pl" | "gain";
+type StockSortKey =
+  | "ticker"
+  | "name"
+  | "shares"
+  | "avg"
+  | "current"
+  | "value"
+  | "pl"
+  | "gain";
+type PositionSortKey =
+  | "ticker"
+  | "name"
+  | "account"
+  | "shares"
+  | "avg"
+  | "current"
+  | "pl"
+  | "gain";
 
 interface Props {
   positions: InvestmentPosition[];
@@ -43,8 +62,25 @@ function fmtPremium(n: number) {
   }).format(n);
 }
 
-function isOption(assetType: string) {
-  return assetType === "option";
+/** Per-share option premium (matches E*Trade avg price precision). */
+function fmtOptionPremium(n: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(n);
+}
+
+function plClass(positive: boolean) {
+  return positive ? "text-success" : "text-danger";
+}
+
+const OCC_OPTION_TICKER = /^[A-Z]{1,6}\s+\d{6}[CP]\d{8}$/i;
+
+function isOption(position: Pick<InvestmentPosition, "assetType" | "ticker">) {
+  if (position.assetType === "option") return true;
+  return OCC_OPTION_TICKER.test(position.ticker.trim());
 }
 
 function assetTypeLabel(assetType: string): string {
@@ -59,193 +95,513 @@ function assetTypeLabel(assetType: string): string {
   return labels[assetType] ?? assetType;
 }
 
-function holdingBadge(position: Pick<InvestmentPosition, "ticker" | "assetType" | "underlyingTicker">): string {
-  if (isOption(position.assetType)) {
-    return (position.underlyingTicker ?? position.ticker.split(/\s+/)[0] ?? position.ticker).slice(0, 4);
-  }
-  return position.ticker.slice(0, 4);
-}
-
 function compareNumbers(a: number, b: number, dir: SortDir): number {
   return dir === "asc" ? a - b : b - a;
 }
 
-function sortPositions(
+function compareStrings(a: string, b: string, dir: SortDir): number {
+  const cmp = a.localeCompare(b);
+  return dir === "asc" ? cmp : -cmp;
+}
+
+function toggleSort<K extends string>(
+  column: K,
+  sortKey: K,
+  setSortKey: (k: K) => void,
+  sortDir: SortDir,
+  setSortDir: (d: SortDir | ((prev: SortDir) => SortDir)) => void,
+  defaultAsc: K[],
+) {
+  if (column === sortKey) {
+    setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+  } else {
+    setSortKey(column);
+    setSortDir(defaultAsc.includes(column) ? "asc" : "desc");
+  }
+}
+
+function SortableHeader<K extends string>({
+  label,
+  column,
+  align,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  label: string;
+  column: K;
+  align?: "left" | "right";
+  sortKey: K;
+  sortDir: SortDir;
+  onSort: (column: K) => void;
+}) {
+  const active = sortKey === column;
+  return (
+    <th
+      className={`px-3 py-2.5 ${align === "right" ? "text-right" : "text-left"}`}
+      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide transition-colors hover:text-text ${
+          active ? "text-primary" : "text-text-muted"
+        } ${align === "right" ? "w-full justify-end" : ""}`}
+      >
+        <span>{label}</span>
+        <span className="text-[9px] leading-none opacity-80" aria-hidden>
+          {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
+function HoldingsTableShell({
+  children,
+  footer,
+}: {
+  children: ReactNode;
+  footer?: string;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-[var(--radius-md)] border border-border">
+      <table className="w-full min-w-[720px] border-collapse text-left text-xs">
+        {children}
+      </table>
+      {footer ? (
+        <p className="border-t border-border bg-surface-raised/50 px-3 py-2 text-[10px] text-text-muted">
+          {footer}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function optionTickerLabel(position: InvestmentPosition): string {
+  return position.underlyingTicker ?? position.ticker.split(/\s+/)[0] ?? position.ticker;
+}
+
+function optionExpirationSortKey(position: InvestmentPosition): number {
+  const label =
+    position.expirationLabel ??
+    position.sector?.match(/exp (.+)$/)?.[1] ??
+    "";
+  const parsed = Date.parse(label);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sortOptionPositions(
   items: InvestmentPosition[],
-  sortKey: SortKey,
+  sortKey: OptionSortKey,
   sortDir: SortDir,
 ): InvestmentPosition[] {
   return [...items].sort((a, b) => {
     switch (sortKey) {
-      case "name":
-        return sortDir === "asc"
-          ? a.name.localeCompare(b.name)
-          : b.name.localeCompare(a.name);
-      case "quantity":
-        return compareNumbers(a.quantity, b.quantity, sortDir);
-      case "gain":
-        return compareNumbers(a.gainLossPercent, b.gainLossPercent, sortDir);
-      case "value":
-      default:
+      case "ticker":
+        return compareStrings(optionTickerLabel(a), optionTickerLabel(b), sortDir);
+      case "expiration":
         return compareNumbers(
-          Number.parseFloat(a.value),
-          Number.parseFloat(b.value),
+          optionExpirationSortKey(a),
+          optionExpirationSortKey(b),
           sortDir,
         );
+      case "contracts":
+        return compareNumbers(a.quantity, b.quantity, sortDir);
+      case "pl":
+        return compareNumbers(
+          Number.parseFloat(a.gainLoss),
+          Number.parseFloat(b.gainLoss),
+          sortDir,
+        );
+      case "gain":
+        return compareNumbers(a.gainLossPercent, b.gainLossPercent, sortDir);
+      default:
+        return 0;
     }
   });
 }
 
-function sortAggregates(
+function stockAvgCost(agg: StockAggregate): number {
+  return agg.totalQuantity > 0
+    ? Number.parseFloat(agg.totalCost) / agg.totalQuantity
+    : 0;
+}
+
+function sortStockAggregates(
   items: StockAggregate[],
-  sortKey: SortKey,
+  sortKey: StockSortKey,
   sortDir: SortDir,
 ): StockAggregate[] {
   return [...items].sort((a, b) => {
     switch (sortKey) {
+      case "ticker":
+        return compareStrings(a.ticker, b.ticker, sortDir);
       case "name":
-        return sortDir === "asc"
-          ? a.name.localeCompare(b.name)
-          : b.name.localeCompare(a.name);
-      case "quantity":
+        return compareStrings(a.name, b.name, sortDir);
+      case "shares":
         return compareNumbers(a.totalQuantity, b.totalQuantity, sortDir);
-      case "gain":
-        return compareNumbers(a.gainLossPercent, b.gainLossPercent, sortDir);
+      case "avg":
+        return compareNumbers(stockAvgCost(a), stockAvgCost(b), sortDir);
+      case "current":
+        return compareNumbers(
+          Number.parseFloat(a.currentPrice),
+          Number.parseFloat(b.currentPrice),
+          sortDir,
+        );
       case "value":
-      default:
         return compareNumbers(
           Number.parseFloat(a.totalValue),
           Number.parseFloat(b.totalValue),
           sortDir,
         );
+      case "pl":
+        return compareNumbers(
+          Number.parseFloat(a.gainLoss),
+          Number.parseFloat(b.gainLoss),
+          sortDir,
+        );
+      case "gain":
+        return compareNumbers(a.gainLossPercent, b.gainLossPercent, sortDir);
+      default:
+        return 0;
     }
   });
 }
 
-function PositionRow({ position }: { position: InvestmentPosition }) {
-  const value = Number.parseFloat(position.value);
-  const positive = Number.parseFloat(position.gainLoss) >= 0;
-  const option = isOption(position.assetType);
+function sortHoldingsPositions(
+  items: InvestmentPosition[],
+  sortKey: PositionSortKey,
+  sortDir: SortDir,
+): InvestmentPosition[] {
+  return [...items].sort((a, b) => {
+    switch (sortKey) {
+      case "ticker":
+        return compareStrings(a.ticker, b.ticker, sortDir);
+      case "name":
+        return compareStrings(a.name, b.name, sortDir);
+      case "account":
+        return compareStrings(a.accountName, b.accountName, sortDir);
+      case "shares":
+        return compareNumbers(a.quantity, b.quantity, sortDir);
+      case "avg":
+        return compareNumbers(
+          Number.parseFloat(a.costBasis),
+          Number.parseFloat(b.costBasis),
+          sortDir,
+        );
+      case "current":
+        return compareNumbers(
+          Number.parseFloat(a.currentPrice),
+          Number.parseFloat(b.currentPrice),
+          sortDir,
+        );
+      case "pl":
+        return compareNumbers(
+          Number.parseFloat(a.gainLoss),
+          Number.parseFloat(b.gainLoss),
+          sortDir,
+        );
+      case "gain":
+        return compareNumbers(a.gainLossPercent, b.gainLossPercent, sortDir);
+      default:
+        return 0;
+    }
+  });
+}
+
+function OptionsPositionsTable({ positions }: { positions: InvestmentPosition[] }) {
+  const [sortKey, setSortKey] = useState<OptionSortKey>("ticker");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const sorted = useMemo(
+    () => sortOptionPositions(positions, sortKey, sortDir),
+    [positions, sortKey, sortDir],
+  );
+
+  const handleSort = (column: OptionSortKey) => {
+    toggleSort(column, sortKey, setSortKey, sortDir, setSortDir, [
+      "ticker",
+      "expiration",
+    ]);
+  };
 
   return (
-    <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-3.5">
-      <div
-        className={`flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-[var(--radius-sm)] font-bold text-text ${
-          option ? "bg-warning/15 ring-1 ring-warning/30" : "bg-surface-raised"
-        }`}
-      >
-        <span className="text-[10px] leading-none">{holdingBadge(position)}</span>
-        {option ? (
-          <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide text-warning">opt</span>
-        ) : null}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p className="truncate text-sm font-semibold text-text">{position.name}</p>
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-              option ? "bg-warning/10 text-warning" : "bg-surface-raised text-text-muted"
-            }`}
-          >
-            {assetTypeLabel(position.assetType)}
-          </span>
-        </div>
-        <p className="mt-0.5 text-xs text-text-muted">
-          {option ? (
-            <>
-              {position.quantity} contract{position.quantity === 1 ? "" : "s"}
-              {position.optionType ? ` · ${position.optionType}` : ""}
-              {position.expirationLabel ? ` · exp ${position.expirationLabel}` : ""}
-              {" · "}
-              {fmtPremium(Number.parseFloat(position.currentPrice))} premium
-            </>
-          ) : (
-            <>
-              {position.quantity} share{position.quantity === 1 ? "" : "s"}
-              {position.sector ? ` · ${position.sector}` : ` · ${assetTypeLabel(position.assetType)}`}
-            </>
-          )}
-          {" · "}
-          {position.accountName}
-          {position.accountMask ? ` ····${position.accountMask}` : ""}
-        </p>
-      </div>
-      <div className="shrink-0 text-right">
-        <p className="text-sm font-bold text-text">{fmt(value)}</p>
-        <p className={`text-xs font-semibold ${positive ? "text-success" : "text-danger"}`}>
-          {positive ? "+" : ""}
-          {position.gainLossPercent.toFixed(1)}%
-        </p>
-      </div>
-    </div>
+    <HoldingsTableShell footer="Avg and current prices are per-share premium (×100 per contract), matching E*Trade.">
+      <thead>
+        <tr className="border-b border-border bg-surface-raised/80">
+          <SortableHeader label="Ticker" column="ticker" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="Expiration" column="expiration" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <th className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+            Avg price
+          </th>
+          <SortableHeader label="Contracts" column="contracts" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <th className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+            Current
+          </th>
+          <SortableHeader label="P/L" column="pl" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="% change" column="gain" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+        </tr>
+      </thead>
+      <tbody>
+        {sorted.map((position) => {
+          const positive = Number.parseFloat(position.gainLoss) >= 0;
+          const gainLoss = Number.parseFloat(position.gainLoss);
+          const expiration =
+            position.expirationLabel ??
+            (position.sector?.match(/exp (.+)$/)?.[1] ?? "—");
+          const contractLabel = position.optionType
+            ? `${optionTickerLabel(position)} ${position.optionType}`
+            : optionTickerLabel(position);
+
+          return (
+            <tr
+              key={position.holdingId}
+              className="border-b border-border/60 bg-surface last:border-b-0 hover:bg-surface-raised/40"
+            >
+              <td className="px-3 py-3">
+                <p className="font-semibold text-text">{contractLabel}</p>
+                <p className="mt-0.5 truncate text-[10px] text-text-muted" title={position.name}>
+                  {position.name}
+                </p>
+                <p className="mt-0.5 text-[10px] text-text-muted">
+                  {position.accountName}
+                  {position.accountMask ? ` ····${position.accountMask}` : ""}
+                </p>
+              </td>
+              <td className="whitespace-nowrap px-3 py-3 text-text">{expiration}</td>
+              <td className="whitespace-nowrap px-3 py-3 text-right font-medium text-text">
+                {fmtOptionPremium(Number.parseFloat(position.costBasis))}
+              </td>
+              <td className="whitespace-nowrap px-3 py-3 text-right text-text">
+                {position.quantity}
+              </td>
+              <td className="whitespace-nowrap px-3 py-3 text-right font-medium text-text">
+                {fmtOptionPremium(Number.parseFloat(position.currentPrice))}
+              </td>
+              <td className={`whitespace-nowrap px-3 py-3 text-right font-semibold ${plClass(positive)}`}>
+                {positive ? "+" : ""}
+                {fmt(gainLoss)}
+              </td>
+              <td className={`whitespace-nowrap px-3 py-3 text-right font-semibold ${plClass(positive)}`}>
+                {positive ? "+" : ""}
+                {position.gainLossPercent.toFixed(1)}%
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </HoldingsTableShell>
   );
 }
 
-function AggregateRow({ aggregate, expanded, onToggle }: {
-  aggregate: StockAggregate;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const value = Number.parseFloat(aggregate.totalValue);
-  const positive = Number.parseFloat(aggregate.gainLoss) >= 0;
+function StockAggregatesTable({ aggregates }: { aggregates: StockAggregate[] }) {
+  const [sortKey, setSortKey] = useState<StockSortKey>("ticker");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
+
+  const sorted = useMemo(
+    () => sortStockAggregates(aggregates, sortKey, sortDir),
+    [aggregates, sortKey, sortDir],
+  );
+
+  const handleSort = (column: StockSortKey) => {
+    toggleSort(column, sortKey, setSortKey, sortDir, setSortDir, ["ticker", "name"]);
+  };
 
   return (
-    <div className="rounded-[var(--radius-md)] border border-border bg-surface">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 p-3.5 text-left"
-      >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-surface-raised text-[10px] font-bold text-text">
-          {aggregate.ticker.slice(0, 4)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="truncate text-sm font-semibold text-text">{aggregate.name}</p>
-            <span className="shrink-0 rounded-full bg-surface-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-              {assetTypeLabel(aggregate.assetType)}
-            </span>
-            {aggregate.accountCount > 1 ? (
-              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                {aggregate.accountCount} accounts
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-0.5 text-xs text-text-muted">
-            {aggregate.totalQuantity} share{aggregate.totalQuantity === 1 ? "" : "s"} total
-            {aggregate.sector ? ` · ${aggregate.sector}` : ""}
-            {" · avg cost "}
-            {fmtPremium(
-              aggregate.totalQuantity > 0
-                ? Number.parseFloat(aggregate.totalCost) / aggregate.totalQuantity
-                : 0,
-            )}
-          </p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-sm font-bold text-text">{fmt(value)}</p>
-          <p className={`text-xs font-semibold ${positive ? "text-success" : "text-danger"}`}>
-            {positive ? "+" : ""}
-            {aggregate.gainLossPercent.toFixed(1)}%
-          </p>
-        </div>
-      </button>
-      {expanded && aggregate.lots.length > 1 ? (
-        <div className="space-y-1 border-t border-border px-3 pb-3 pt-2">
-          {aggregate.lots.map((lot) => (
-            <div
-              key={`${aggregate.ticker}-${lot.accountId}`}
-              className="flex items-center justify-between rounded-[var(--radius-sm)] bg-surface-raised/60 px-3 py-2 text-xs"
+    <HoldingsTableShell footer="Aggregated across accounts. Click a row with multiple accounts to see lots.">
+      <thead>
+        <tr className="border-b border-border bg-surface-raised/80">
+          <SortableHeader label="Ticker" column="ticker" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="Name" column="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="Avg cost" column="avg" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="Shares" column="shares" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="Current" column="current" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="Value" column="value" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="P/L" column="pl" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="% change" column="gain" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+        </tr>
+      </thead>
+      <tbody>
+        {sorted.map((agg) => {
+          const positive = Number.parseFloat(agg.gainLoss) >= 0;
+          const gainLoss = Number.parseFloat(agg.gainLoss);
+          const avg = stockAvgCost(agg);
+          const expanded = expandedTicker === agg.ticker && agg.lots.length > 1;
+
+          return (
+            <Fragment key={agg.ticker}>
+              <tr
+                className={`border-b border-border/60 bg-surface hover:bg-surface-raised/40 ${
+                  agg.lots.length > 1 ? "cursor-pointer" : ""
+                }`}
+                onClick={
+                  agg.lots.length > 1
+                    ? () =>
+                        setExpandedTicker((t) => (t === agg.ticker ? null : agg.ticker))
+                    : undefined
+                }
+              >
+                <td className="px-3 py-3">
+                  <p className="font-semibold text-text">{agg.ticker}</p>
+                  {agg.accountCount > 1 ? (
+                    <p className="mt-0.5 text-[10px] text-primary">
+                      {agg.accountCount} accounts {expanded ? "▲" : "▼"}
+                    </p>
+                  ) : null}
+                </td>
+                <td className="px-3 py-3">
+                  <p className="font-medium text-text">{agg.name}</p>
+                  <p className="mt-0.5 text-[10px] text-text-muted">
+                    {assetTypeLabel(agg.assetType)}
+                    {agg.sector ? ` · ${agg.sector}` : ""}
+                  </p>
+                </td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-medium text-text">
+                  {fmtPremium(avg)}
+                </td>
+                <td className="whitespace-nowrap px-3 py-3 text-right text-text">
+                  {agg.totalQuantity}
+                </td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-medium text-text">
+                  {fmtPremium(Number.parseFloat(agg.currentPrice))}
+                </td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-bold text-text">
+                  {fmt(Number.parseFloat(agg.totalValue))}
+                </td>
+                <td className={`whitespace-nowrap px-3 py-3 text-right font-semibold ${plClass(positive)}`}>
+                  {positive ? "+" : ""}
+                  {fmt(gainLoss)}
+                </td>
+                <td className={`whitespace-nowrap px-3 py-3 text-right font-semibold ${plClass(positive)}`}>
+                  {positive ? "+" : ""}
+                  {agg.gainLossPercent.toFixed(1)}%
+                </td>
+              </tr>
+              {expanded
+                ? agg.lots.map((lot) => (
+                    <tr
+                      key={`${agg.ticker}-${lot.accountId}`}
+                      className="border-b border-border/40 bg-surface-raised/30"
+                    >
+                      <td className="px-3 py-2 pl-6 text-[10px] text-text-muted" colSpan={2}>
+                        {lot.accountName}
+                      </td>
+                      <td className="px-3 py-2 text-right text-[10px] text-text-muted">
+                        {fmtPremium(Number.parseFloat(lot.costBasis))}
+                      </td>
+                      <td className="px-3 py-2 text-right text-[10px] text-text">
+                        {lot.quantity}
+                      </td>
+                      <td className="px-3 py-2" />
+                      <td className="px-3 py-2 text-right text-[10px] font-medium text-text">
+                        {fmt(Number.parseFloat(lot.value))}
+                      </td>
+                      <td className="px-3 py-2" colSpan={2} />
+                    </tr>
+                  ))
+                : null}
+            </Fragment>
+          );
+        })}
+      </tbody>
+    </HoldingsTableShell>
+  );
+}
+
+function HoldingsPositionsTable({
+  positions,
+  showAccountColumn,
+}: {
+  positions: InvestmentPosition[];
+  showAccountColumn: boolean;
+}) {
+  const [sortKey, setSortKey] = useState<PositionSortKey>("ticker");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const sorted = useMemo(
+    () => sortHoldingsPositions(positions, sortKey, sortDir),
+    [positions, sortKey, sortDir],
+  );
+
+  const handleSort = (column: PositionSortKey) => {
+    toggleSort(column, sortKey, setSortKey, sortDir, setSortDir, [
+      "ticker",
+      "name",
+      "account",
+    ]);
+  };
+
+  return (
+    <HoldingsTableShell>
+      <thead>
+        <tr className="border-b border-border bg-surface-raised/80">
+          <SortableHeader label="Ticker" column="ticker" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="Name" column="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          {showAccountColumn ? (
+            <SortableHeader label="Account" column="account" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          ) : null}
+          <SortableHeader label="Avg cost" column="avg" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="Shares" column="shares" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="Current" column="current" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="P/L" column="pl" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="% change" column="gain" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+        </tr>
+      </thead>
+      <tbody>
+        {sorted.map((position) => {
+          const positive = Number.parseFloat(position.gainLoss) >= 0;
+          const gainLoss = Number.parseFloat(position.gainLoss);
+          const option = isOption(position);
+          const avgFmt = option ? fmtOptionPremium : fmtPremium;
+
+          return (
+            <tr
+              key={position.holdingId}
+              className="border-b border-border/60 bg-surface last:border-b-0 hover:bg-surface-raised/40"
             >
-              <span className="text-text-muted">{lot.accountName}</span>
-              <span className="font-semibold text-text">
-                {lot.quantity} sh · {fmt(Number.parseFloat(lot.value))}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </div>
+              <td className="px-3 py-3 font-semibold text-text">{position.ticker}</td>
+              <td className="px-3 py-3">
+                <p className="font-medium text-text">{position.name}</p>
+                <p className="mt-0.5 text-[10px] text-text-muted">
+                  {assetTypeLabel(position.assetType)}
+                  {option && position.expirationLabel
+                    ? ` · exp ${position.expirationLabel}`
+                    : ""}
+                  {!option && position.sector ? ` · ${position.sector}` : ""}
+                </p>
+              </td>
+              {showAccountColumn ? (
+                <td className="whitespace-nowrap px-3 py-3 text-text">
+                  {position.accountName}
+                  {position.accountMask ? (
+                    <span className="text-text-muted"> ····{position.accountMask}</span>
+                  ) : null}
+                </td>
+              ) : null}
+              <td className="whitespace-nowrap px-3 py-3 text-right font-medium text-text">
+                {avgFmt(Number.parseFloat(position.costBasis))}
+              </td>
+              <td className="whitespace-nowrap px-3 py-3 text-right text-text">
+                {position.quantity}
+              </td>
+              <td className="whitespace-nowrap px-3 py-3 text-right font-medium text-text">
+                {avgFmt(Number.parseFloat(position.currentPrice))}
+              </td>
+              <td className={`whitespace-nowrap px-3 py-3 text-right font-semibold ${plClass(positive)}`}>
+                {positive ? "+" : ""}
+                {fmt(gainLoss)}
+              </td>
+              <td className={`whitespace-nowrap px-3 py-3 text-right font-semibold ${plClass(positive)}`}>
+                {positive ? "+" : ""}
+                {position.gainLossPercent.toFixed(1)}%
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </HoldingsTableShell>
   );
 }
 
@@ -257,23 +613,20 @@ export function HoldingsPortfolioSection({
   accountOptions,
 }: Props) {
   const [view, setView] = useState<HoldingsView>("stocks");
-  const [sortKey, setSortKey] = useState<SortKey>("value");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [accountFilter, setAccountFilter] = useState<string>("all");
-  const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
 
   const filteredPositions = useMemo(() => {
     let list = positions;
     if (view === "options") {
       list = optionPositions;
     } else if (view === "stocks") {
-      list = positions.filter((p) => !isOption(p.assetType));
+      list = positions.filter((p) => !isOption(p));
     }
     if (accountFilter !== "all") {
       list = list.filter((p) => p.accountId === accountFilter);
     }
-    return sortPositions(list, sortKey, sortDir);
-  }, [positions, optionPositions, view, accountFilter, sortKey, sortDir]);
+    return list;
+  }, [positions, optionPositions, view, accountFilter]);
 
   const filteredAggregates = useMemo(() => {
     let list = stockAggregates;
@@ -302,27 +655,33 @@ export function HoldingsPortfolioSection({
         })
         .filter((agg): agg is StockAggregate => agg != null);
     }
-    return sortAggregates(list, sortKey, sortDir);
-  }, [stockAggregates, accountFilter, sortKey, sortDir]);
+    return list;
+  }, [stockAggregates, accountFilter]);
 
-  const positionsByAccount = useMemo(() => {
+  const accountGroups = useMemo(() => {
     const grouped = new Map<string, InvestmentPosition[]>();
     for (const position of filteredPositions) {
       const list = grouped.get(position.accountId) ?? [];
       list.push(position);
       grouped.set(position.accountId, list);
     }
-    return [...grouped.entries()].sort((a, b) => {
-      const aVal = a[1].reduce((s, p) => s + Number.parseFloat(p.value), 0);
-      const bVal = b[1].reduce((s, p) => s + Number.parseFloat(p.value), 0);
-      return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+    return [...grouped.entries()].map(([accountId, accountPositions]) => {
+      const first = accountPositions[0]!;
+      const total = accountPositions.reduce(
+        (s, p) => s + Number.parseFloat(p.value),
+        0,
+      );
+      return { accountId, accountPositions, first, total };
     });
-  }, [filteredPositions, sortDir]);
+  }, [filteredPositions]);
 
   const isEmpty =
     view === "stocks"
       ? filteredAggregates.length === 0
       : filteredPositions.length === 0;
+
+  const showAccountColumnInTable =
+    view === "account" && accountFilter === "all" && accountGroups.length > 1;
 
   return (
     <div className="space-y-3">
@@ -375,23 +734,6 @@ export function HoldingsPortfolioSection({
             </option>
           ))}
         </select>
-        <select
-          value={sortKey}
-          onChange={(e) => setSortKey(e.target.value as SortKey)}
-          className="rounded-[var(--radius-sm)] border border-border bg-surface px-2 py-1.5 text-xs text-text"
-        >
-          <option value="value">Sort: Value</option>
-          <option value="gain">Sort: Gain %</option>
-          <option value="name">Sort: Name</option>
-          <option value="quantity">Sort: Quantity</option>
-        </select>
-        <button
-          type="button"
-          onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
-          className="rounded-[var(--radius-sm)] border border-border bg-surface px-2 py-1.5 text-xs font-semibold text-text-muted hover:text-text"
-        >
-          {sortDir === "desc" ? "↓ High to low" : "↑ Low to high"}
-        </button>
       </div>
 
       {isEmpty ? (
@@ -401,37 +743,22 @@ export function HoldingsPortfolioSection({
       ) : null}
 
       {view === "stocks" && !isEmpty ? (
-        <div className="space-y-2">
-          {filteredAggregates.map((agg) => (
-            <AggregateRow
-              key={agg.ticker}
-              aggregate={agg}
-              expanded={expandedTicker === agg.ticker}
-              onToggle={() =>
-                setExpandedTicker((t) => (t === agg.ticker ? null : agg.ticker))
-              }
-            />
-          ))}
-        </div>
+        <StockAggregatesTable aggregates={filteredAggregates} />
       ) : null}
 
       {view === "options" && !isEmpty ? (
-        <div className="space-y-2">
-          {filteredPositions.map((position) => (
-            <PositionRow key={position.holdingId} position={position} />
-          ))}
-        </div>
+        <OptionsPositionsTable positions={filteredPositions} />
       ) : null}
 
       {view === "account" && !isEmpty ? (
-        <div className="space-y-4">
-          {positionsByAccount.map(([accountId, accountPositions]) => {
-            const accountTotal = accountPositions.reduce(
-              (s, p) => s + Number.parseFloat(p.value),
-              0,
-            );
-            const first = accountPositions[0]!;
-            return (
+        showAccountColumnInTable ? (
+          <HoldingsPositionsTable
+            positions={filteredPositions}
+            showAccountColumn
+          />
+        ) : (
+          <div className="space-y-4">
+            {accountGroups.map(({ accountId, accountPositions, first, total }) => (
               <div key={accountId} className="space-y-2">
                 <div className="flex items-center justify-between px-1">
                   <div>
@@ -440,18 +767,20 @@ export function HoldingsPortfolioSection({
                       {first.institutionName}
                       {first.accountMask ? ` ····${first.accountMask}` : ""}
                       {" · "}
-                      {accountPositions.length} position{accountPositions.length === 1 ? "" : "s"}
+                      {accountPositions.length} position
+                      {accountPositions.length === 1 ? "" : "s"}
                     </p>
                   </div>
-                  <p className="text-sm font-bold text-text">{fmt(accountTotal)}</p>
+                  <p className="text-sm font-bold text-text">{fmt(total)}</p>
                 </div>
-                {accountPositions.map((position) => (
-                  <PositionRow key={position.holdingId} position={position} />
-                ))}
+                <HoldingsPositionsTable
+                  positions={accountPositions}
+                  showAccountColumn={false}
+                />
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )
       ) : null}
     </div>
   );
