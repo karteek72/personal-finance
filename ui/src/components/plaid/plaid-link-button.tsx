@@ -8,12 +8,10 @@ import {
 } from "react-plaid-link";
 import clsx from "clsx";
 
+import { primaryButtonClassName } from "@/components/ui/button-classes";
 import { IconButton, PlusIcon } from "@/components/ui/icon-button";
 import { api } from "@/lib/api-client";
 import { storePlaidLinkToken } from "@/lib/plaid-storage";
-
-const defaultClassName =
-  "inline-flex items-center justify-center gap-2 rounded-[var(--radius-pill)] bg-primary px-5 py-2.5 text-sm font-semibold text-text-inverse transition-all hover:opacity-90 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 const dashedClassName =
   "flex min-h-[180px] w-full flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border-2 border-dashed border-border/80 bg-surface/50 text-text-muted transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50";
@@ -103,7 +101,7 @@ function PlaidLinkLauncher({
       type="button"
       disabled={!ready || exchanging}
       onClick={() => open()}
-      className={className ?? defaultClassName}
+      className={primaryButtonClassName(className)}
     >
       {exchanging ? "Syncing…" : label}
     </button>
@@ -172,7 +170,7 @@ export function PlaidLinkButton({
     return (
       <button
         type="button"
-        className={className ?? defaultClassName}
+        className={primaryButtonClassName(className)}
         onClick={() => setFetchAttempt((n) => n + 1)}
       >
         Retry Plaid setup
@@ -200,7 +198,7 @@ export function PlaidLinkButton({
     }
 
     return (
-      <button type="button" disabled className={className ?? defaultClassName}>
+      <button type="button" disabled className={primaryButtonClassName(className)}>
         {label ?? "Add account"}
       </button>
     );

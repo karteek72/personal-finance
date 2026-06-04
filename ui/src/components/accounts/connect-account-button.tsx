@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { PlaidLinkButton } from "@/components/plaid/plaid-link-button";
+import { primaryButtonClassName } from "@/components/ui/button-classes";
 import { ModalPortal } from "@/components/ui/modal-portal";
 import { api } from "@/lib/api-client";
 import { createTellerConnectHandle } from "@/lib/teller-connect";
@@ -192,7 +193,7 @@ export function ConnectAccountButton({
     return (
       <button
         type="button"
-        className={className}
+        className={primaryButtonClassName(className)}
         onClick={() => void handleTellerConnect()}
       >
         {label}
@@ -244,7 +245,7 @@ export function ConnectAccountButton({
     <>
       <button
         type="button"
-        className={className}
+        className={primaryButtonClassName(className)}
         onClick={handleOpen}
       >
         {label}
@@ -367,7 +368,7 @@ function ProviderPickerModal({
                     <PlaidLinkButton
                       label="Connect with Plaid"
                       variant="default"
-                      className="w-full"
+                      className={primaryButtonClassName("w-full")}
                       onSuccess={onPlaidSuccess}
                       onError={onPlaidError}
                     />
@@ -375,7 +376,7 @@ function ProviderPickerModal({
                     <button
                       type="button"
                       disabled={connecting !== null}
-                      className="w-full rounded-[var(--radius-sm)] bg-primary px-3 py-2 text-sm font-semibold text-text-inverse disabled:opacity-60"
+                      className={primaryButtonClassName("w-full")}
                       onClick={() => onPick(provider.id)}
                     >
                       {connecting === provider.id
