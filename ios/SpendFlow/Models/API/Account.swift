@@ -68,4 +68,5 @@ struct DeleteAccountResponse: Codable, Sendable {
     let name: String
     let mask: String
     let transactionsDeleted: Int
+    let plaidItemDisconnected: Bool
 }

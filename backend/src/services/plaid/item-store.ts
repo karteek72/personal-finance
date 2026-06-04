@@ -11,6 +11,7 @@ import {
 } from "../../lib/operation-log.js";
 import { createLogger } from "../../lib/logger.js";
 import { decryptPlaidToken, encryptPlaidToken } from "./crypto.js";
+import { disconnectPlaidItem } from "./disconnect-item.js";
 import { syncPlaidItem, type PlaidSyncOptions } from "./sync.js";
 
 const log = createLogger("plaid.item-store");
@@ -129,13 +130,12 @@ export async function listPlaidItems(userId: string) {
     .orderBy(desc(plaidItems.createdAt));
 }
 
-export async function deletePlaidItem(itemDbId: string, userId: string) {
-  const db = getDb();
-  await db
-    .delete(plaidItems)
-    .where(
-      and(eq(plaidItems.id, itemDbId), eq(plaidItems.userId, userId)),
-    );
+export async function deletePlaidItem(
+  itemDbId: string,
+  userId: string,
+  env: Env,
+): Promise<boolean> {
+  return disconnectPlaidItem(itemDbId, userId, env);
 }
 
 export async function syncAllPlaidItems(

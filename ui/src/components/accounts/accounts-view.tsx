@@ -15,6 +15,7 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useBackgroundSyncHelpers } from "@/hooks/use-background-sync";
 import { useCreditDebtSummary } from "@/hooks/use-credit-debt";
 import { api } from "@/lib/api-client";
+import { refetchCoreFinancialQueries } from "@/lib/invalidate-financial-queries";
 import { notifications } from "@/lib/notifications";
 import { formatMoney } from "@/lib/format-money";
 import type { Account } from "@/types/api";
@@ -410,7 +411,7 @@ export function AccountsView() {
   ) {
     const label = mask ? `${accountName} (•••• ${mask})` : accountName;
     const confirmed = window.confirm(
-      `Remove ${label} and all its transactions? Can't undo this.`,
+      `Remove ${label} and all its transactions? If this is the last account from a linked bank, Plaid will be disconnected too. Can't undo this.`,
     );
     if (!confirmed) return;
 
@@ -418,13 +419,17 @@ export function AccountsView() {
 
     try {
       const result = await api.deleteAccount(accountId);
+      const plaidNote = result.plaidItemDisconnected
+        ? " Bank disconnected from Plaid."
+        : "";
       notifications.push(
         "success",
         "Account removed",
-        `Removed ${result.name} (${result.transactionsDeleted} transactions).`,
+        `Removed ${result.name} (${result.transactionsDeleted} transactions).${plaidNote}`,
         "system",
       );
       syncHelpers.invalidateFinancialQueries();
+      await refetchCoreFinancialQueries(queryClient);
       await refetch();
     } catch (err) {
       notifications.push(

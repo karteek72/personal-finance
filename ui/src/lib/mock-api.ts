@@ -22,6 +22,7 @@ import merchantsData from "@/mocks/merchants.json";
 import calendarData from "@/mocks/calendar.json";
 import forecastData from "@/mocks/forecast.json";
 import type {
+  Account,
   AccountsResponse,
   AlertsResponse,
   BehavioralResponse,
@@ -46,6 +47,7 @@ import type {
   PatternsResponse,
   RecurringResponse,
   ResilienceResponse,
+  Transaction,
   TransactionFilters,
   TransactionSummary,
   TrendsResponse,
@@ -55,6 +57,126 @@ import type {
 } from "@/types/api";
 
 const MOCK_DELAY_MS = 150;
+
+const INTERNAL_TRANSFER_CATEGORY = "Internal Transfers";
+const CREDIT_CARD_PAYMENT_SUBCATEGORY = "Credit Card Payments";
+
+const INITIAL_MOCK_ACCOUNTS = (accountsData as AccountsResponse).accounts;
+const mockAccounts: Account[] = structuredClone(INITIAL_MOCK_ACCOUNTS);
+let mockTransactionItems: Transaction[] = structuredClone(
+  (transactionsData as PaginatedTransactions).items,
+);
+let mockDataMutated = false;
+
+const EMPTY_SUMMARY: TransactionSummary = {
+  totalSpent: "0.00",
+  income: "0.00",
+  netSavings: "0.00",
+  avgMonthlySpend: "0.00",
+  topCategory: { name: "None", amount: "0.00" },
+  ccPaymentsExcluded: "0.00",
+  savingsRate: 0,
+  transactionCount: 0,
+  pendingCount: 0,
+  monthsInPeriod: 1,
+};
+
+function activeMockAccountIds(): Set<string> {
+  return new Set(mockAccounts.map((account) => account.id));
+}
+
+function filterMockTransactions(items: Transaction[]): Transaction[] {
+  const activeIds = activeMockAccountIds();
+  return items.filter((tx) => activeIds.has(tx.accountId));
+}
+
+function computeMockSummary(from?: string, to?: string): TransactionSummary {
+  let items = filterMockTransactions(mockTransactionItems);
+  if (from && to) {
+    items = items.filter((tx) => tx.date >= from && tx.date <= to);
+  } else {
+    const month = monthFromDateRange(from, to);
+    if (month) {
+      items = items.filter((tx) => transactionMatchesMonth(tx.date, month));
+    }
+  }
+
+  if (items.length === 0) {
+    return { ...EMPTY_SUMMARY };
+  }
+
+  let totalSpent = 0;
+  let income = 0;
+  let ccPaymentsExcluded = 0;
+  let pendingCount = 0;
+  let transactionCount = 0;
+  const categoryTotals = new Map<string, number>();
+
+  for (const tx of items) {
+    if (tx.pending) {
+      pendingCount += 1;
+      continue;
+    }
+    const amount = Math.abs(Number.parseFloat(tx.amount));
+    if (
+      tx.transactionType === "expense" &&
+      !tx.isTransfer &&
+      tx.category !== INTERNAL_TRANSFER_CATEGORY
+    ) {
+      totalSpent += amount;
+      transactionCount += 1;
+      categoryTotals.set(
+        tx.category,
+        (categoryTotals.get(tx.category) ?? 0) + amount,
+      );
+    } else if (tx.transactionType === "income" && !tx.isTransfer) {
+      income += amount;
+    } else if (
+      tx.isTransfer &&
+      tx.category === INTERNAL_TRANSFER_CATEGORY &&
+      tx.subCategory === CREDIT_CARD_PAYMENT_SUBCATEGORY
+    ) {
+      ccPaymentsExcluded += amount;
+    }
+  }
+
+  const net = income - totalSpent;
+  let topCategory = { name: "None", amount: "0.00" };
+  for (const [name, amount] of categoryTotals) {
+    if (
+      topCategory.name === "None" ||
+      amount > Number.parseFloat(topCategory.amount)
+    ) {
+      topCategory = { name, amount: amount.toFixed(2) };
+    }
+  }
+
+  return {
+    totalSpent: totalSpent.toFixed(2),
+    income: income.toFixed(2),
+    netSavings: net.toFixed(2),
+    avgMonthlySpend: totalSpent.toFixed(2),
+    topCategory,
+    ccPaymentsExcluded: ccPaymentsExcluded.toFixed(2),
+    savingsRate: income > 0 ? Math.round((net / income) * 10000) / 100 : 0,
+    transactionCount,
+    pendingCount,
+    monthsInPeriod: 1,
+  };
+}
+
+function syncMockHouseholdAccounts(): void {
+  mockHouseholdState.accounts = mockAccounts.map((account, index) => ({
+    accountId: account.id,
+    name: account.name,
+    mask: account.mask ?? "0000",
+    institutionName: account.institutionName,
+    balanceCurrent: account.balanceCurrent,
+    memberId: index % 2 === 0 ? "mock-member-owner" : "mock-member-partner",
+    memberName: index % 2 === 0 ? "Me" : "Partner",
+    memberColor: index % 2 === 0 ? "#7c3aed" : "#ec4899",
+  }));
+}
 
 function delay(): Promise<void> {
   return new Promise((resolve) => {
@@ -80,10 +202,13 @@ function transactionMatchesMonth(date: string, month?: string): boolean {
 }
 
 export async function getSummary(
-  _from?: string,
-  _to?: string,
+  from?: string,
+  to?: string,
 ): Promise<TransactionSummary> {
   await delay();
+  if (mockDataMutated) {
+    return computeMockSummary(from, to);
+  }
   return summaryData as TransactionSummary;
 }
 
@@ -147,13 +272,10 @@ export async function getTransactions(
   } = filters;
 
   const accountMasks = new Map(
-    (accountsData as AccountsResponse).accounts.map((account) => [
-      account.id,
-      account.mask,
-    ]),
+    mockAccounts.map((account) => [account.id, account.mask]),
   );
 
-  const allItems = (transactionsData as PaginatedTransactions).items.map(
+  const allItems = filterMockTransactions(mockTransactionItems).map(
     (tx) => ({
       ...tx,
       accountMask: tx.accountMask ?? accountMasks.get(tx.accountId) ?? null,
@@ -222,13 +344,12 @@ export async function getTransactions(
 
 export async function getAccounts(): Promise<AccountsResponse> {
   await delay();
-  return accountsData as AccountsResponse;
+  return { accounts: [...mockAccounts] };
 }
 
 export async function getCreditDebtSummary(): Promise<CreditDebtSummary> {
   await delay();
-  const data = accountsData as AccountsResponse;
-  const cards = data.accounts
+  const cards = mockAccounts
     .filter((account) => account.type === "credit")
     .map((account) => ({
       accountId: account.id,
@@ -269,16 +390,38 @@ export async function deleteAccount(
   accountId: string,
 ): Promise<import("@/types/api").DeleteAccountResponse> {
   await delay();
-  const data = accountsData as AccountsResponse;
-  const account = data.accounts.find((row) => row.id === accountId);
+  const index = mockAccounts.findIndex((row) => row.id === accountId);
+  if (index < 0) {
+    throw new Error("Account not found");
+  }
+  const account = mockAccounts[index];
   if (!account) {
     throw new Error("Account not found");
   }
+  mockAccounts.splice(index, 1);
+  const transactionsDeleted = mockTransactionItems.filter(
+    (tx) => tx.accountId === accountId,
+  ).length;
+  mockTransactionItems = mockTransactionItems.filter(
+    (tx) => tx.accountId !== accountId,
+  );
+  mockDataMutated = true;
+  syncMockHouseholdAccounts();
+
+  const plaidItemDisconnected =
+    account.source === "plaid" &&
+    !mockAccounts.some(
+      (row) =>
+        row.source === "plaid" &&
+        row.institutionName === account.institutionName,
+    );
+
   return {
     id: account.id,
     name: account.name,
     mask: account.mask ?? "0000",
-    transactionsDeleted: 0,
+    transactionsDeleted,
+    plaidItemDisconnected,
   };
 }
 
@@ -364,10 +507,9 @@ export async function getChartData(params: {
 }): Promise<ChartDataResponse> {
   await delay();
 
-  const accounts = (accountsData as AccountsResponse).accounts;
-  const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
+  const accountNames = new Map(mockAccounts.map((a) => [a.id, a.name]));
 
-  let items = (transactionsData as PaginatedTransactions).items.filter((tx) => {
+  let items = filterMockTransactions(mockTransactionItems).filter((tx) => {
     if (params.from && tx.date < params.from) return false;
     if (params.to && tx.date > params.to) return false;
     if (params.accountId && tx.accountId !== params.accountId) return false;
@@ -506,7 +648,7 @@ const mockHouseholdState: HouseholdResponse = {
       createdAt: new Date().toISOString(),
     },
   ],
-  accounts: (accountsData as AccountsResponse).accounts.map((account, index) => ({
+  accounts: INITIAL_MOCK_ACCOUNTS.map((account, index) => ({
     accountId: account.id,
     name: account.name,
     mask: account.mask ?? "0000",

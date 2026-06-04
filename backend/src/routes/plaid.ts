@@ -240,7 +240,7 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
     }
 
     try {
-      await deletePlaidItem(item.id, user.id);
+      await deletePlaidItem(item.id, user.id, app.config.env);
       request.log.info({ userId: user.id, itemId: item.id }, "plaid item removed");
       return reply.status(204).send();
     } catch (error) {

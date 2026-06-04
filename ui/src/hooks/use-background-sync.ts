@@ -3,17 +3,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
+import { invalidateFinancialQueries } from "@/lib/invalidate-financial-queries";
 import { createTaskId, notifications } from "@/lib/notifications";
-
-function invalidateFinancialQueries(
-  queryClient: ReturnType<typeof useQueryClient>,
-): void {
-  void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-  void queryClient.invalidateQueries({ queryKey: ["transactions"] });
-  void queryClient.invalidateQueries({ queryKey: ["categories"] });
-  void queryClient.invalidateQueries({ queryKey: ["summary"] });
-  void queryClient.invalidateQueries({ queryKey: ["chart-data"] });
-}
 
 export function useBackgroundSyncHelpers(
   refetchAccounts: () => Promise<unknown>,

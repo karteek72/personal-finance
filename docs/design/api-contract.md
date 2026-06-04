@@ -46,7 +46,7 @@ HTTP status codes: `200` success, `201` created, `204` no content, `400` validat
 | POST | `/plaid/link-token` | `{ platform?: "web" \| "ios" }` | `{ linkToken }` |
 | POST | `/plaid/exchange-token` | `{ publicToken }` | `{ itemId, institutionName }` |
 | GET | `/plaid/accounts` | — | `{ accounts: Account[] }` |
-| DELETE | `/plaid/items/:itemId` | — | `204` |
+| DELETE | `/plaid/items/:itemId` | — | `204` — Plaid `itemRemove` plus delete of all accounts and transactions on that item |
 | POST | `/plaid/items/:itemId/sync` | — | `{ status: "queued" }` |
 
 ### Liabilities (credit cards)
@@ -85,7 +85,7 @@ Requires `PLAID_PRODUCTS=transactions,liabilities`. Existing items must be re-li
 | Method | Path | Body | Response |
 |--------|------|------|----------|
 | GET | `/accounts` | — | `{ accounts: Account[] }` (includes liability detail when available) |
-| DELETE | `/accounts/:accountId` | — | `{ deleted: true }` |
+| DELETE | `/accounts/:accountId` | — | `{ id, name, mask, transactionsDeleted, plaidItemDisconnected }` — cascades transactions; when the last account on a Plaid item is removed, calls Plaid `itemRemove` and deletes the item |
 | POST | `/accounts/:accountId/sync` | — | `{ status: "queued" }` |
 | POST | `/plaid/sync` | — | `{ queued: number }` (sync all items) |
 

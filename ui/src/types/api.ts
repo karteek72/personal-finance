@@ -220,6 +220,8 @@ export interface DeleteAccountResponse {
   name: string;
   mask: string;
   transactionsDeleted: number;
+  /** True when this was the last account on a Plaid link and the bank was disconnected. */
+  plaidItemDisconnected: boolean;
 }
 
 export interface AlertsResponse {

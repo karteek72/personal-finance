@@ -15,7 +15,7 @@ export const accountRoutes: FastifyPluginAsync = async (app) => {
     const { accountId } = request.params as { accountId: string };
     const user = await requireRequestUser(request, app.config.env);
 
-    const result = await deleteAccount(accountId, user.id);
+    const result = await deleteAccount(accountId, user.id, app.config.env);
     if (!result) {
       throw AppError.notFound("Account not found");
     }
