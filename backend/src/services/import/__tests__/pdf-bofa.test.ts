@@ -45,6 +45,32 @@ test("parseBofaCreditCardText extracts purchases and payments", () => {
   assert.equal(payment?.transactionType, "transfer");
 });
 
+test("detectPdfInstitution identifies BoFA Visa grid statement as credit", () => {
+  const text = readFileSync(
+    resolve(fixtures, "bofa-credit-grid-sample.txt"),
+    "utf8",
+  );
+  assert.equal(detectPdfInstitution(text), "bofa-credit");
+});
+
+test("parseBofaCreditCardText extracts Visa grid layout purchases", () => {
+  const text = readFileSync(
+    resolve(fixtures, "bofa-credit-grid-sample.txt"),
+    "utf8",
+  );
+  const stmt = parseBofaCreditCardText(text, "eStmt_2026-05-06.pdf");
+
+  assert.equal(stmt.account.type, "credit");
+  assert.equal(extractBofaAccountMask(text), "7138");
+  assert.ok(stmt.bankingTransactions.length >= 10);
+
+  const coserv = stmt.bankingTransactions.find((t) =>
+    /COSERV/i.test(t.name),
+  );
+  assert.ok(coserv);
+  assert.equal(coserv?.amount, "224.00");
+});
+
 test("parseBofaDepositoryText extracts checking transactions", () => {
   const text = readFileSync(resolve(fixtures, "bofa-checking-sample.txt"), "utf8");
   const stmt = parseBofaDepositoryText(text, "bofa-checking-jan-2024.pdf");

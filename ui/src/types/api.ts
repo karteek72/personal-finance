@@ -243,6 +243,13 @@ export interface ChartMonthlyPoint {
   net: string;
 }
 
+export interface ChartYearlyPoint {
+  year: string;
+  expenses: string;
+  income: string;
+  net: string;
+}
+
 export interface ChartCategorySlice {
   name: string;
   amount: string;
@@ -266,6 +273,8 @@ export interface ChartMemberSlice {
 
 export interface ChartDataResponse {
   monthly: ChartMonthlyPoint[];
+  /** Full-history yearly totals when data spans more than one calendar year. */
+  yearly: ChartYearlyPoint[];
   byCategory: ChartCategorySlice[];
   bySubCategory: ChartCategorySlice[];
   byAccount: ChartAccountSlice[];

@@ -72,7 +72,7 @@ Requires `PLAID_PRODUCTS=transactions,liabilities`. Existing items must be re-li
 | GET | `/transactions` | `month`, `category`, `subCategory`, `accountId`, `memberId`, `scope` (`all`\|`household`\|`personal`), `q`, `type`, `sort` (`date_desc`\|`date_asc`\|`amount_desc`\|`amount_asc`), `limit`, `cursor` | `{ items: Transaction[], nextCursor }` |
 | GET | `/transactions/summary` | `from`, `to` | `TransactionSummary` |
 | GET | `/transactions/by-category` | `from`, `to` | `{ categories: CategoryTotal[] }` |
-| GET | `/transactions/chart-data` | `from`, `to`, `category`, `accountId` | `ChartDataResponse` (monthly series + category breakdown) |
+| GET | `/transactions/chart-data` | `from`, `to`, `category`, `accountId` | `ChartDataResponse` — `monthly` (filtered by `from`/`to`), `yearly` (full history when data spans 2+ calendar years), category breakdown |
 | GET | `/transactions/flow` | `from`, `to` | `MoneyFlowResponse` |
 | PATCH | `/transactions/:id/category` | `{ category, rememberForMerchant? }` | `{ transaction, merchantTransactionsUpdated }` |
 | GET | `/transactions/category-options` | — | `{ categories: string[] }` |

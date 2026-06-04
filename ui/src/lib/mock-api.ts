@@ -509,15 +509,25 @@ export async function getChartData(params: {
 
   const accountNames = new Map(mockAccounts.map((a) => [a.id, a.name]));
 
-  let items = filterMockTransactions(mockTransactionItems).filter((tx) => {
+  const scopedItems = filterMockTransactions(mockTransactionItems).filter(
+    (tx) => {
+      if (params.accountId && tx.accountId !== params.accountId) return false;
+      if (params.category && tx.category !== params.category) return false;
+      return true;
+    },
+  );
+
+  let items = scopedItems.filter((tx) => {
     if (params.from && tx.date < params.from) return false;
     if (params.to && tx.date > params.to) return false;
-    if (params.accountId && tx.accountId !== params.accountId) return false;
-    if (params.category && tx.category !== params.category) return false;
     return true;
   });
 
   const monthlyMap = new Map<
+    string,
+    { expenses: number; income: number; net: number }
+  >();
+  const yearlyMap = new Map<
     string,
     { expenses: number; income: number; net: number }
   >();
@@ -545,6 +555,22 @@ export async function getChartData(params: {
     }
 
     monthlyMap.set(month, entry);
+  }
+
+  for (const tx of scopedItems) {
+    const year = tx.date.slice(0, 4);
+    const entry = yearlyMap.get(year) ?? { expenses: 0, income: 0, net: 0 };
+    const amount = Number.parseFloat(tx.amount);
+
+    if (tx.transactionType === "expense" && !tx.isTransfer) {
+      entry.expenses += amount;
+      entry.net -= amount;
+    } else if (tx.transactionType === "income" && !tx.isTransfer) {
+      entry.income += Math.abs(amount);
+      entry.net += Math.abs(amount);
+    }
+
+    yearlyMap.set(year, entry);
   }
 
   const monthly = [...monthlyMap.entries()]
@@ -602,8 +628,21 @@ export async function getChartData(params: {
     0,
   );
 
+  const yearly =
+    yearlyMap.size > 1
+      ? [...yearlyMap.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([year, values]) => ({
+            year,
+            expenses: values.expenses.toFixed(2),
+            income: values.income.toFixed(2),
+            net: values.net.toFixed(2),
+          }))
+      : [];
+
   return {
     monthly,
+    yearly,
     byCategory,
     bySubCategory: [],
     byAccount,

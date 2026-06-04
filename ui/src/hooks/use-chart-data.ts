@@ -29,6 +29,7 @@ export function useChartData(filters: ChartDataFilters = {}) {
     select: (response) => ({
       ...response,
       monthly: sliceLastMonthlyPoints(response.monthly),
+      yearly: response.yearly ?? [],
     }),
   });
 }

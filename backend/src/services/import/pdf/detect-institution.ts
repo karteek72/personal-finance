@@ -49,31 +49,35 @@ export function detectPdfInstitution(text: string): PdfInstitutionId | null {
       return "bofa-auto-loan";
     }
 
+    const isCredit =
+      /Visa\s+Signature|World\s+Mastercard|Credit Card|Cash Rewards/i.test(
+        head,
+      ) ||
+      /Account#\s*\d{4}\s+\d{4}\s+\d{4}\s+\d{4}/i.test(head) ||
+      /! Account # [\d ]+ !/i.test(text) ||
+      /\d{2}\/\d{2}\s+\d{2}\/\d{2}\s+.+\s+\d{4}\s+\d{4}\s+-?[\d,]+\.\d{2}/m.test(
+        text.slice(0, 30_000),
+      ) ||
+      (/\bReference\b[\s\S]{0,400}\bAccount\b[\s\S]{0,200}\bAmount\b/i.test(
+        text,
+      ) &&
+        /! Account #/i.test(text));
+
+    if (isCredit) {
+      return "bofa-credit";
+    }
+
     const isDepository =
       /Advantage Banking|Adv Plus Banking|Relationship Banking|Money Market Savings/i.test(
         head,
-      ) || /Account number:\s*[\d\s]{8,}/i.test(head);
+      ) ||
+      /Account number:\s*\d{4}\s+\d{4}\s+\d{4}/i.test(head);
 
     if (
       isDepository ||
       /\d{2}\/\d{2}\/\d{2}\s+.+\s+-?[\d,]+\.\d{2}/m.test(text.slice(0, 30_000))
     ) {
       return "bofa-depository";
-    }
-
-    if (
-      /Account#\s*[\d\s]{12,}\d{4}|Credit Card|Visa\s+Signature|World\s+Mastercard/i.test(
-        head,
-      ) ||
-      /\d{2}\/\d{2}\s+\d{2}\/\d{2}\s+.+\s+\d{4}\s+\d{4}\s+-?[\d,]+\.\d{2}/m.test(
-        text.slice(0, 30_000),
-      )
-    ) {
-      return "bofa-credit";
-    }
-
-    if (/! Account #/i.test(head)) {
-      return "bofa-credit";
     }
 
     return "bofa-depository";

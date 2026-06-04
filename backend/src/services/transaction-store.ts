@@ -790,14 +790,25 @@ export interface ChartDataParams {
   scopedAccountIds?: string[] | null;
 }
 
-function buildChartFilters(params: ChartDataParams) {
+/** When `dateRange` is null, no date filter is applied (used for bounds + yearly history). */
+function buildChartFilters(
+  params: ChartDataParams,
+  dateRange?: { from: string; to: string } | null,
+) {
   const userFilter =
     params.userIds.length === 1
       ? sql`t.user_id = ${params.userIds[0]!}`
       : sql`t.user_id IN (${sql.join(params.userIds.map((id) => sql`${id}`), sql`, `)})`;
   const parts = [userFilter, sql`t.pending = false`];
-  if (params.from && params.to) {
-    parts.push(sql`t.date >= ${params.from} AND t.date <= ${params.to}`);
+  const range =
+    dateRange === null
+      ? null
+      : (dateRange ??
+        (params.from && params.to
+          ? { from: params.from, to: params.to }
+          : null));
+  if (range) {
+    parts.push(sql`t.date >= ${range.from} AND t.date <= ${range.to}`);
   }
   if (params.accountId) {
     parts.push(sql`t.account_id = ${params.accountId}`);
@@ -820,6 +831,18 @@ function buildChartFilters(params: ChartDataParams) {
   return sql.join(parts, sql` AND `);
 }
 
+const CHART_PERIOD_AGG_SQL = sql`
+  COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' AND NOT t.is_transfer AND t.category != ${INTERNAL_TRANSFER_CATEGORY} THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS expenses,
+  COALESCE(SUM(CASE WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS income,
+  COALESCE(SUM(
+    CASE
+      WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric)
+      WHEN t.transaction_type = 'expense' AND NOT t.is_transfer AND t.category != ${INTERNAL_TRANSFER_CATEGORY} THEN -ABS(t.amount::numeric)
+      ELSE 0
+    END
+  ), 0)::text AS net
+`;
+
 export async function getChartData(params: ChartDataParams) {
   const db = getDb();
   const whereClause = buildChartFilters(params);
@@ -832,20 +855,56 @@ export async function getChartData(params: ChartDataParams) {
   }>(sql`
     SELECT
       to_char(date_trunc('month', t.date), 'YYYY-MM') AS month,
-      COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' AND NOT t.is_transfer AND t.category != ${INTERNAL_TRANSFER_CATEGORY} THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS expenses,
-      COALESCE(SUM(CASE WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS income,
-      COALESCE(SUM(
-        CASE
-          WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric)
-          WHEN t.transaction_type = 'expense' AND NOT t.is_transfer AND t.category != ${INTERNAL_TRANSFER_CATEGORY} THEN -ABS(t.amount::numeric)
-          ELSE 0
-        END
-      ), 0)::text AS net
+      ${CHART_PERIOD_AGG_SQL}
     FROM transactions t
     WHERE ${whereClause}
     GROUP BY date_trunc('month', t.date)
     ORDER BY month
   `);
+
+  const boundsRows = await db.execute<{
+    min_date: string | null;
+    max_date: string | null;
+  }>(sql`
+    SELECT min(t.date)::text AS min_date, max(t.date)::text AS max_date
+    FROM transactions t
+    WHERE ${buildChartFilters(params, null)}
+  `);
+
+  let yearly: {
+    year: string;
+    expenses: string;
+    income: string;
+    net: string;
+  }[] = [];
+
+  const minDate = boundsRows[0]?.min_date;
+  const maxDate = boundsRows[0]?.max_date;
+  if (minDate && maxDate) {
+    const minYear = Number.parseInt(minDate.slice(0, 4), 10);
+    const maxYear = Number.parseInt(maxDate.slice(0, 4), 10);
+    if (
+      Number.isFinite(minYear) &&
+      Number.isFinite(maxYear) &&
+      maxYear > minYear
+    ) {
+      const yearlyRows = await db.execute<{
+        year: string;
+        expenses: string;
+        income: string;
+        net: string;
+      }>(sql`
+        SELECT
+          to_char(date_trunc('year', t.date), 'YYYY') AS year,
+          ${CHART_PERIOD_AGG_SQL}
+        FROM transactions t
+        WHERE ${buildChartFilters(params, { from: minDate, to: maxDate })}
+        GROUP BY date_trunc('year', t.date)
+        ORDER BY year
+      `);
+      yearly = yearlyRows;
+    }
+  }
 
   const categoryRows = await db.execute<{ name: string; amount: string }>(sql`
     SELECT t.category AS name, SUM(ABS(t.amount::numeric))::text AS amount
@@ -993,6 +1052,12 @@ export async function getChartData(params: ChartDataParams) {
   return {
     monthly: monthly.map((row) => ({
       month: row.month,
+      expenses: formatMoneyAmount(row.expenses),
+      income: formatMoneyAmount(row.income),
+      net: formatMoneyAmount(row.net),
+    })),
+    yearly: yearly.map((row) => ({
+      year: row.year,
       expenses: formatMoneyAmount(row.expenses),
       income: formatMoneyAmount(row.income),
       net: formatMoneyAmount(row.net),
