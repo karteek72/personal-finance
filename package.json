@@ -7,6 +7,7 @@
     "dev:detach": "./scripts/podman/dev.sh --detach",
     "dev:infra": "./scripts/podman/dev.sh --infra-only",
     "dev:api": "./scripts/run-with-root-env.sh backend dev",
+    "dev:worker": "./scripts/run-with-root-env.sh backend dev:worker",
     "dev:ui": "./scripts/run-with-root-env.sh ui dev",
     "dev:down": "./scripts/podman/dev-down.sh",
     "db:migrate": "./scripts/run-with-root-env.sh backend db:migrate",

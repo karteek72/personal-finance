@@ -19,6 +19,8 @@ fi
 case "${PKG}" in
   backend)
     export PORT="${PORT:-4000}"
+    export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6380}"
+    export DATABASE_URL="${DATABASE_URL:-postgresql://spendflow:spendflow@localhost:5433/spendflow}"
     ;;
   ui)
     export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-http://localhost:4000/api/v1}"

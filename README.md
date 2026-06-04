@@ -165,8 +165,9 @@ npm run db:migrate
 # Full dev stack (Postgres + Redis in Podman, API + UI on host):
 npm run dev
 
-# Or API / UI only (infra already running):
+# Or run services separately (infra already running):
 npm run dev:api
+npm run dev:worker   # BullMQ: Plaid sync + statement import jobs (needs REDIS_URL)
 npm run dev:ui
 ```
 
