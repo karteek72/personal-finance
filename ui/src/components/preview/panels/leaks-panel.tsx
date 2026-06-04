@@ -13,28 +13,12 @@ interface Fee {
   fixable: boolean;
 }
 
-const FALLBACK_FEES: Fee[] = [
-  { id: "atm", label: "Out-of-network ATM fees", source: "Various ATMs", count: 14, total: 49.0, fixable: true },
-  { id: "overdraft", label: "Overdraft fees", source: "Chase Checking", count: 3, total: 105.0, fixable: true },
-  { id: "maint", label: "Account maintenance", source: "Chase Checking", count: 12, total: 144.0, fixable: true },
-  { id: "late", label: "Credit card late fees", source: "Amex", count: 2, total: 78.0, fixable: true },
-  { id: "fx", label: "Foreign transaction fees", source: "Debit card abroad", count: 9, total: 41.2, fixable: true },
-  { id: "interest", label: "Carried-balance interest", source: "Amex", count: 7, total: 286.0, fixable: false },
-];
-
 interface Habit {
   id: string;
   emoji: string;
   label: string;
   monthly: number;
 }
-
-const FALLBACK_HABITS: Habit[] = [
-  { id: "coffee", emoji: "☕", label: "Daily coffee shop", monthly: 132 },
-  { id: "dining", emoji: "🍔", label: "Eating out / delivery", monthly: 540 },
-  { id: "rideshare", emoji: "🚕", label: "Rideshare", monthly: 96 },
-  { id: "subs", emoji: "📺", label: "Streaming subscriptions", monthly: 78 },
-];
 
 function money(n: number) {
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: n % 1 === 0 ? 0 : 2 })}`;
@@ -51,25 +35,21 @@ export function LeaksPanel() {
   const [tab, setTab] = useState<"fees" | "audit">("fees");
   const { data } = useRecurring();
 
-  const fees: Fee[] = data
-    ? data.leaks.fees.map((f) => ({
-        id: f.id,
-        label: f.label,
-        source: f.source,
-        count: f.count,
-        total: Number.parseFloat(f.total),
-        fixable: f.fixable,
-      }))
-    : FALLBACK_FEES;
+  const fees: Fee[] = (data?.leaks.fees ?? []).map((f) => ({
+    id: f.id,
+    label: f.label,
+    source: f.source,
+    count: f.count,
+    total: Number.parseFloat(f.total),
+    fixable: f.fixable,
+  }));
 
-  const habits: Habit[] = data
-    ? data.leaks.habits.map((h) => ({
-        id: h.id,
-        emoji: h.emoji ?? "💸",
-        label: h.label,
-        monthly: Number.parseFloat(h.monthly),
-      }))
-    : FALLBACK_HABITS;
+  const habits: Habit[] = (data?.leaks.habits ?? []).map((h) => ({
+    id: h.id,
+    emoji: h.emoji ?? "💸",
+    label: h.label,
+    monthly: Number.parseFloat(h.monthly),
+  }));
 
   const feeTotal = fees.reduce((s, f) => s + f.total, 0);
   const recoverable = fees.filter((f) => f.fixable).reduce((s, f) => s + f.total, 0);

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { useHasActiveAccounts } from "@/hooks/use-has-active-accounts";
 import { api } from "@/lib/api-client";
 import { useCoach } from "@/hooks/use-features";
 
@@ -14,30 +15,6 @@ const STARTER_MESSAGES: Message[] = [
   },
 ];
 
-const FALLBACK_QA: { q: string; a: string }[] = [
-  {
-    q: "How much did I spend on food delivery last month?",
-    a: "Last month you spent **$312** on food delivery across 18 orders — DoorDash ($189), Uber Eats ($97), and Grubhub ($26). That's **+41% vs. your 3-month average of $221**. Your peak ordering days were Thursdays and Sundays. Want me to set a food delivery budget?",
-  },
-  {
-    q: "Am I on track to hit my emergency fund goal?",
-    a: "Your emergency fund goal is $10,000 by December 2026. You're at **$6,420 (64.2%)** with 7 months left. At your current savings pace of $380/month, you'll hit **$9,070 by December** — about $930 short. To hit the goal exactly, you'd need to save **$511/month**. Want me to find where you could cut to close that gap?",
-  },
-  {
-    q: "What's my biggest wasted expense?",
-    a: "Looking at your last 3 months, your Adobe Creative Cloud subscription at **$54.99/month** hasn't had any associated file activity I can detect. You're also paying for **Hulu + Disney+ simultaneously** — you binge one heavily, the other has zero activity this quarter. That's **$32/month or $384/year** you could reclaim.",
-  },
-];
-
-const FALLBACK_NARRATIVE = `**May was your best month financially in 2026.** You spent $3,847 — $290 less than April. Dining out dropped 22% after your budget nudge mid-month. Your savings rate hit 21%, crossing the 20% threshold for the first time this year.
-
-Watch out for: Shopping crept up to $340 (13% over budget). You also have 3 subscriptions renewing in June totaling $48.97. Consider reviewing before the charges land.
-
-One win worth noting: you haven't touched your Japan fund since March, but your automatic $200 transfer kept running quietly. You're now 40% of the way there.`;
-
-const FALLBACK_FORECAST =
-  "Based on your patterns, you'll likely spend **$3,600–$3,950** in June. Big events: annual Adobe renewal ($660), Japan fund transfer ($200), and your typical summer dining uptick. Savings rate projected at **18–21%**.";
-
 function renderText(text: string) {
   return text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 }
@@ -48,12 +25,21 @@ export function CoachAssistant() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "narrative">("chat");
+  const { hasAccounts } = useHasActiveAccounts();
   const { data } = useCoach();
 
-  const SAMPLE_QA = data?.qa.length ? data.qa : FALLBACK_QA;
+  const SAMPLE_QA = data?.qa ?? [];
   const CHIP_LABELS = SAMPLE_QA.map((x) => x.q);
-  const MONTHLY_NARRATIVE = data?.narrative ?? FALLBACK_NARRATIVE;
-  const FORECAST = data?.forecast ?? FALLBACK_FORECAST;
+  const MONTHLY_NARRATIVE =
+    data?.narrative ??
+    (hasAccounts
+      ? "Connect transactions and sync accounts to generate your monthly narrative."
+      : "Connect accounts to unlock coach insights.");
+  const FORECAST =
+    data?.forecast ??
+    (hasAccounts
+      ? "Forecast will appear once enough cash-flow history is available."
+      : "");
 
   function handleChip(q: string) {
     const qa = SAMPLE_QA.find((x) => x.q === q);

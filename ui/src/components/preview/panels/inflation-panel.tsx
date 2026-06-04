@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useInflation } from "@/hooks/use-features";
 
 interface InflationCategory {
@@ -8,22 +13,6 @@ interface InflationCategory {
   inflation: number;
   severity: string;
 }
-
-const FALLBACK_CATEGORIES: InflationCategory[] = [
-  { name: "Healthcare", share: 8, inflation: 5.2, severity: "high" },
-  { name: "Groceries", share: 14, inflation: 4.1, severity: "high" },
-  { name: "Housing", share: 28, inflation: 3.8, severity: "medium" },
-  { name: "Transport", share: 12, inflation: 3.1, severity: "medium" },
-  { name: "Dining Out", share: 11, inflation: 2.9, severity: "medium" },
-  { name: "Entertainment", share: 7, inflation: 1.8, severity: "low" },
-  { name: "Shopping", share: 10, inflation: 1.2, severity: "low" },
-  { name: "Personal Care", share: 5, inflation: 0.9, severity: "low" },
-  { name: "Utilities", share: 5, inflation: 4.8, severity: "high" },
-];
-
-const FALLBACK_PERSONAL_RATE = 3.8;
-const FALLBACK_NATIONAL_CPI = 3.1;
-const FALLBACK_SALARY_RAISE = 3.0;
 
 function severityColor(s: string) {
   if (s === "high") return "#ef4444";
@@ -36,19 +25,28 @@ function usd(n: number) {
 }
 
 export function InflationPanel() {
-  const { data } = useInflation();
+  const gate = useFeaturePanelGate("personal inflation");
+  const { data, isLoading, isError } = useInflation();
 
-  const PERSONAL_RATE = data?.personalRate ?? FALLBACK_PERSONAL_RATE;
-  const NATIONAL_CPI = data?.nationalCpi ?? FALLBACK_NATIONAL_CPI;
-  const SALARY_RAISE = data?.salaryRaise ?? FALLBACK_SALARY_RAISE;
-  const realSavingsRate = data?.realSavingsRate ?? 5.2 - PERSONAL_RATE;
-  const realRaise = data?.realRaise ?? SALARY_RAISE - PERSONAL_RATE;
-  const powerLoss = data ? `−${usd(Number.parseFloat(data.powerLoss))}` : "−$1,240";
-  const salary = data ? Number.parseFloat(data.salary) : 80000;
-  const breakEvenSalary = data ? Number.parseFloat(data.breakEvenSalary) : 82720;
-  const targetSalary = data ? Number.parseFloat(data.targetSalary) : 84800;
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
+  if (isError || !data) {
+    return (
+      <FeatureEmptyState feature="personal inflation" variant="insufficient-data" />
+    );
+  }
+
+  const PERSONAL_RATE = data.personalRate;
+  const NATIONAL_CPI = data.nationalCpi;
+  const SALARY_RAISE = data.salaryRaise;
+  const realSavingsRate = data.realSavingsRate;
+  const realRaise = data.realRaise;
+  const powerLoss = `−${usd(Number.parseFloat(data.powerLoss))}`;
+  const salary = Number.parseFloat(data.salary);
+  const breakEvenSalary = Number.parseFloat(data.breakEvenSalary);
+  const targetSalary = Number.parseFloat(data.targetSalary);
   const raiseNeeded = breakEvenSalary - salary;
-  const categories: InflationCategory[] = data?.categories.length ? data.categories : FALLBACK_CATEGORIES;
+  const categories: InflationCategory[] = data.categories;
 
   return (
     <div className="space-y-5">

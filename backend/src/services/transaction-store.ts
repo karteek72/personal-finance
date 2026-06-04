@@ -14,6 +14,10 @@ import {
   GENERAL_SUBCATEGORY,
 } from "./infer-subcategory.js";
 import { INTERNAL_TRANSFER_CATEGORY, CREDIT_CARD_PAYMENT_SUBCATEGORY } from "./transfer-classification.js";
+import {
+  getActiveAccountIds,
+  sqlActiveAccountIdsIn,
+} from "./active-account-scope.js";
 
 export async function listAccounts(userId: string) {
   const db = getDb();
@@ -182,6 +186,16 @@ function sqlUserIdsIn(userIds: string[]) {
     return sql`user_id = ${userIds[0]!}`;
   }
   return sql`user_id IN (${sql.join(userIds.map((id) => sql`${id}`), sql`, `)})`;
+}
+
+async function activeTransactionSqlFilters(userIds: string[]) {
+  const accountIds = await getActiveAccountIds(userIds);
+  return {
+    accountIds,
+    userFilter: sqlUserIdsIn(userIds),
+    accountFilter: sqlActiveAccountIdsIn(accountIds),
+    tAccountFilter: sqlActiveAccountIdsIn(accountIds, "t.account_id"),
+  };
 }
 
 export type TransactionListFilters = {
@@ -432,7 +446,9 @@ export async function getSummary(
   to?: string,
 ) {
   const db = getDb();
+  const accountIds = await getActiveAccountIds(userIds);
   const userFilter = sqlUserIdsIn(userIds);
+  const accountFilter = sqlActiveAccountIdsIn(accountIds);
   const dateFilter =
     from && to
       ? sql`date >= ${from} AND date <= ${to}`
@@ -442,6 +458,7 @@ export async function getSummary(
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND category != ${INTERNAL_TRANSFER_CATEGORY}
@@ -453,6 +470,7 @@ export async function getSummary(
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'income'
       AND is_transfer = false
       AND pending = false
@@ -463,6 +481,7 @@ export async function getSummary(
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND is_transfer = true
       AND category = ${INTERNAL_TRANSFER_CATEGORY}
       AND sub_category = ${CREDIT_CARD_PAYMENT_SUBCATEGORY}
@@ -477,6 +496,7 @@ export async function getSummary(
     SELECT category AS name, SUM(ABS(amount::numeric))::text AS amount
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND category != ${INTERNAL_TRANSFER_CATEGORY}
@@ -498,6 +518,7 @@ export async function getSummary(
     SELECT COUNT(*)::text AS count
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND category != ${INTERNAL_TRANSFER_CATEGORY}
@@ -509,6 +530,7 @@ export async function getSummary(
     SELECT COUNT(*)::text AS count
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND pending = true
       AND ${dateFilter}
   `);
@@ -541,7 +563,7 @@ export async function getCategories(
   to?: string,
 ) {
   const db = getDb();
-  const userFilter = sqlUserIdsIn(userIds);
+  const { userFilter, accountFilter } = await activeTransactionSqlFilters(userIds);
   const dateFilter =
     from && to
       ? sql`date >= ${from} AND date <= ${to}`
@@ -559,6 +581,7 @@ export async function getCategories(
       SUM(amount::numeric)::text AS amount
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND category != ${INTERNAL_TRANSFER_CATEGORY}
@@ -628,7 +651,8 @@ export async function getMoneyFlow(
   void from;
   void to;
   const db = getDb();
-  const userFilter = sqlUserIdsIn(userIds);
+  const { userFilter, accountFilter, tAccountFilter } =
+    await activeTransactionSqlFilters(userIds);
   const tUserFilter =
     userIds.length === 1
       ? sql`t.user_id = ${userIds[0]!}`
@@ -638,6 +662,7 @@ export async function getMoneyFlow(
     SELECT name AS label, SUM(ABS(amount::numeric))::text AS amount
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'income' AND is_transfer = false
     GROUP BY name
     ORDER BY SUM(ABS(amount::numeric)) DESC
@@ -649,6 +674,8 @@ export async function getMoneyFlow(
     FROM transactions t
     JOIN accounts a ON a.id = t.account_id
     WHERE ${tUserFilter}
+      AND ${tAccountFilter}
+      AND a.is_active = true
       AND a.type = 'depository' AND t.transaction_type = 'expense' AND t.is_transfer = false
     GROUP BY a.name
   `);
@@ -658,6 +685,8 @@ export async function getMoneyFlow(
     FROM transactions t
     JOIN accounts a ON a.id = t.account_id
     WHERE ${tUserFilter}
+      AND ${tAccountFilter}
+      AND a.is_active = true
       AND a.type = 'credit' AND t.transaction_type = 'expense' AND t.is_transfer = false
     GROUP BY a.name
   `);
@@ -675,6 +704,7 @@ export async function getMoneyFlow(
       COALESCE(SUM(CASE WHEN transaction_type = 'income' AND NOT is_transfer THEN ABS(amount::numeric) WHEN transaction_type = 'expense' AND NOT is_transfer THEN -amount::numeric ELSE 0 END), 0)::text AS net
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
     GROUP BY date_trunc('month', date)
     ORDER BY month
   `);
@@ -685,7 +715,7 @@ export async function getMoneyFlow(
   );
   const transferTotal = await db.execute<{ total: string }>(sql`
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
-    FROM transactions WHERE ${userFilter} AND is_transfer = true
+    FROM transactions WHERE ${userFilter} AND ${accountFilter} AND is_transfer = true
   `);
   const ccTotal = creditCards.reduce(
     (s, r) => s + Number.parseFloat(r.amount),
@@ -717,7 +747,7 @@ export async function getTrends(
   void from;
   void to;
   const db = getDb();
-  const userFilter = sqlUserIdsIn(userIds);
+  const { userFilter, accountFilter } = await activeTransactionSqlFilters(userIds);
 
   const rows = await db.execute<{
     name: string;
@@ -730,6 +760,7 @@ export async function getTrends(
       SUM(amount::numeric)::text AS amount
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'expense' AND NOT is_transfer
       AND category != ${INTERNAL_TRANSFER_CATEGORY}
     GROUP BY category, date_trunc('month', date)
@@ -1049,11 +1080,12 @@ async function categorySpendByMonth(
 ): Promise<number> {
   const db = getDb();
   const { from, to } = monthBounds(month);
-  const userFilter = sqlUserIdsIn(userIds);
+  const { userFilter, accountFilter } = await activeTransactionSqlFilters(userIds);
   const rows = await db.execute<{ total: string }>(sql`
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND category = ${category}
@@ -1094,12 +1126,13 @@ export async function getAlerts(
     });
   }
 
-  const userFilter = sqlUserIdsIn(userIds);
+  const { userFilter, accountFilter } = await activeTransactionSqlFilters(userIds);
   const { from, to } = monthBounds(refMonth);
   const pendingRows = await db.execute<{ count: string }>(sql`
     SELECT COUNT(*)::text AS count
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND pending = true
       AND date >= ${from}
       AND date <= ${to}

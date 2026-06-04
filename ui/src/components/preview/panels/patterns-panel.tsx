@@ -1,23 +1,11 @@
 "use client";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { usePatterns } from "@/hooks/use-features";
-
-const FALLBACK_DAY_OF_WEEK = [
-  { day: "Mon", value: 42 },
-  { day: "Tue", value: 38 },
-  { day: "Wed", value: 51 },
-  { day: "Thu", value: 64 },
-  { day: "Fri", value: 98 },
-  { day: "Sat", value: 134 },
-  { day: "Sun", value: 112 },
-];
-
-const FALLBACK_PATTERNS = [
-  { label: "Weekend spending", value: "+43%", description: "You spend 43% more on Saturdays and Sundays vs. weekdays", severity: "warning" },
-  { label: "Post-payday splurge", value: "+67%", description: "In the 3 days after your paycheck, spending spikes 67%", severity: "warning" },
-  { label: "Late-night orders", value: "$189/mo", description: "38% of your food delivery orders happen between 10pm–2am", severity: "neutral" },
-  { label: "Stress spending", value: "+28%", description: "Shopping and dining surge on high-workload weeks", severity: "neutral" },
-];
 
 const DOW_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
@@ -28,14 +16,25 @@ function sortByDayOfWeek<T extends { day: string }>(rows: T[]): T[] {
 }
 
 export function PatternsPanel() {
-  const { data } = usePatterns();
+  const gate = useFeaturePanelGate("spending patterns");
+  const { data, isLoading } = usePatterns();
+
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
 
   const dayOfWeek = sortByDayOfWeek(
-    data?.dayOfWeek.length
-      ? data.dayOfWeek.map((d) => ({ day: d.day, value: Number.parseFloat(d.value) }))
-      : FALLBACK_DAY_OF_WEEK,
+    (data?.dayOfWeek ?? []).map((d) => ({
+      day: d.day,
+      value: Number.parseFloat(d.value),
+    })),
   );
-  const patterns = data?.patterns.length ? data.patterns : FALLBACK_PATTERNS;
+  const patterns = data?.patterns ?? [];
+
+  if (dayOfWeek.every((d) => d.value === 0) && patterns.length === 0) {
+    return (
+      <FeatureEmptyState feature="spending patterns" variant="insufficient-data" />
+    );
+  }
   const maxDay = Math.max(...dayOfWeek.map((d) => d.value), 1);
   const barMaxPx = 96;
 
@@ -88,6 +87,9 @@ export function PatternsPanel() {
       {/* Detected patterns */}
       <div className="space-y-2">
         <p className="px-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Spending patterns detected</p>
+        {patterns.length === 0 && (
+          <p className="px-1 text-xs text-text-muted">No notable patterns detected yet.</p>
+        )}
         {patterns.map((p) => (
           <div key={p.label} className="flex items-start gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-3.5">
             <div className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${p.severity === "warning" ? "bg-warning/10 text-warning" : "bg-border text-text-muted"}`}>

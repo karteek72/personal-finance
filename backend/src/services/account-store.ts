@@ -4,6 +4,7 @@ import { getDb } from "../db/client.js";
 import { accounts, transactions } from "../db/schema.js";
 import { resolveHouseholdContext } from "./household-access.js";
 import { disconnectPlaidItem } from "./plaid/disconnect-item.js";
+import { purgeDerivedFinancialData } from "./purge-derived-financial-data.js";
 
 export interface DeleteAccountResult {
   id: string;
@@ -75,6 +76,8 @@ export async function deleteAccount(
       );
     }
   }
+
+  await purgeDerivedFinancialData(userId);
 
   return {
     id: account.id,

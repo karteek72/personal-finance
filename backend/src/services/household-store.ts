@@ -8,6 +8,7 @@ import {
   households,
   transactions,
 } from "../db/schema.js";
+import { getActiveAccountIds } from "./active-account-scope.js";
 import {
   type HouseholdContext,
   requireHouseholdOwner,
@@ -408,12 +409,20 @@ export async function resolveScopedAccountIds(
   return resolveScopedAccountIdsForContext(ctx, scope, memberId);
 }
 
+function intersectActiveIds(
+  candidateIds: string[],
+  activeSet: Set<string>,
+): string[] {
+  return candidateIds.filter((id) => activeSet.has(id));
+}
+
 export async function resolveScopedAccountIdsForContext(
   ctx: HouseholdContext,
   scope?: "all" | "household" | "personal",
   memberId?: string,
 ): Promise<string[] | null> {
   const db = getDb();
+  const activeSet = new Set(await getActiveAccountIds(ctx.userIds));
 
   if (memberId) {
     const rows = await db
@@ -425,7 +434,10 @@ export async function resolveScopedAccountIdsForContext(
           eq(householdAccountAssignments.memberId, memberId),
         ),
       );
-    return rows.map((row) => row.accountId);
+    return intersectActiveIds(
+      rows.map((row) => row.accountId),
+      activeSet,
+    );
   }
 
   if (scope === "household") {
@@ -433,7 +445,10 @@ export async function resolveScopedAccountIdsForContext(
       .select({ accountId: householdAccountAssignments.accountId })
       .from(householdAccountAssignments)
       .where(eq(householdAccountAssignments.householdId, ctx.householdId));
-    return rows.map((row) => row.accountId);
+    return intersectActiveIds(
+      rows.map((row) => row.accountId),
+      activeSet,
+    );
   }
 
   if (scope === "personal") {
@@ -441,10 +456,13 @@ export async function resolveScopedAccountIdsForContext(
       .select({ accountId: householdAccountAssignments.accountId })
       .from(householdAccountAssignments)
       .where(eq(householdAccountAssignments.memberId, ctx.memberId));
-    return rows.map((row) => row.accountId);
+    return intersectActiveIds(
+      rows.map((row) => row.accountId),
+      activeSet,
+    );
   }
 
-  return null;
+  return [...activeSet];
 }
 
 export async function getHouseholdInsights(userId: string) {

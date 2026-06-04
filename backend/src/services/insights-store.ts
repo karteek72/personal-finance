@@ -1,15 +1,18 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import {
   challenges,
   habitStreaks,
   spendingDna,
-  spendingPatterns,
   transactionReasons,
   transactions,
-  wellnessScores,
 } from "../db/schema.js";
 import { formatMoneyAmount } from "../lib/money.js";
+import {
+  drizzleActiveTransactionWhere,
+  resolveActiveAccountScope,
+} from "./active-account-scope.js";
+import { computePatternsFromTransactions } from "./compute-patterns.js";
 import { computeWellnessFromTransactions } from "./compute-wellness.js";
 import { resolveHouseholdContext } from "./household-access.js";
 
@@ -27,30 +30,22 @@ export interface WellnessResponse {
   isLive: boolean;
 }
 
+export function emptyWellnessResponse(): WellnessResponse {
+  return {
+    score: 0,
+    delta: 0,
+    history: [],
+    dimensions: [],
+    isLive: false,
+  };
+}
+
 export async function getWellness(userId: string): Promise<WellnessResponse> {
   const ctx = await resolveHouseholdContext(userId);
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(wellnessScores)
-    .where(inArray(wellnessScores.userId, ctx.userIds))
-    .orderBy(asc(wellnessScores.periodMonth));
-
-  if (rows.length > 0) {
-    const latest = rows[rows.length - 1]!;
-    const prior = rows[rows.length - 2];
-    const dimensions =
-      (latest.dimensions as WellnessResponse["dimensions"] | undefined) ?? [];
-
-    return {
-      score: latest.score,
-      delta: prior ? latest.score - prior.score : 0,
-      history: rows.map((r) => ({ month: r.periodMonth.slice(5), score: r.score })),
-      dimensions,
-      isLive: true,
-    };
+  const { hasActiveAccounts } = await resolveActiveAccountScope(ctx.userIds);
+  if (!hasActiveAccounts) {
+    return emptyWellnessResponse();
   }
-
   return computeWellnessFromTransactions(ctx.userIds);
 }
 
@@ -63,21 +58,12 @@ export interface DnaResponse {
 
 export async function getDna(userId: string): Promise<DnaResponse | null> {
   const ctx = await resolveHouseholdContext(userId);
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(spendingDna)
-    .where(inArray(spendingDna.userId, ctx.userIds))
-    .limit(1);
-  if (!row) {
+  const { hasActiveAccounts } = await resolveActiveAccountScope(ctx.userIds);
+  if (!hasActiveAccounts) {
     return null;
   }
-  return {
-    archetype: row.archetype,
-    narrative: row.narrative,
-    peerRarity: row.peerRarity,
-    axes: (row.axes as DnaResponse["axes"]) ?? [],
-  };
+  void ctx;
+  return null;
 }
 
 export interface PatternsResponse {
@@ -92,26 +78,11 @@ export interface PatternsResponse {
 
 export async function getPatterns(userId: string): Promise<PatternsResponse> {
   const ctx = await resolveHouseholdContext(userId);
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(spendingPatterns)
-    .where(inArray(spendingPatterns.userId, ctx.userIds))
-    .orderBy(asc(spendingPatterns.sortOrder));
-
-  return {
-    dayOfWeek: rows
-      .filter((r) => r.kind === "day_of_week")
-      .map((r) => ({ day: r.label, value: r.metric ?? "0.00" })),
-    patterns: rows
-      .filter((r) => r.kind === "pattern")
-      .map((r) => ({
-        label: r.label,
-        value: r.metric ?? "",
-        description: r.description ?? "",
-        severity: r.severity ?? "neutral",
-      })),
-  };
+  const { hasActiveAccounts } = await resolveActiveAccountScope(ctx.userIds);
+  if (!hasActiveAccounts) {
+    return { dayOfWeek: [], patterns: [] };
+  }
+  return computePatternsFromTransactions(ctx.userIds);
 }
 
 const REASON_META: Record<
@@ -163,7 +134,28 @@ export async function getBehavioral(
   userId: string,
 ): Promise<BehavioralResponse> {
   const ctx = await resolveHouseholdContext(userId);
+  const { accountIds, hasActiveAccounts } =
+    await resolveActiveAccountScope(ctx.userIds);
   const db = getDb();
+
+  if (!hasActiveAccounts) {
+    return {
+      archetype: "—",
+      creep: { months: [], income: [], spending: [] },
+      reasons: Object.entries(REASON_META).map(([id, meta]) => ({
+        id,
+        emoji: meta.emoji,
+        label: meta.label,
+        color: meta.color,
+        total: "0.00",
+      })),
+      taggedTransactions: [],
+      challenges: [],
+      streaks: [],
+    };
+  }
+
+  const txScope = drizzleActiveTransactionWhere(ctx.userIds, accountIds);
 
   const monthly = await db
     .select({
@@ -172,12 +164,7 @@ export async function getBehavioral(
       spending: sql<string>`coalesce(sum(case when ${transactions.transactionType} = 'expense' and ${transactions.isTransfer} = false then ${transactions.amount} else 0 end), 0)`,
     })
     .from(transactions)
-    .where(
-      and(
-        inArray(transactions.userId, ctx.userIds),
-        eq(transactions.pending, false),
-      ),
-    )
+    .where(and(txScope, eq(transactions.pending, false)))
     .groupBy(sql`to_char(${transactions.date}, 'YYYY-MM')`)
     .orderBy(sql`to_char(${transactions.date}, 'YYYY-MM')`);
   const lastTen = monthly.slice(-10);
@@ -193,7 +180,12 @@ export async function getBehavioral(
     })
     .from(transactionReasons)
     .innerJoin(transactions, eq(transactionReasons.transactionId, transactions.id))
-    .where(inArray(transactionReasons.userId, ctx.userIds));
+    .where(
+      and(
+        inArray(transactionReasons.userId, ctx.userIds),
+        inArray(transactions.accountId, accountIds),
+      ),
+    );
 
   const reasonTotals = new Map<string, number>();
   for (const t of tagged) {
@@ -219,7 +211,7 @@ export async function getBehavioral(
     .where(inArray(habitStreaks.userId, ctx.userIds));
 
   return {
-    archetype: dna?.archetype ?? "The Spender",
+    archetype: dna?.archetype ?? "—",
     creep: {
       months: lastTen.map((r) => r.month.slice(5)),
       income: lastTen.map((r) => formatMoneyAmount(r.income)),

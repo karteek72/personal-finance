@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useFire } from "@/hooks/use-features";
-
-const FALLBACK_AGE = 29;
-const FALLBACK_NET_WORTH = 84000;
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -24,10 +26,17 @@ function yearsToTarget(start: number, monthly: number, target: number, annualRet
 }
 
 export function FirePanel() {
-  const { data: fire } = useFire();
+  const gate = useFeaturePanelGate("FIRE projection");
+  const { data: fire, isLoading, isError } = useFire();
 
-  const CURRENT_AGE = fire?.currentAge ?? FALLBACK_AGE;
-  const CURRENT_NET_WORTH = fire ? Number.parseFloat(fire.currentNetWorth) : FALLBACK_NET_WORTH;
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
+  if (isError || !fire) {
+    return <FeatureEmptyState feature="FIRE projection" variant="insufficient-data" />;
+  }
+
+  const CURRENT_AGE = fire.currentAge;
+  const CURRENT_NET_WORTH = Number.parseFloat(fire.currentNetWorth);
 
   const [monthlySpend, setMonthlySpend] = useState(4200);
   const [monthlyInvest, setMonthlyInvest] = useState(2100);

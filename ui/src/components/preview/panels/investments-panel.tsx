@@ -3,6 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useInvestments } from "@/hooks/use-features";
 
@@ -15,33 +20,6 @@ interface Holding {
   sector: string;
 }
 
-const FALLBACK_HOLDINGS: Holding[] = [
-  { ticker: "AAPL", name: "Apple Inc.", shares: 12, costBasis: 142, currentPrice: 211, sector: "Technology" },
-  { ticker: "VOO", name: "Vanguard S&P 500", shares: 8, costBasis: 380, currentPrice: 498, sector: "ETF" },
-  { ticker: "MSFT", name: "Microsoft Corp.", shares: 5, costBasis: 310, currentPrice: 421, sector: "Technology" },
-  { ticker: "TSLA", name: "Tesla Inc.", shares: 15, costBasis: 248, currentPrice: 176, sector: "Auto" },
-  { ticker: "AMZN", name: "Amazon.com Inc.", shares: 3, costBasis: 155, currentPrice: 202, sector: "Consumer" },
-  { ticker: "BTC", name: "Bitcoin", shares: 0.12, costBasis: 38000, currentPrice: 69400, sector: "Crypto" },
-];
-
-const FALLBACK_BEHAVIORAL_ALERTS = [
-  {
-    type: "warning",
-    title: "Panic sell pattern detected",
-    desc: "You sold TSLA three times during market dips > 5%. All three positions recovered within 14 days — avg opportunity cost: $840",
-  },
-  {
-    type: "info",
-    title: "Sector concentration",
-    desc: "62% of your portfolio is in Technology. Consider diversifying to reduce correlated risk.",
-  },
-  {
-    type: "positive",
-    title: "Spend-to-invest correlation",
-    desc: "On weeks markets dropped >2%, you spent 23% more on dining and entertainment. This week the market is down 3.1%.",
-  },
-];
-
 function fmt(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 }
@@ -52,26 +30,26 @@ function pct(cost: number, current: number) {
 
 export function InvestmentsPanel() {
   const [activeTab, setActiveTab] = useState<"portfolio" | "behavioral">("portfolio");
+  const gate = useFeaturePanelGate("investments");
   const { data, isLoading } = useAccounts();
   const { data: investments } = useInvestments();
+
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
 
   const investmentAccounts = (data?.accounts ?? []).filter((a) => a.type === "investment");
   const portfolioValue = investmentAccounts.reduce((s, a) => s + Number.parseFloat(a.balanceCurrent ?? "0"), 0);
 
-  const holdings: Holding[] = investments?.holdings.length
-    ? investments.holdings.map((h) => ({
-        ticker: h.ticker,
-        name: h.name,
-        shares: h.quantity,
-        costBasis: Number.parseFloat(h.costBasis),
-        currentPrice: Number.parseFloat(h.currentPrice),
-        sector: h.sector ?? h.assetType,
-      }))
-    : FALLBACK_HOLDINGS;
+  const holdings: Holding[] = (investments?.holdings ?? []).map((h) => ({
+    ticker: h.ticker,
+    name: h.name,
+    shares: h.quantity,
+    costBasis: Number.parseFloat(h.costBasis),
+    currentPrice: Number.parseFloat(h.currentPrice),
+    sector: h.sector ?? h.assetType,
+  }));
 
-  const behavioralAlerts = investments?.behavioralAlerts.length
-    ? investments.behavioralAlerts
-    : FALLBACK_BEHAVIORAL_ALERTS;
+  const behavioralAlerts = investments?.behavioralAlerts ?? [];
 
   return (
     <div className="space-y-5">

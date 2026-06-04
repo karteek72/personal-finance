@@ -2,23 +2,12 @@
 
 import { useState } from "react";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useBudgets } from "@/hooks/use-features";
-
-const FALLBACK_BUDGETS = [
-  { category: "Food & Dining", emoji: "🍔", spent: 487, limit: 600, color: "#f97316" },
-  { category: "Transport", emoji: "🚗", spent: 210, limit: 250, color: "#3b82f6" },
-  { category: "Shopping", emoji: "🛍️", spent: 340, limit: 300, color: "#ef4444" },
-  { category: "Entertainment", emoji: "🎬", spent: 89, limit: 150, color: "#a855f7" },
-  { category: "Health & Fitness", emoji: "💪", spent: 55, limit: 80, color: "#22c55e" },
-  { category: "Travel", emoji: "✈️", spent: 0, limit: 400, color: "#06b6d4" },
-  { category: "Personal Care", emoji: "🧴", spent: 62, limit: 100, color: "#ec4899" },
-];
-
-const FALLBACK_GOALS = [
-  { name: "Emergency Fund", target: 10000, current: 6420, deadline: "Dec 2026", color: "#22c55e", emoji: "🛡️" },
-  { name: "Japan Trip", target: 4500, current: 1800, deadline: "Aug 2026", color: "#3b82f6", emoji: "✈️" },
-  { name: "New MacBook", target: 2500, current: 2200, deadline: "Jul 2026", color: "#a855f7", emoji: "💻" },
-];
 
 const DEFAULT_BUDGET_COLOR = "#3b82f6";
 const DEFAULT_GOAL_COLOR = "#22c55e";
@@ -29,35 +18,37 @@ function formatMoney(n: number) {
 
 export function BudgetsPanel() {
   const [activeTab, setActiveTab] = useState<"budgets" | "goals">("budgets");
+  const gate = useFeaturePanelGate("budgets and goals");
   const { data, isLoading } = useBudgets();
 
-  const budgets = data?.budgets.length
-    ? data.budgets.map((b) => ({
-        category: b.category,
-        emoji: b.emoji ?? "💸",
-        spent: Number.parseFloat(b.spent),
-        limit: Number.parseFloat(b.limit),
-        color: b.color ?? DEFAULT_BUDGET_COLOR,
-      }))
-    : isLoading
-      ? []
-      : FALLBACK_BUDGETS;
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
 
-  const goals = data?.goals.length
-    ? data.goals.map((g) => ({
-        name: g.name,
-        emoji: g.emoji ?? "🎯",
-        target: Number.parseFloat(g.target),
-        current: Number.parseFloat(g.current),
-        deadline: g.deadline ?? "—",
-        color: g.color ?? DEFAULT_GOAL_COLOR,
-      }))
-    : isLoading
-      ? []
-      : FALLBACK_GOALS;
+  const budgets = (data?.budgets ?? []).map((b) => ({
+    category: b.category,
+    emoji: b.emoji ?? "💸",
+    spent: Number.parseFloat(b.spent),
+    limit: Number.parseFloat(b.limit),
+    color: b.color ?? DEFAULT_BUDGET_COLOR,
+  }));
 
-  const safeToSpend = data ? Number.parseFloat(data.safeToSpend) : 47;
-  const daysRemaining = data?.daysRemaining ?? 27;
+  const goals = (data?.goals ?? []).map((g) => ({
+    name: g.name,
+    emoji: g.emoji ?? "🎯",
+    target: Number.parseFloat(g.target),
+    current: Number.parseFloat(g.current),
+    deadline: g.deadline ?? "—",
+    color: g.color ?? DEFAULT_GOAL_COLOR,
+  }));
+
+  if (budgets.length === 0 && goals.length === 0) {
+    return (
+      <FeatureEmptyState feature="budgets and goals" variant="insufficient-data" />
+    );
+  }
+
+  const safeToSpend = data ? Number.parseFloat(data.safeToSpend) : 0;
+  const daysRemaining = data?.daysRemaining ?? 0;
   const totalBudget = budgets.reduce((s, b) => s + b.limit, 0);
   const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
 

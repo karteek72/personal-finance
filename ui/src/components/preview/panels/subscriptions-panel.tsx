@@ -15,19 +15,6 @@ interface Sub {
   oldAmount: number;
 }
 
-const FALLBACK_SUBS: Sub[] = [
-  { name: "Netflix", amount: 17.99, category: "Entertainment", nextDate: "Jun 12", logo: "N", color: "#e50914", changed: true, oldAmount: 15.99 },
-  { name: "Spotify", amount: 11.99, category: "Entertainment", nextDate: "Jun 15", logo: "S", color: "#1db954", changed: false, oldAmount: 0 },
-  { name: "Amazon Prime", amount: 14.99, category: "Shopping", nextDate: "Jun 22", logo: "A", color: "#ff9900", changed: false, oldAmount: 0 },
-  { name: "ChatGPT Plus", amount: 20.00, category: "Productivity", nextDate: "Jun 8", logo: "C", color: "#74aa9c", changed: false, oldAmount: 0 },
-  { name: "Adobe Creative Cloud", amount: 54.99, category: "Software", nextDate: "Jun 18", logo: "Ai", color: "#ff0000", changed: false, oldAmount: 0 },
-  { name: "Apple iCloud+", amount: 2.99, category: "Storage", nextDate: "Jun 5", logo: "☁", color: "#555", changed: false, oldAmount: 0 },
-  { name: "Hulu", amount: 17.99, category: "Entertainment", nextDate: "Jun 28", logo: "H", color: "#1ce783", changed: false, oldAmount: 0 },
-  { name: "New York Times", amount: 4.00, category: "News", nextDate: "Jun 30", logo: "T", color: "#000", changed: false, oldAmount: 0 },
-  { name: "Notion", amount: 16.00, category: "Productivity", nextDate: "Jun 10", logo: "N", color: "#333", changed: false, oldAmount: 0 },
-  { name: "Duolingo Plus", amount: 6.99, category: "Education", nextDate: "Jul 3", logo: "D", color: "#58cc02", changed: false, oldAmount: 0 },
-];
-
 function shortDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -39,25 +26,25 @@ export function SubscriptionsPanel() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const { data, isLoading } = useRecurring();
 
-  const subs: Sub[] = data?.subscriptions.length
-    ? data.subscriptions.map((s) => ({
-        name: s.merchantName,
-        amount: Number.parseFloat(s.amount),
-        category: s.category,
-        nextDate: shortDate(s.nextChargeDate),
-        logo: s.merchantName.slice(0, 1).toUpperCase(),
-        color: s.brandColor ?? "#6366f1",
-        changed: s.priceChanged,
-        oldAmount: s.previousAmount ? Number.parseFloat(s.previousAmount) : 0,
-      }))
-    : isLoading
-      ? []
-      : FALLBACK_SUBS;
+  const subs: Sub[] = (data?.subscriptions ?? []).map((s) => ({
+    name: s.merchantName,
+    amount: Number.parseFloat(s.amount),
+    category: s.category,
+    nextDate: shortDate(s.nextChargeDate),
+    logo: s.merchantName.slice(0, 1).toUpperCase(),
+    color: s.brandColor ?? "#6366f1",
+    changed: s.priceChanged,
+    oldAmount: s.previousAmount ? Number.parseFloat(s.previousAmount) : 0,
+  }));
 
   const active = subs.filter((s) => !dismissed.has(s.name));
   const monthly = active.reduce((sum, s) => sum + s.amount, 0);
   const annual = monthly * 12;
   const priceChanges = active.filter((s) => s.changed);
+
+  if (!isLoading && subs.length === 0) {
+    return <p className="text-xs text-text-muted">No recurring subscriptions detected yet.</p>;
+  }
 
   return (
     <div className="space-y-5">

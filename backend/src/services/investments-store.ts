@@ -51,6 +51,7 @@ export async function getInvestments(
       and(
         inArray(accounts.userId, ctx.userIds),
         eq(accounts.type, "investment"),
+        eq(accounts.isActive, true),
       ),
     );
 
@@ -149,7 +150,12 @@ export async function getNetWorth(userId: string): Promise<NetWorthResponse> {
   const accountRows = await db
     .select()
     .from(accounts)
-    .where(inArray(accounts.userId, ctx.userIds));
+    .where(
+      and(
+        inArray(accounts.userId, ctx.userIds),
+        eq(accounts.isActive, true),
+      ),
+    );
 
   let assets = 0;
   let liabilities = 0;

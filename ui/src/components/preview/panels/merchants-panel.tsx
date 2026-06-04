@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useMerchants } from "@/hooks/use-features";
 
 interface Merchant {
@@ -12,20 +17,6 @@ interface Merchant {
   trend: number; // % MoM
   trail: number[]; // 6-month spend trail
 }
-
-const FALLBACK_MERCHANTS: Merchant[] = [
-  { name: "Amazon", emoji: "📦", visits: 41, total: 1284.5, trend: 12, trail: [180, 210, 240, 260, 300, 320] },
-  { name: "Whole Foods", emoji: "🛒", visits: 28, total: 1102.0, trend: -4, trail: [210, 200, 190, 195, 185, 180] },
-  { name: "DoorDash", emoji: "🍔", visits: 34, total: 968.3, trend: 23, trail: [110, 130, 140, 170, 190, 228] },
-  { name: "Shell", emoji: "⛽", visits: 19, total: 642.1, trend: 2, trail: [100, 105, 108, 110, 108, 111] },
-  { name: "Starbucks", emoji: "☕", visits: 47, total: 416.8, trend: 8, trail: [58, 62, 66, 70, 74, 80] },
-  { name: "Uber", emoji: "🚕", visits: 22, total: 388.0, trend: -11, trail: [80, 78, 70, 64, 60, 56] },
-];
-
-const FALLBACK_INCOME_MONTHS = ["Dec", "Jan", "Feb", "Mar", "Apr", "May"];
-const FALLBACK_INCOME = [6520, 6520, 6520, 7100, 6520, 7340];
-const FALLBACK_SIDE_INCOME = [0, 240, 0, 420, 180, 610];
-const FALLBACK_SOURCES = 3;
 
 function money(n: number) {
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: n % 1 === 0 ? 0 : 2 })}`;
@@ -47,24 +38,32 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 
 export function MerchantsPanel() {
   const [tab, setTab] = useState<"merchants" | "income">("merchants");
-  const { data } = useMerchants();
+  const gate = useFeaturePanelGate("merchant and income insights");
+  const { data, isLoading } = useMerchants();
 
-  const MERCHANTS: Merchant[] = data?.merchants.length
-    ? data.merchants.map((m) => ({
-        name: m.name,
-        emoji: m.emoji,
-        visits: m.visits,
-        total: Number.parseFloat(m.total),
-        trend: m.trend,
-        trail: m.trail,
-      }))
-    : FALLBACK_MERCHANTS;
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
 
-  const INCOME_MONTHS = data?.income.months.length ? data.income.months : FALLBACK_INCOME_MONTHS;
-  const INCOME = data?.income.primary.length ? data.income.primary : FALLBACK_INCOME;
-  const SIDE_INCOME = data?.income.side.length ? data.income.side : FALLBACK_SIDE_INCOME;
-  const sources = data?.incomeSources ?? FALLBACK_SOURCES;
-  const merchantCount = data?.merchantCount ?? 63;
+  const MERCHANTS: Merchant[] = (data?.merchants ?? []).map((m) => ({
+    name: m.name,
+    emoji: m.emoji,
+    visits: m.visits,
+    total: Number.parseFloat(m.total),
+    trend: m.trend,
+    trail: m.trail,
+  }));
+
+  const INCOME_MONTHS = data?.income.months ?? [];
+  const INCOME = data?.income.primary ?? [];
+  const SIDE_INCOME = data?.income.side ?? [];
+  const sources = data?.incomeSources ?? 0;
+  const merchantCount = data?.merchantCount ?? 0;
+
+  if (MERCHANTS.length === 0 && INCOME.length === 0) {
+    return (
+      <FeatureEmptyState feature="merchant and income insights" variant="insufficient-data" />
+    );
+  }
 
   const topMerchant = [...MERCHANTS].sort((a, b) => b.total - a.total)[0];
   const mostVisited = [...MERCHANTS].sort((a, b) => b.visits - a.visits)[0];

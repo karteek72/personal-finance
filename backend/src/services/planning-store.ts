@@ -11,6 +11,10 @@ import {
 } from "../db/schema.js";
 import { formatMoneyAmount, roundDecimal } from "../lib/money.js";
 import { categoryMeta } from "./category-meta.js";
+import {
+  drizzleActiveTransactionWhere,
+  resolveActiveAccountScope,
+} from "./active-account-scope.js";
 import { detectRecurringFromTransactions } from "./detect-recurring.js";
 import { resolveHouseholdContext } from "./household-access.js";
 
@@ -32,11 +36,16 @@ const MONTH_LABELS = [
 
 /** Latest transaction month (YYYY-MM) for the household, or current month. */
 async function latestMonth(userIds: string[]): Promise<string> {
+  const { accountIds, hasActiveAccounts } =
+    await resolveActiveAccountScope(userIds);
+  if (!hasActiveAccounts) {
+    return new Date().toISOString().slice(0, 7);
+  }
   const db = getDb();
   const [row] = await db
     .select({ maxDate: sql<string | null>`max(${transactions.date})` })
     .from(transactions)
-    .where(inArray(transactions.userId, userIds));
+    .where(drizzleActiveTransactionWhere(userIds, accountIds));
   const maxDate = row?.maxDate;
   if (maxDate) {
     return maxDate.slice(0, 7);
@@ -74,6 +83,8 @@ export interface BudgetsResponse {
 
 export async function getBudgets(userId: string): Promise<BudgetsResponse> {
   const ctx = await resolveHouseholdContext(userId);
+  const { accountIds, hasActiveAccounts } =
+    await resolveActiveAccountScope(ctx.userIds);
   const db = getDb();
 
   const budgetRows = await db
@@ -85,23 +96,25 @@ export async function getBudgets(userId: string): Promise<BudgetsResponse> {
   const configured = budgetRows.filter((b) => b.periodMonth === period);
   const { start, end } = monthBounds(period);
 
-  const spentRows = await db
-    .select({
-      category: transactions.category,
-      total: sql<string>`sum(${transactions.amount})`,
-    })
-    .from(transactions)
-    .where(
-      and(
-        inArray(transactions.userId, ctx.userIds),
-        eq(transactions.transactionType, "expense"),
-        eq(transactions.isTransfer, false),
-        eq(transactions.pending, false),
-        gte(transactions.date, start),
-        lte(transactions.date, end),
-      ),
-    )
-    .groupBy(transactions.category);
+  const spentRows = hasActiveAccounts
+    ? await db
+        .select({
+          category: transactions.category,
+          total: sql<string>`sum(${transactions.amount})`,
+        })
+        .from(transactions)
+        .where(
+          and(
+            drizzleActiveTransactionWhere(ctx.userIds, accountIds),
+            eq(transactions.transactionType, "expense"),
+            eq(transactions.isTransfer, false),
+            eq(transactions.pending, false),
+            gte(transactions.date, start),
+            lte(transactions.date, end),
+          ),
+        )
+        .groupBy(transactions.category)
+    : [];
   const spentByCategory = new Map(
     spentRows.map((r) => [r.category, Number.parseFloat(r.total ?? "0")]),
   );
@@ -136,23 +149,25 @@ export async function getBudgets(userId: string): Promise<BudgetsResponse> {
     const avgByCategory = new Map<string, number[]>();
     for (const pm of priorMonths) {
       const bounds = monthBounds(pm);
-      const rows = await db
-        .select({
-          category: transactions.category,
-          total: sql<string>`sum(${transactions.amount})`,
-        })
-        .from(transactions)
-        .where(
-          and(
-            inArray(transactions.userId, ctx.userIds),
-            eq(transactions.transactionType, "expense"),
-            eq(transactions.isTransfer, false),
-            eq(transactions.pending, false),
-            gte(transactions.date, bounds.start),
-            lte(transactions.date, bounds.end),
-          ),
-        )
-        .groupBy(transactions.category);
+      const rows = hasActiveAccounts
+        ? await db
+            .select({
+              category: transactions.category,
+              total: sql<string>`sum(${transactions.amount})`,
+            })
+            .from(transactions)
+            .where(
+              and(
+                drizzleActiveTransactionWhere(ctx.userIds, accountIds),
+                eq(transactions.transactionType, "expense"),
+                eq(transactions.isTransfer, false),
+                eq(transactions.pending, false),
+                gte(transactions.date, bounds.start),
+                lte(transactions.date, bounds.end),
+              ),
+            )
+            .groupBy(transactions.category)
+        : [];
       for (const r of rows) {
         const list = avgByCategory.get(r.category) ?? [];
         list.push(Number.parseFloat(r.total ?? "0"));
@@ -261,12 +276,16 @@ interface RecurringItem {
 
 export async function getRecurring(userId: string): Promise<RecurringResponse> {
   const ctx = await resolveHouseholdContext(userId);
+  const { accountIds, hasActiveAccounts } =
+    await resolveActiveAccountScope(ctx.userIds);
   const db = getDb();
 
-  const rows = await db
-    .select()
-    .from(recurringSeries)
-    .where(inArray(recurringSeries.userId, ctx.userIds));
+  const rows = hasActiveAccounts
+    ? await db
+        .select()
+        .from(recurringSeries)
+        .where(inArray(recurringSeries.userId, ctx.userIds))
+    : [];
 
   const toItem = (r: (typeof rows)[number]): RecurringItem => ({
     merchantName: r.merchantName,
@@ -330,26 +349,30 @@ export async function getRecurring(userId: string): Promise<RecurringResponse> {
     0,
   );
 
-  const feeRows = await db
-    .select({
-      subCategory: transactions.subCategory,
-      total: sql<string>`sum(${transactions.amount})`,
-      count: sql<number>`count(*)::int`,
-    })
-    .from(transactions)
-    .where(
-      and(
-        inArray(transactions.userId, ctx.userIds),
-        eq(transactions.subCategory, "Bank Fees"),
-      ),
-    )
-    .groupBy(transactions.subCategory);
+  const feeRows = hasActiveAccounts
+    ? await db
+        .select({
+          subCategory: transactions.subCategory,
+          total: sql<string>`sum(${transactions.amount})`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(transactions)
+        .where(
+          and(
+            drizzleActiveTransactionWhere(ctx.userIds, accountIds),
+            eq(transactions.subCategory, "Bank Fees"),
+          ),
+        )
+        .groupBy(transactions.subCategory)
+    : [];
   const bankFees = feeRows[0];
 
-  const habitRows = await db
-    .select()
-    .from(lifestyleHabits)
-    .where(inArray(lifestyleHabits.userId, ctx.userIds));
+  const habitRows = hasActiveAccounts
+    ? await db
+        .select()
+        .from(lifestyleHabits)
+        .where(inArray(lifestyleHabits.userId, ctx.userIds))
+    : [];
 
   return {
     monthlyTotal: formatMoneyAmount(monthlyTotal),
@@ -391,6 +414,10 @@ export interface FireResponse {
 
 export async function getFire(userId: string): Promise<FireResponse | null> {
   const ctx = await resolveHouseholdContext(userId);
+  const { hasActiveAccounts } = await resolveActiveAccountScope(ctx.userIds);
+  if (!hasActiveAccounts) {
+    return null;
+  }
   const db = getDb();
   const [row] = await db
     .select()
@@ -421,6 +448,8 @@ export interface CalendarResponse {
 /** Money calendar for the latest month — derived from recurring series + transactions. */
 export async function getCalendar(userId: string): Promise<CalendarResponse> {
   const ctx = await resolveHouseholdContext(userId);
+  const { accountIds, hasActiveAccounts } =
+    await resolveActiveAccountScope(ctx.userIds);
   const db = getDb();
 
   const month = await latestMonth(ctx.userIds);
@@ -456,22 +485,24 @@ export async function getCalendar(userId: string): Promise<CalendarResponse> {
     });
   }
 
-  const incomeRows = await db
-    .select({
-      date: transactions.date,
-      name: transactions.name,
-      amount: sql<string>`sum(abs(${transactions.amount}))`,
-    })
-    .from(transactions)
-    .where(
-      and(
-        inArray(transactions.userId, ctx.userIds),
-        eq(transactions.transactionType, "income"),
-        gte(transactions.date, start),
-        lte(transactions.date, end),
-      ),
-    )
-    .groupBy(transactions.date, transactions.name);
+  const incomeRows = hasActiveAccounts
+    ? await db
+        .select({
+          date: transactions.date,
+          name: transactions.name,
+          amount: sql<string>`sum(abs(${transactions.amount}))`,
+        })
+        .from(transactions)
+        .where(
+          and(
+            drizzleActiveTransactionWhere(ctx.userIds, accountIds),
+            eq(transactions.transactionType, "income"),
+            gte(transactions.date, start),
+            lte(transactions.date, end),
+          ),
+        )
+        .groupBy(transactions.date, transactions.name)
+    : [];
   let incomeTotal = 0;
   for (const r of incomeRows) {
     const amount = Number.parseFloat(r.amount ?? "0");
@@ -484,23 +515,25 @@ export async function getCalendar(userId: string): Promise<CalendarResponse> {
     });
   }
 
-  const dailyRows = await db
-    .select({
-      date: transactions.date,
-      total: sql<string>`sum(${transactions.amount})`,
-    })
-    .from(transactions)
-    .where(
-      and(
-        inArray(transactions.userId, ctx.userIds),
-        eq(transactions.transactionType, "expense"),
-        eq(transactions.isTransfer, false),
-        eq(transactions.pending, false),
-        gte(transactions.date, start),
-        lte(transactions.date, end),
-      ),
-    )
-    .groupBy(transactions.date);
+  const dailyRows = hasActiveAccounts
+    ? await db
+        .select({
+          date: transactions.date,
+          total: sql<string>`sum(${transactions.amount})`,
+        })
+        .from(transactions)
+        .where(
+          and(
+            drizzleActiveTransactionWhere(ctx.userIds, accountIds),
+            eq(transactions.transactionType, "expense"),
+            eq(transactions.isTransfer, false),
+            eq(transactions.pending, false),
+            gte(transactions.date, start),
+            lte(transactions.date, end),
+          ),
+        )
+        .groupBy(transactions.date)
+    : [];
   const spendByDay = new Map<number, number>();
   for (const r of dailyRows) {
     const day = Number(r.date.slice(8, 10));

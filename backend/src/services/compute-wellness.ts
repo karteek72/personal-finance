@@ -2,8 +2,12 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { accounts, savingsGoals, transactions } from "../db/schema.js";
 import { formatMoneyAmount, roundPercent } from "../lib/money.js";
+import {
+  drizzleActiveTransactionWhere,
+  resolveActiveAccountScope,
+} from "./active-account-scope.js";
+import { emptyWellnessResponse, type WellnessResponse } from "./insights-store.js";
 import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
-import type { WellnessResponse } from "./insights-store.js";
 
 function clampScore(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
@@ -27,6 +31,7 @@ function monthBounds(period: string): { start: string; end: string } {
 
 async function monthTotals(
   userIds: string[],
+  accountIds: string[],
   period: string,
 ): Promise<{ income: number; spending: number; savingsRate: number }> {
   const db = getDb();
@@ -39,7 +44,7 @@ async function monthTotals(
     .from(transactions)
     .where(
       and(
-        inArray(transactions.userId, userIds),
+        drizzleActiveTransactionWhere(userIds, accountIds),
         eq(transactions.pending, false),
         sql`${transactions.date} >= ${start} and ${transactions.date} <= ${end}`,
       ),
@@ -164,15 +169,20 @@ function compositeScore(dimensions: WellnessResponse["dimensions"]): number {
 export async function computeWellnessFromTransactions(
   userIds: string[],
 ): Promise<WellnessResponse> {
+  const { accountIds, hasActiveAccounts } =
+    await resolveActiveAccountScope(userIds);
+  if (!hasActiveAccounts) {
+    return emptyWellnessResponse();
+  }
+
   const db = getDb();
+  const txScope = drizzleActiveTransactionWhere(userIds, accountIds);
   const months = await db
     .select({
       month: sql<string>`to_char(${transactions.date}, 'YYYY-MM')`,
     })
     .from(transactions)
-    .where(
-      and(inArray(transactions.userId, userIds), eq(transactions.pending, false)),
-    )
+    .where(and(txScope, eq(transactions.pending, false)))
     .groupBy(sql`to_char(${transactions.date}, 'YYYY-MM')`)
     .orderBy(sql`to_char(${transactions.date}, 'YYYY-MM')`);
 
@@ -180,7 +190,7 @@ export async function computeWellnessFromTransactions(
   const history: WellnessResponse["history"] = [];
 
   for (const mk of monthKeys) {
-    const totals = await monthTotals(userIds, mk);
+    const totals = await monthTotals(userIds, accountIds, mk);
     const { liquidCash, creditBalance, creditLimit } = await accountMetrics(userIds);
     const utilization =
       creditLimit > 0 ? (creditBalance / creditLimit) * 100 : 0;
@@ -200,10 +210,10 @@ export async function computeWellnessFromTransactions(
   }
 
   const latestPeriod = monthKeys[monthKeys.length - 1] ?? new Date().toISOString().slice(0, 7);
-  const latestTotals = await monthTotals(userIds, latestPeriod);
+  const latestTotals = await monthTotals(userIds, accountIds, latestPeriod);
   const priorPeriod = monthKeys[monthKeys.length - 2];
   const priorTotals = priorPeriod
-    ? await monthTotals(userIds, priorPeriod)
+    ? await monthTotals(userIds, accountIds, priorPeriod)
     : null;
 
   const { liquidCash, creditBalance, creditLimit } = await accountMetrics(userIds);
@@ -270,10 +280,23 @@ export interface MonthlySummary {
 export async function buildMonthlySummary(
   userIds: string[],
 ): Promise<MonthlySummary> {
+  const { accountIds, hasActiveAccounts } =
+    await resolveActiveAccountScope(userIds);
   const period = new Date().toISOString().slice(0, 7);
-  const totals = await monthTotals(userIds, period);
+  if (!hasActiveAccounts) {
+    return {
+      period,
+      income: "0.00",
+      spending: "0.00",
+      savingsRate: 0,
+      topCategory: null,
+      safeToSpend: "0.00",
+    };
+  }
+  const totals = await monthTotals(userIds, accountIds, period);
   const { start, end } = monthBounds(period);
   const db = getDb();
+  const txScope = drizzleActiveTransactionWhere(userIds, accountIds);
 
   const [top] = await db
     .select({
@@ -283,7 +306,7 @@ export async function buildMonthlySummary(
     .from(transactions)
     .where(
       and(
-        inArray(transactions.userId, userIds),
+        txScope,
         eq(transactions.transactionType, "expense"),
         eq(transactions.isTransfer, false),
         eq(transactions.pending, false),

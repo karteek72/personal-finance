@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useForecast } from "@/hooks/use-features";
 
 type Weather = "sunny" | "partly" | "cloudy" | "stormy";
@@ -25,39 +30,37 @@ function asWeather(w: string): Weather {
   return w === "sunny" || w === "partly" || w === "cloudy" || w === "stormy" ? w : "cloudy";
 }
 
-const FALLBACK_FORECAST: DayForecast[] = [
-  { date: "Jun 3", weekday: "Tue", weather: "sunny", projectedBalance: 4120, note: "No bills. Spending pace healthy." },
-  { date: "Jun 4", weekday: "Wed", weather: "sunny", projectedBalance: 4060, note: "Clear skies." },
-  { date: "Jun 5", weekday: "Thu", weather: "partly", projectedBalance: 3910, note: "iCloud + grocery run expected." },
-  { date: "Jun 6", weekday: "Fri", weather: "cloudy", projectedBalance: 3640, note: "Weekend spending typically spikes." },
-  { date: "Jun 7", weekday: "Sat", weather: "stormy", projectedBalance: 3180, note: "Electricity bill + dining surge risk." },
-  { date: "Jun 8", weekday: "Sun", weather: "cloudy", projectedBalance: 3010, note: "Recovery, but tight." },
-  { date: "Jun 9", weekday: "Mon", weather: "partly", projectedBalance: 2980, note: "Stabilizing before payday." },
-];
-
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
 }
 
 export function ForecastPanel() {
   const [selected, setSelected] = useState(0);
-  const { data } = useForecast();
+  const gate = useFeaturePanelGate("cash-flow forecast");
+  const { data, isLoading } = useForecast();
 
-  const FORECAST: DayForecast[] = data?.days.length
-    ? data.days.map((d) => ({
-        date: d.date,
-        weekday: d.weekday,
-        weather: asWeather(d.weather),
-        projectedBalance: Number.parseFloat(d.projectedBalance),
-        note: d.note,
-      }))
-    : FALLBACK_FORECAST;
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
+
+  const FORECAST: DayForecast[] = (data?.days ?? []).map((d) => ({
+    date: d.date,
+    weekday: d.weekday,
+    weather: asWeather(d.weather),
+    projectedBalance: Number.parseFloat(d.projectedBalance),
+    note: d.note,
+  }));
+
+  if (FORECAST.length === 0) {
+    return <FeatureEmptyState feature="cash-flow forecast" variant="insufficient-data" />;
+  }
 
   const today = FORECAST[selected] ?? FORECAST[0]!;
   const meta = WEATHER_META[today.weather];
 
   const stormyDays = FORECAST.filter((d) => d.weather === "stormy" || d.weather === "cloudy").length;
-  const minBalance = data ? Number.parseFloat(data.minBalance) : Math.min(...FORECAST.map((d) => d.projectedBalance));
+  const minBalance = Number.parseFloat(
+    data?.minBalance ?? String(Math.min(...FORECAST.map((d) => d.projectedBalance))),
+  );
   const lowestDay = data?.lowestDay ?? "Jun 9";
   const nextClearDate = data?.nextClearDate ?? "Jun 14";
   const comfortFloor = data ? Number.parseFloat(data.comfortFloor) : 2500;

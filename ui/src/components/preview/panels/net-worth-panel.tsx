@@ -6,17 +6,6 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useNetWorth } from "@/hooks/use-features";
 import type { Account } from "@/types/api";
 
-const FALLBACK_TREND = [
-  { month: "Oct", value: 62000 },
-  { month: "Nov", value: 64200 },
-  { month: "Dec", value: 63800 },
-  { month: "Jan", value: 67100 },
-  { month: "Feb", value: 69500 },
-  { month: "Mar", value: 71200 },
-  { month: "Apr", value: 74800 },
-  { month: "May", value: 76460 },
-];
-
 function monthLabel(month: string): string {
   // month is "YYYY-MM"; render a short label like "May"
   const parts = month.split("-");
@@ -47,13 +36,11 @@ export function NetWorthPanel() {
   const { data: netWorthData } = useNetWorth();
   const accounts = data?.accounts ?? [];
 
-  const trendData = netWorthData?.trend?.length
-    ? netWorthData.trend.map((t) => ({
-        month: monthLabel(t.month),
-        value: Number.parseFloat(t.netWorth),
-      }))
-    : FALLBACK_TREND;
-  const hasRealTrend = Boolean(netWorthData?.trend?.length);
+  const trendData = (netWorthData?.trend ?? []).map((t) => ({
+    month: monthLabel(t.month),
+    value: Number.parseFloat(t.netWorth),
+  }));
+  const hasRealTrend = trendData.length > 0;
 
   if (isLoading) {
     return (
@@ -124,31 +111,25 @@ export function NetWorthPanel() {
 
       {/* Trend chart — real net-worth snapshots when available */}
       <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-semibold text-text">Net worth trend</p>
-          {!hasRealTrend && (
-            <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
-              Illustrative
-            </span>
-          )}
-        </div>
-        <div className="flex h-24 items-end gap-2">
-          {trendData.map((h, i) => {
-            const heightPct = range === 0 ? 50 : ((h.value - minVal) / range) * 80 + 10;
-            const isLatest = i === trendData.length - 1;
-            return (
-              <div key={`${h.month}-${i}`} className="flex flex-1 flex-col items-center gap-1">
-                <div
-                  className="w-full rounded-t-[var(--radius-xs)] transition-all"
-                  style={{ height: `${heightPct}px`, background: isLatest ? "var(--color-primary)" : "var(--color-border)" }}
-                />
-                <span className="text-[9px] text-text-muted">{h.month}</span>
-              </div>
-            );
-          })}
-        </div>
-        {!hasRealTrend && (
-          <p className="mt-2 text-[11px] text-text-muted">
+        <p className="mb-3 text-sm font-semibold text-text">Net worth trend</p>
+        {hasRealTrend ? (
+          <div className="flex h-24 items-end gap-2">
+            {trendData.map((h, i) => {
+              const heightPct = range === 0 ? 50 : ((h.value - minVal) / range) * 80 + 10;
+              const isLatest = i === trendData.length - 1;
+              return (
+                <div key={`${h.month}-${i}`} className="flex flex-1 flex-col items-center gap-1">
+                  <div
+                    className="w-full rounded-t-[var(--radius-xs)] transition-all"
+                    style={{ height: `${heightPct}px`, background: isLatest ? "var(--color-primary)" : "var(--color-border)" }}
+                  />
+                  <span className="text-[9px] text-text-muted">{h.month}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-[11px] text-text-muted">
             Historical net-worth tracking starts once enough synced balance snapshots accumulate.
           </p>
         )}

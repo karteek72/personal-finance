@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useResilience } from "@/hooks/use-features";
 
 interface Scenario {
@@ -14,17 +19,6 @@ interface Scenario {
   monthsCovered: number;
   recommendedMonths: number;
 }
-
-const FALLBACK_LIQUID_CASH = 21400;
-const FALLBACK_MONTHLY_BURN = 5080;
-
-const FALLBACK_SCENARIOS: Scenario[] = [
-  { id: "job", name: "Job loss", emoji: "💼", shock: 5080, recurring: true, detail: "Income stops; you live off reserves at current burn rate.", monthsCovered: 4.2, recommendedMonths: 6 },
-  { id: "car", name: "$5K car repair", emoji: "🚗", shock: 5000, recurring: false, detail: "Sudden transmission failure, paid out of pocket.", monthsCovered: 99, recommendedMonths: 1 },
-  { id: "medical", name: "$8K medical bill", emoji: "🏥", shock: 8000, recurring: false, detail: "ER visit + deductible after insurance.", monthsCovered: 99, recommendedMonths: 1 },
-  { id: "rate", name: "Rate spike +2%", emoji: "📈", shock: 180, recurring: true, detail: "Variable debt payments rise $180/mo.", monthsCovered: 99, recommendedMonths: 1 },
-  { id: "rent", name: "Rent +15%", emoji: "🏠", shock: 278, recurring: true, detail: "Lease renewal adds $278/mo to fixed costs.", monthsCovered: 99, recommendedMonths: 1 },
-];
 
 function scenarioScore(s: Scenario): number {
   if (s.recommendedMonths <= 0) return 100;
@@ -44,24 +38,31 @@ function scoreVerdict(s: number) {
 }
 
 export function ResiliencePanel() {
-  const { data } = useResilience();
+  const gate = useFeaturePanelGate("financial resilience");
+  const { data, isLoading, isError } = useResilience();
 
-  const LIQUID_CASH = data ? Number.parseFloat(data.liquidCash) : FALLBACK_LIQUID_CASH;
-  const MONTHLY_BURN = data ? Number.parseFloat(data.monthlyBurn) : FALLBACK_MONTHLY_BURN;
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
+  if (isError || !data) {
+    return (
+      <FeatureEmptyState feature="financial resilience" variant="insufficient-data" />
+    );
+  }
+
+  const LIQUID_CASH = Number.parseFloat(data.liquidCash);
+  const MONTHLY_BURN = Number.parseFloat(data.monthlyBurn);
   const RUNWAY_MONTHS = data?.runwayMonths ?? LIQUID_CASH / MONTHLY_BURN;
 
-  const SCENARIOS: Scenario[] = data?.scenarios.length
-    ? data.scenarios.map((s) => ({
-        id: s.id,
-        name: s.name,
-        emoji: s.emoji ?? "⚠️",
-        shock: Number.parseFloat(s.shockAmount),
-        recurring: s.shockType !== "one_time",
-        detail: s.detail ?? "",
-        monthsCovered: s.monthsCovered,
-        recommendedMonths: s.recommendedMonths,
-      }))
-    : FALLBACK_SCENARIOS;
+  const SCENARIOS: Scenario[] = data.scenarios.map((s) => ({
+    id: s.id,
+    name: s.name,
+    emoji: s.emoji ?? "⚠️",
+    shock: Number.parseFloat(s.shockAmount),
+    recurring: s.shockType !== "one_time",
+    detail: s.detail ?? "",
+    monthsCovered: s.monthsCovered,
+    recommendedMonths: s.recommendedMonths,
+  }));
 
   const [active, setActive] = useState<string>(SCENARIOS[0]?.id ?? "job");
   const scenario = SCENARIOS.find((s) => s.id === active) ?? SCENARIOS[0]!;

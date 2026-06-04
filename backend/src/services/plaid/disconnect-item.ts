@@ -4,6 +4,7 @@ import { getDb } from "../../db/client.js";
 import { accounts, plaidItems } from "../../db/schema.js";
 import { createLogger } from "../../lib/logger.js";
 import { getPlaidClient } from "./client.js";
+import { purgeDerivedFinancialData } from "../purge-derived-financial-data.js";
 import { decryptPlaidToken } from "./crypto.js";
 
 const log = createLogger("plaid.disconnect");
@@ -46,6 +47,8 @@ export async function disconnectPlaidItem(
   await db
     .delete(plaidItems)
     .where(and(eq(plaidItems.id, itemDbId), eq(plaidItems.userId, userId)));
+
+  await purgeDerivedFinancialData(userId);
 
   return true;
 }

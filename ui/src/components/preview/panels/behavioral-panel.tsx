@@ -2,23 +2,12 @@
 
 import { useMemo, useState } from "react";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useBehavioral } from "@/hooks/use-features";
-
-const FALLBACK_CHALLENGES = [
-  { title: "Dining budget cut", goal: "Reduce dining by 20% this month", progress: 62, days: 18, color: "#f97316", complete: false },
-  { title: "No impulse over $50", goal: "Wait 24h before any purchase >$50", progress: 85, days: 6, color: "#22c55e", complete: false },
-  { title: "Auto-savings streak", goal: "Automate $200 extra to savings", progress: 100, days: 0, color: "#a855f7", complete: true },
-];
-
-const FALLBACK_STREAKS = [
-  { label: "Under budget", days: 12, max: 30, color: "#22c55e" },
-  { label: "No food delivery", days: 5, max: 14, color: "#3b82f6" },
-  { label: "Savings auto-transfer", days: 47, max: 60, color: "#a855f7" },
-];
-
-const FALLBACK_CREEP_MONTHS = ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
-const FALLBACK_INCOME = [7200, 7200, 7600, 7600, 7600, 7600, 8100, 8100, 8100, 8100];
-const FALLBACK_SPENDING = [4800, 4900, 5200, 5400, 5600, 5700, 6100, 6300, 6400, 6520];
 
 const REASONS = [
   { id: "need", emoji: "✅", label: "Needed it", color: "#22c55e" },
@@ -40,70 +29,56 @@ interface Txn {
   defaultReason?: ReasonId;
 }
 
-const INITIAL: Txn[] = [
-  { id: "t1", merchant: "DoorDash", amount: 38.4, date: "Today, 11:42pm", emoji: "🍔", defaultReason: "stress" },
-  { id: "t2", merchant: "Amazon", amount: 64.99, date: "Today, 2:15pm", emoji: "📦", defaultReason: "impulse" },
-  { id: "t3", merchant: "Whole Foods", amount: 112.3, date: "Yesterday", emoji: "🛒", defaultReason: "need" },
-  { id: "t4", merchant: "Bar Louie", amount: 56.0, date: "Yesterday", emoji: "🍻", defaultReason: "social" },
-  { id: "t5", merchant: "Steam", amount: 29.99, date: "2 days ago", emoji: "🎮", defaultReason: "bored" },
-  { id: "t6", merchant: "Sephora", amount: 84.5, date: "3 days ago", emoji: "💄", defaultReason: "treat" },
-];
-
-const FALLBACK_HISTORY: Record<ReasonId, number> = {
-  need: 1840,
-  treat: 420,
-  social: 610,
-  bored: 290,
-  stress: 540,
-  impulse: 480,
-};
-
 function money(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 }
 
 export function BehavioralPanel() {
-  const { data } = useBehavioral();
-  const [tags, setTags] = useState<Record<string, ReasonId>>(
-    Object.fromEntries(INITIAL.filter((t) => t.defaultReason).map((t) => [t.id, t.defaultReason!])),
-  );
+  const gate = useFeaturePanelGate("behavioral insights");
+  const { data, isLoading } = useBehavioral();
+  const [tags, setTags] = useState<Record<string, ReasonId>>({});
+
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
+
+  const tagInbox: Txn[] = (data?.taggedTransactions ?? []).map((t) => ({
+    id: t.id,
+    merchant: t.merchant,
+    amount: Number.parseFloat(t.amount),
+    date: t.date,
+    emoji: "💳",
+    defaultReason: t.reasonId as ReasonId,
+  }));
 
   const setTag = (txnId: string, reason: ReasonId) => setTags((t) => ({ ...t, [txnId]: reason }));
 
-  const archetype = data?.archetype ?? "The Foodie";
-  const creepMonths = data?.creep.months.length ? data.creep.months : FALLBACK_CREEP_MONTHS;
-  const income = data?.creep.income.length
-    ? data.creep.income.map((v) => Number.parseFloat(v))
-    : FALLBACK_INCOME;
-  const spending = data?.creep.spending.length
-    ? data.creep.spending.map((v) => Number.parseFloat(v))
-    : FALLBACK_SPENDING;
+  const archetype = data?.archetype ?? "—";
+  const creepMonths = data?.creep.months ?? [];
+  const income = (data?.creep.income ?? []).map((v) => Number.parseFloat(v));
+  const spending = (data?.creep.spending ?? []).map((v) => Number.parseFloat(v));
 
-  const reasonTotals: Record<string, number> = data?.reasons.length
-    ? Object.fromEntries(data.reasons.map((r) => [r.id, Number.parseFloat(r.total)]))
-    : FALLBACK_HISTORY;
+  const reasonTotals: Record<string, number> = Object.fromEntries(
+    (data?.reasons ?? []).map((r) => [r.id, Number.parseFloat(r.total)]),
+  );
 
-  const challenges = data?.challenges.length
-    ? data.challenges.map((c) => ({
-        title: c.title,
-        goal: c.goal,
-        progress: c.progressPercent,
-        days: c.daysRemaining,
-        color: c.color ?? "#3b82f6",
-        complete: c.complete,
-      }))
-    : FALLBACK_CHALLENGES;
+  const challenges = (data?.challenges ?? []).map((c) => ({
+    title: c.title,
+    goal: c.goal,
+    progress: c.progressPercent,
+    days: c.daysRemaining,
+    color: c.color ?? "#3b82f6",
+    complete: c.complete,
+  }));
 
-  const streaks = data?.streaks.length
-    ? data.streaks.map((s) => ({
-        label: s.label,
-        days: s.currentDays,
-        max: s.maxDays,
-        color: s.color ?? "#22c55e",
-      }))
-    : FALLBACK_STREAKS;
+  const streaks = (data?.streaks ?? []).map((s) => ({
+    label: s.label,
+    days: s.currentDays,
+    max: s.maxDays,
+    color: s.color ?? "#22c55e",
+  }));
 
-  const maxVal = Math.max(...income, ...spending);
+  const hasCreep = creepMonths.length > 0;
+  const maxVal = Math.max(...income, ...spending, 1);
   const emotionalTotal =
     (reasonTotals.stress ?? 0) + (reasonTotals.bored ?? 0) + (reasonTotals.impulse ?? 0);
   const totalSpend = Object.values(reasonTotals).reduce((a, b) => a + b, 0);
@@ -141,8 +116,13 @@ export function BehavioralPanel() {
             <p className="text-sm font-semibold text-text">Lifestyle creep detector</p>
             <p className="text-xs text-text-muted">Income vs. spending over 10 months</p>
           </div>
-          <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">Creep detected</span>
+          {hasCreep && (
+            <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">Creep detected</span>
+          )}
         </div>
+        {!hasCreep ? (
+          <p className="mt-3 text-xs text-text-muted">Need more months of income and spending history.</p>
+        ) : (
         <div className="mt-3 flex h-20 items-end gap-1">
           {creepMonths.map((m, i) => {
             const incPct = ((income[i] ?? 0) / maxVal) * 72;
@@ -158,6 +138,7 @@ export function BehavioralPanel() {
             );
           })}
         </div>
+        )}
         <div className="mt-2 flex gap-4 text-[11px] text-text-muted">
           <span className="flex items-center gap-1">
             <div className="h-2 w-2 rounded-full bg-success/40" />Income
@@ -166,9 +147,11 @@ export function BehavioralPanel() {
             <div className="h-2 w-2 rounded-full" style={{ background: "var(--color-primary)" }} />Spending
           </span>
         </div>
-        <p className="mt-2 rounded-[var(--radius-sm)] bg-warning/10 p-2 text-xs text-warning">
-          Since your March raise (+$500/mo), spending grew $420/mo — your savings rate improved only $80/mo.
-        </p>
+        {hasCreep && (
+          <p className="mt-2 rounded-[var(--radius-sm)] bg-warning/10 p-2 text-xs text-warning">
+            Compare income vs spending month over month to spot lifestyle creep.
+          </p>
+        )}
       </div>
 
       {/* Why tagging — emotional spending */}
@@ -186,7 +169,10 @@ export function BehavioralPanel() {
           <p className="mb-1 text-sm font-bold text-text">Why did you buy these?</p>
           <p className="mb-3 text-[11px] text-text-muted">Tap a reason — patterns build over time.</p>
           <div className="space-y-3">
-            {INITIAL.map((t) => (
+            {tagInbox.length === 0 && (
+              <p className="text-xs text-text-muted">Tag recent transactions to build reason patterns.</p>
+            )}
+            {tagInbox.map((t) => (
               <div key={t.id} className="rounded-[var(--radius-sm)] border border-border p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -253,6 +239,9 @@ export function BehavioralPanel() {
       <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
         <p className="mb-3 text-sm font-semibold text-text">Habit streaks</p>
         <div className="space-y-3">
+          {streaks.length === 0 && (
+            <p className="text-xs text-text-muted">No active streaks yet.</p>
+          )}
           {streaks.map((s) => (
             <div key={s.label}>
               <div className="mb-1 flex justify-between text-xs">
@@ -270,6 +259,9 @@ export function BehavioralPanel() {
       {/* 30-day challenges */}
       <div className="space-y-2">
         <p className="px-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Active challenges</p>
+        {challenges.length === 0 && (
+          <p className="px-1 text-xs text-text-muted">No challenges yet.</p>
+        )}
         {challenges.map((c) => (
           <div key={c.title} className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
             <div className="flex items-center justify-between">

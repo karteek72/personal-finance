@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { FeatureEmptyState } from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useRecurring } from "@/hooks/use-features";
 
 interface PastHabit {
@@ -18,47 +20,39 @@ const LOOKBACK_YEARS = 3;
 // Approx S&P 500 growth multiple over the lookback (illustrative)
 const INVEST_MULTIPLE = 1.45;
 
-const FALLBACK_HABITS: PastHabit[] = [
-  { id: "dining", emoji: "🍔", category: "Restaurants & takeout", spent: 8400, yearsAgo: 3, investedValue: 12180 },
-  { id: "rideshare", emoji: "🚕", category: "Rideshare & taxis", spent: 3120, yearsAgo: 3, investedValue: 4520 },
-  { id: "subs", emoji: "📺", category: "Unused subscriptions", spent: 1860, yearsAgo: 3, investedValue: 2700 },
-  { id: "coffee", emoji: "☕", category: "Coffee shops", spent: 2240, yearsAgo: 3, investedValue: 3250 },
-  { id: "impulse", emoji: "🛍️", category: "Impulse online buys", spent: 5100, yearsAgo: 3, investedValue: 7400 },
-];
-
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
 }
 
 export function TimeMachinePanel() {
+  const gate = useFeaturePanelGate("money time machine");
   const { data } = useRecurring();
-
-  const HABITS: PastHabit[] = data?.leaks.habits.length
-    ? data.leaks.habits.map((h) => {
-        const spent = Number.parseFloat(h.monthly) * 12 * LOOKBACK_YEARS;
-        return {
-          id: h.id,
-          emoji: h.emoji ?? "💸",
-          category: h.label,
-          spent,
-          yearsAgo: LOOKBACK_YEARS,
-          investedValue: Math.round(spent * INVEST_MULTIPLE),
-        };
-      })
-    : FALLBACK_HABITS;
-
-  const [selected, setSelected] = useState<string[]>(
-    FALLBACK_HABITS.slice(0, 2).map((h) => h.id),
-  );
-
-  // Seed the selection from real habit ids once they load
+  const [selected, setSelected] = useState<string[]>([]);
   const seeded = useRef(false);
+
+  const HABITS: PastHabit[] = (data?.leaks.habits ?? []).map((h) => {
+    const spent = Number.parseFloat(h.monthly) * 12 * LOOKBACK_YEARS;
+    return {
+      id: h.id,
+      emoji: h.emoji ?? "💸",
+      category: h.label,
+      spent,
+      yearsAgo: LOOKBACK_YEARS,
+      investedValue: Math.round(spent * INVEST_MULTIPLE),
+    };
+  });
+
   useEffect(() => {
-    if (data?.leaks.habits.length && !seeded.current) {
+    if (HABITS.length > 0 && !seeded.current) {
       seeded.current = true;
-      setSelected(data.leaks.habits.slice(0, 2).map((h) => h.id));
+      setSelected(HABITS.slice(0, 2).map((h) => h.id));
     }
-  }, [data]);
+  }, [HABITS]);
+
+  if (!gate.ready) return gate.node;
+  if (HABITS.length === 0) {
+    return <FeatureEmptyState feature="money time machine" variant="insufficient-data" />;
+  }
 
   const toggle = (id: string) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));

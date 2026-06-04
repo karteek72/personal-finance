@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useCalendar } from "@/hooks/use-features";
 
 type EventType = "bill" | "income" | "subscription" | "goal";
@@ -15,31 +20,6 @@ interface DayEvent {
 function asEventType(t: string): EventType {
   return t === "bill" || t === "income" || t === "subscription" || t === "goal" ? t : "bill";
 }
-
-const FALLBACK_EVENTS: Record<number, DayEvent[]> = {
-  1: [{ type: "bill", label: "Rent", amount: 1850 }],
-  3: [{ type: "subscription", label: "Spotify", amount: 11.99 }],
-  5: [{ type: "subscription", label: "iCloud+", amount: 9.99 }],
-  7: [{ type: "bill", label: "Electricity", amount: 124 }],
-  12: [{ type: "subscription", label: "Netflix", amount: 22.99 }],
-  14: [{ type: "income", label: "Paycheck", amount: 3260 }],
-  15: [{ type: "bill", label: "Car insurance", amount: 188 }],
-  18: [{ type: "subscription", label: "Gym", amount: 49 }],
-  20: [
-    { type: "bill", label: "Internet", amount: 70 },
-    { type: "subscription", label: "ChatGPT", amount: 20 },
-  ],
-  22: [{ type: "goal", label: "Auto-save → Emergency", amount: 400 }],
-  25: [{ type: "bill", label: "Phone", amount: 85 }],
-  28: [{ type: "income", label: "Paycheck", amount: 3260 }],
-  30: [{ type: "bill", label: "Credit card min", amount: 240 }],
-};
-
-const FALLBACK_HEAT: Record<number, number> = {
-  1: 3, 2: 1, 3: 2, 4: 0, 5: 1, 6: 3, 7: 2, 8: 1, 9: 0, 10: 1,
-  11: 2, 12: 3, 13: 3, 14: 1, 15: 2, 16: 0, 17: 1, 18: 2, 19: 1, 20: 3,
-  21: 2, 22: 0, 23: 1, 24: 1, 25: 2, 26: 3, 27: 3, 28: 1, 29: 0, 30: 2,
-};
 
 const TYPE_META: Record<EventType, { color: string; dot: string; label: string }> = {
   bill: { color: "#ef4444", dot: "bg-danger", label: "Bill due" },
@@ -61,11 +41,14 @@ function heatColor(level: number): string {
 }
 
 export function CalendarPanel() {
-  const [selectedDay, setSelectedDay] = useState<number | null>(14);
-  const { data } = useCalendar();
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const gate = useFeaturePanelGate("cash-flow calendar");
+  const { data, isLoading } = useCalendar();
 
-  // Resolve the month being rendered (defaults to the demo month June 2026)
-  const monthIso = data?.month ?? "2026-06";
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
+
+  const monthIso = data?.month ?? new Date().toISOString().slice(0, 7);
   const year = Number.parseInt(monthIso.split("-")[0] ?? "2026", 10);
   const monthIdx = Number.parseInt(monthIso.split("-")[1] ?? "6", 10) - 1;
   const monthLabel = `${MONTH_NAMES[monthIdx] ?? "June"} ${year}`;
@@ -74,38 +57,29 @@ export function CalendarPanel() {
   const jsStart = new Date(year, monthIdx, 1).getDay();
   const startOffset = (jsStart + 6) % 7;
 
-  const EVENTS: Record<number, DayEvent[]> = data?.events.length
-    ? data.events.reduce<Record<number, DayEvent[]>>((acc, e) => {
-        const item: DayEvent = {
-          type: asEventType(e.type),
-          label: e.label,
-          amount: Number.parseFloat(e.amount),
-        };
-        (acc[e.day] = acc[e.day] ?? []).push(item);
-        return acc;
-      }, {})
-    : FALLBACK_EVENTS;
+  const EVENTS: Record<number, DayEvent[]> = (data?.events ?? []).reduce<
+    Record<number, DayEvent[]>
+  >((acc, e) => {
+    const item: DayEvent = {
+      type: asEventType(e.type),
+      label: e.label,
+      amount: Number.parseFloat(e.amount),
+    };
+    (acc[e.day] = acc[e.day] ?? []).push(item);
+    return acc;
+  }, {});
 
-  const HEAT: Record<number, number> = data?.heat.length
-    ? data.heat.reduce<Record<number, number>>((acc, h) => {
-        acc[h.day] = h.level;
-        return acc;
-      }, {})
-    : FALLBACK_HEAT;
+  const HEAT: Record<number, number> = (data?.heat ?? []).reduce<Record<number, number>>(
+    (acc, h) => {
+      acc[h.day] = h.level;
+      return acc;
+    },
+    {},
+  );
 
-  const totalBills = data
-    ? Number.parseFloat(data.totals.bills)
-    : Object.values(FALLBACK_EVENTS)
-        .flat()
-        .filter((e) => e.type === "bill" || e.type === "subscription")
-        .reduce((s, e) => s + e.amount, 0);
-  const totalIncome = data
-    ? Number.parseFloat(data.totals.income)
-    : Object.values(FALLBACK_EVENTS)
-        .flat()
-        .filter((e) => e.type === "income")
-        .reduce((s, e) => s + e.amount, 0);
-  const safeToSpend = data ? Number.parseFloat(data.safeToSpendToday) : 74;
+  const totalBills = Number.parseFloat(data?.totals.bills ?? "0");
+  const totalIncome = Number.parseFloat(data?.totals.income ?? "0");
+  const safeToSpend = Number.parseFloat(data?.safeToSpendToday ?? "0");
 
   const selectedEvents = selectedDay ? EVENTS[selectedDay] ?? [] : [];
 

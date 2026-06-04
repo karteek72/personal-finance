@@ -16,6 +16,7 @@
     "db:assign-legacy": "tsx scripts/assign-legacy-data.ts",
     "db:gen-mock": "tsx scripts/generate-mock-dataset.ts",
     "db:seed": "tsx scripts/seed-mock-data.ts",
+    "db:wipe-user": "tsx scripts/wipe-user-financial-data.ts",
     "seed:mock": "tsx scripts/seed-mock-data.ts",
     "test:import": "tsx --test src/services/import/__tests__/*.test.ts",
     "test:export": "tsx --test src/services/__tests__/export-user-data.test.ts"

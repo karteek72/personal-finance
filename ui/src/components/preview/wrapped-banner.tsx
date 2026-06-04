@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { useHasActiveAccounts } from "@/hooks/use-has-active-accounts";
 import { useWrapped } from "@/hooks/use-features";
 import type { WrappedResponse } from "@/types/api";
 
@@ -14,29 +15,6 @@ interface Slide {
 function usd(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 }
-
-const FALLBACK: WrappedResponse = {
-  year: 2025,
-  totalSpent: "47240",
-  transactionCount: 1847,
-  totalSaved: "14820",
-  savingsRate: 23.9,
-  peerPercentile: "Top 12% of SpendFlow users in your income bracket",
-  archetype: "Foodie",
-  topCategory: { name: "Food & Dining", amount: "14300" },
-  personality: { "Restaurant visits": 482, "Food-delivery orders": 87, "Grocery runs": 23 },
-  moments: [
-    { label: "Biggest single purchase", value: "Japan flights — $1,842" },
-    { label: "Best savings month", value: "October — saved $1,920" },
-    { label: "Most frugal day", value: "17 Tuesdays — $0 spent" },
-    { label: "Subscription you forgot", value: "Adobe — $660/yr" },
-  ],
-  goals: [
-    { label: "Emergency fund", target: "10000", pct: 64 },
-    { label: "Japan trip fund", target: "4500", pct: 40 },
-    { label: "Max Roth IRA", target: "7000", pct: 55 },
-  ],
-};
 
 function buildSlides(w: WrappedResponse): Slide[] {
   return [
@@ -144,9 +122,14 @@ function buildSlides(w: WrappedResponse): Slide[] {
 export function WrappedBanner() {
   const [open, setOpen] = useState(false);
   const [slide, setSlide] = useState(0);
-  const { data } = useWrapped();
+  const { hasAccounts } = useHasActiveAccounts();
+  const { data, isError } = useWrapped();
 
-  const SLIDES = buildSlides(data ?? FALLBACK);
+  if (!hasAccounts || isError || !data || data.transactionCount === 0) {
+    return null;
+  }
+
+  const SLIDES = buildSlides(data);
   const current = SLIDES[slide] ?? SLIDES[0]!;
 
   return (
@@ -162,7 +145,7 @@ export function WrappedBanner() {
       >
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg">🎁</div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-white">Your {(data ?? FALLBACK).year} Wrapped is ready</p>
+          <p className="text-sm font-bold text-white">Your {data.year} Wrapped is ready</p>
           <p className="truncate text-xs text-white/70">Your year in money, as a story. Tap to play.</p>
         </div>
         <span className="shrink-0 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">Play</span>

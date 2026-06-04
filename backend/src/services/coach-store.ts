@@ -7,6 +7,10 @@ import {
   wrappedSummaries,
 } from "../db/schema.js";
 import { formatMoneyAmount, roundDecimal, roundPercent } from "../lib/money.js";
+import {
+  drizzleActiveTransactionWhere,
+  resolveActiveAccountScope,
+} from "./active-account-scope.js";
 import { resolveHouseholdContext } from "./household-access.js";
 import { computeWrappedFromTransactions } from "./compute-wrapped.js";
 
@@ -18,6 +22,10 @@ export interface CoachResponse {
 
 export async function getCoach(userId: string): Promise<CoachResponse> {
   const ctx = await resolveHouseholdContext(userId);
+  const { hasActiveAccounts } = await resolveActiveAccountScope(ctx.userIds);
+  if (!hasActiveAccounts) {
+    return { narrative: "", forecast: "", qa: [] };
+  }
   const db = getDb();
   const rows = await db
     .select()
@@ -52,6 +60,10 @@ export async function getWrapped(
   userId: string,
 ): Promise<WrappedResponse | null> {
   const ctx = await resolveHouseholdContext(userId);
+  const { hasActiveAccounts } = await resolveActiveAccountScope(ctx.userIds);
+  if (!hasActiveAccounts) {
+    return null;
+  }
   const db = getDb();
   const rows = await db
     .select()
@@ -118,6 +130,18 @@ export async function getMerchants(
   userId: string,
 ): Promise<MerchantsResponse> {
   const ctx = await resolveHouseholdContext(userId);
+  const { accountIds, hasActiveAccounts } =
+    await resolveActiveAccountScope(ctx.userIds);
+  if (!hasActiveAccounts) {
+    return {
+      merchants: [],
+      income: { months: [], primary: [], side: [] },
+      merchantCount: 0,
+      incomeSources: 0,
+      isLive: false,
+    };
+  }
+
   const db = getDb();
 
   const rows = await db
@@ -132,7 +156,7 @@ export async function getMerchants(
     .from(transactions)
     .where(
       and(
-        inArray(transactions.userId, ctx.userIds),
+        drizzleActiveTransactionWhere(ctx.userIds, accountIds),
         eq(transactions.pending, false),
       ),
     );

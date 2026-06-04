@@ -1,7 +1,11 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { transactions } from "../db/schema.js";
 import { formatMoneyAmount } from "../lib/money.js";
+import {
+  drizzleActiveTransactionWhere,
+  resolveActiveAccountScope,
+} from "./active-account-scope.js";
 import { categoryMeta } from "./category-meta.js";
 
 export interface DetectedRecurringItem {
@@ -50,6 +54,12 @@ function daysBetween(a: string, b: string): number {
 export async function detectRecurringFromTransactions(
   userIds: string[],
 ): Promise<DetectedRecurringItem[]> {
+  const { accountIds, hasActiveAccounts } =
+    await resolveActiveAccountScope(userIds);
+  if (!hasActiveAccounts) {
+    return [];
+  }
+
   const db = getDb();
   const rows = await db
     .select({
@@ -62,7 +72,7 @@ export async function detectRecurringFromTransactions(
     .from(transactions)
     .where(
       and(
-        inArray(transactions.userId, userIds),
+        drizzleActiveTransactionWhere(userIds, accountIds),
         eq(transactions.transactionType, "expense"),
         eq(transactions.isTransfer, false),
         eq(transactions.pending, false),

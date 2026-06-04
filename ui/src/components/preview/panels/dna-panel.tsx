@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
+import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useDna } from "@/hooks/use-features";
 
 interface Axis {
@@ -9,21 +14,6 @@ interface Axis {
   you: number; // 0-100
   peers: number; // 0-100
 }
-
-const FALLBACK_AXES: Axis[] = [
-  { label: "Dining", you: 82, peers: 48 },
-  { label: "Travel", you: 64, peers: 38 },
-  { label: "Shopping", you: 41, peers: 55 },
-  { label: "Groceries", you: 35, peers: 62 },
-  { label: "Subscriptions", you: 71, peers: 44 },
-  { label: "Transport", you: 28, peers: 50 },
-  { label: "Wellness", you: 58, peers: 33 },
-  { label: "Savings", you: 76, peers: 51 },
-];
-
-const FALLBACK_ARCHETYPE = "The Experience Seeker";
-const FALLBACK_NARRATIVE =
-  "Your DNA skews heavily toward dining, travel and wellness — and you save more than most. Only 6% of peers in your income bracket share this pattern.";
 
 const SIZE = 260;
 const CENTER = SIZE / 2;
@@ -52,11 +42,18 @@ function axisPoint(i: number, n: number, factor: number) {
 
 export function DnaPanel() {
   const [showPeers, setShowPeers] = useState(true);
-  const { data } = useDna();
+  const gate = useFeaturePanelGate("spending DNA");
+  const { data, isLoading, isError } = useDna();
 
-  const AXES: Axis[] = data?.axes.length ? data.axes : FALLBACK_AXES;
-  const archetype = data?.archetype ?? FALLBACK_ARCHETYPE;
-  const narrative = data?.narrative ?? FALLBACK_NARRATIVE;
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
+  if (isError || !data?.axes.length) {
+    return <FeatureEmptyState feature="spending DNA" variant="insufficient-data" />;
+  }
+
+  const AXES: Axis[] = data.axes;
+  const archetype = data.archetype;
+  const narrative = data.narrative;
   const n = AXES.length;
 
   const distinctive = [...AXES]

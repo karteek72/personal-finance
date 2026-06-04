@@ -2,6 +2,10 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { savingsGoals, transactions } from "../db/schema.js";
 import { formatMoneyAmount, roundDecimal, roundPercent } from "../lib/money.js";
+import {
+  drizzleActiveTransactionWhere,
+  resolveActiveAccountScope,
+} from "./active-account-scope.js";
 import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
 import type { WrappedResponse } from "./coach-store.js";
 
@@ -39,7 +43,14 @@ function monthName(monthKey: string): string {
 export async function computeWrappedFromTransactions(
   userIds: string[],
 ): Promise<WrappedResponse | null> {
+  const { accountIds, hasActiveAccounts } =
+    await resolveActiveAccountScope(userIds);
+  if (!hasActiveAccounts) {
+    return null;
+  }
+
   const db = getDb();
+  const txScope = drizzleActiveTransactionWhere(userIds, accountIds);
 
   const [yearRow] = await db
     .select({
@@ -48,7 +59,7 @@ export async function computeWrappedFromTransactions(
     .from(transactions)
     .where(
       and(
-        inArray(transactions.userId, userIds),
+        txScope,
         eq(transactions.pending, false),
         eq(transactions.transactionType, "expense"),
         eq(transactions.isTransfer, false),
@@ -75,7 +86,7 @@ export async function computeWrappedFromTransactions(
     .from(transactions)
     .where(
       and(
-        inArray(transactions.userId, userIds),
+        txScope,
         eq(transactions.pending, false),
         sql`${transactions.date} >= ${start} and ${transactions.date} <= ${end}`,
       ),
