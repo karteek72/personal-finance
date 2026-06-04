@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { PlaidLinkButton } from "@/components/plaid/plaid-link-button";
+import { ModalPortal } from "@/components/ui/modal-portal";
 import { api } from "@/lib/api-client";
 import { createTellerConnectHandle } from "@/lib/teller-connect";
 import type { ConnectionProviderId, ConnectionProviderOption } from "@/types/api";
@@ -42,6 +43,15 @@ export function ConnectAccountButton({
   const [connecting, setConnecting] = useState<ConnectionProviderId | null>(
     null,
   );
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  const reportError = useCallback(
+    (message: string) => {
+      setModalError(message);
+      onError?.(message);
+    },
+    [onError],
+  );
 
   const loadProviders = useCallback(async () => {
     setLoadingProviders(true);
@@ -58,7 +68,7 @@ export function ConnectAccountButton({
       }
       setProviders(list);
     } catch (error) {
-      onError?.(
+      reportError(
         error instanceof Error
           ? error.message
           : "Could not load connection options",
@@ -66,7 +76,7 @@ export function ConnectAccountButton({
     } finally {
       setLoadingProviders(false);
     }
-  }, [onError, preferredProviders]);
+  }, [preferredProviders, reportError]);
 
   useEffect(() => {
     if (open && providers.length === 0 && !loadingProviders) {
@@ -93,7 +103,7 @@ export function ConnectAccountButton({
             });
             onSuccess();
           } catch (error) {
-            onError?.(
+            reportError(
               error instanceof Error
                 ? error.message
                 : "Failed to connect Teller account",
@@ -107,7 +117,7 @@ export function ConnectAccountButton({
       handle.open();
     } catch (error) {
       setConnecting(null);
-      onError?.(
+      reportError(
         error instanceof Error
           ? error.message
           : "Could not start Teller Connect",
@@ -117,15 +127,19 @@ export function ConnectAccountButton({
 
   async function handleSnaptradeConnect() {
     setConnecting("snaptrade");
+    setModalError(null);
     try {
       const { redirectUri } = await api.createSnaptradePortalUrl();
       const popup = window.open(
         redirectUri,
         "snaptrade-connect",
-        "width=520,height=720",
+        "width=520,height=720,noopener,noreferrer",
       );
       if (!popup) {
-        window.location.href = redirectUri;
+        setConnecting(null);
+        reportError(
+          "Pop-up blocked. Allow pop-ups for this site, then try again.",
+        );
         return;
       }
 
@@ -138,7 +152,7 @@ export function ConnectAccountButton({
             .completeSnaptradeConnection()
             .then(() => onSuccess())
             .catch((error: unknown) => {
-              onError?.(
+              reportError(
                 error instanceof Error
                   ? error.message
                   : "Failed to sync brokerage accounts",
@@ -148,12 +162,17 @@ export function ConnectAccountButton({
       }, 500);
     } catch (error) {
       setConnecting(null);
-      onError?.(
+      reportError(
         error instanceof Error
           ? error.message
           : "Could not open SnapTrade portal",
       );
     }
+  }
+
+  function handleOpen() {
+    setModalError(null);
+    setOpen(true);
   }
 
   if (itemId) {
@@ -188,7 +207,7 @@ export function ConnectAccountButton({
           type="button"
           aria-label={label}
           className={className}
-          onClick={() => setOpen(true)}
+          onClick={handleOpen}
         >
           {variant === "icon" ? (
             <span className="text-lg leading-none" aria-hidden="true">
@@ -204,6 +223,7 @@ export function ConnectAccountButton({
             providers={providers}
             loading={loadingProviders}
             connecting={connecting}
+            error={modalError}
             onClose={() => setOpen(false)}
             onPick={(id) => {
               if (id === "teller") void handleTellerConnect();
@@ -213,7 +233,7 @@ export function ConnectAccountButton({
               setOpen(false);
               onSuccess();
             }}
-            onPlaidError={onError}
+            onPlaidError={reportError}
           />
         ) : null}
       </>
@@ -225,7 +245,7 @@ export function ConnectAccountButton({
       <button
         type="button"
         className={className}
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
       >
         {label}
       </button>
@@ -235,6 +255,7 @@ export function ConnectAccountButton({
           providers={providers}
           loading={loadingProviders}
           connecting={connecting}
+          error={modalError}
           onClose={() => setOpen(false)}
           onPick={(id) => {
             if (id === "teller") void handleTellerConnect();
@@ -244,7 +265,7 @@ export function ConnectAccountButton({
             setOpen(false);
             onSuccess();
           }}
-          onPlaidError={onError}
+          onPlaidError={reportError}
         />
       ) : null}
     </>
@@ -256,6 +277,7 @@ interface ProviderPickerModalProps {
   providers: ConnectionProviderOption[];
   loading: boolean;
   connecting: ConnectionProviderId | null;
+  error: string | null;
   onClose: () => void;
   onPick: (id: ConnectionProviderId) => void;
   onPlaidSuccess: () => void;
@@ -267,94 +289,106 @@ function ProviderPickerModal({
   providers,
   loading,
   connecting,
+  error,
   onClose,
   onPick,
   onPlaidSuccess,
   onPlaidError,
 }: ProviderPickerModalProps) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="connect-account-title"
-      onClick={onClose}
-    >
+    <ModalPortal>
       <div
-        className="w-full max-w-md rounded-[var(--radius-card)] bg-surface p-5 card-shadow"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 p-4 sm:items-center"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="connect-account-title"
+        onClick={onClose}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 id="connect-account-title" className="text-lg font-bold text-text">
-              {label}
-            </h2>
-            <p className="mt-1 text-sm text-text-muted">
-              Choose how to link your financial accounts.
-            </p>
+        <div
+          className="flex max-h-[min(90vh,640px)] w-full max-w-md flex-col overflow-hidden rounded-[var(--radius-card)] bg-surface card-shadow"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="shrink-0 p-5 pb-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 id="connect-account-title" className="text-lg font-bold text-text">
+                  {label}
+                </h2>
+                <p className="mt-1 text-sm text-text-muted">
+                  Choose how to link your financial accounts.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-text-muted hover:text-text"
+                aria-label="Close"
+                onClick={onClose}
+              >
+                ×
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            className="text-text-muted hover:text-text"
-            aria-label="Close"
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </div>
 
-        <div className="mt-4 flex flex-col gap-2">
-          {loading ? (
-            <p className="text-sm text-text-muted">Loading options…</p>
+          {error ? (
+            <div className="mx-5 mb-3 shrink-0 rounded-[var(--radius-sm)] border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+              {error}
+            </div>
           ) : null}
 
-          {!loading && providers.length === 0 ? (
-            <p className="text-sm text-text-muted">
-              No connection providers are configured on this server.
-            </p>
-          ) : null}
+          <div className="flex flex-col gap-2 overflow-y-auto px-5 pb-5">
+            {loading ? (
+              <p className="text-sm text-text-muted">Loading options…</p>
+            ) : null}
 
-          {providers.map((provider) => (
-            <div
-              key={provider.id}
-              className="rounded-[var(--radius-sm)] border border-border p-3"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-semibold text-text">{provider.label}</p>
-                  <p className="text-xs text-text-muted">
-                    {PROVIDER_HINTS[provider.id]}
-                  </p>
-                  <p className="mt-1 text-xs text-text-muted">
-                    {provider.description}
-                  </p>
+            {!loading && providers.length === 0 ? (
+              <p className="text-sm text-text-muted">
+                No connection providers are configured on this server.
+              </p>
+            ) : null}
+
+            {providers.map((provider) => (
+              <div
+                key={provider.id}
+                className="rounded-[var(--radius-sm)] border border-border p-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-text">{provider.label}</p>
+                    <p className="text-xs text-text-muted">
+                      {PROVIDER_HINTS[provider.id]}
+                    </p>
+                    <p className="mt-1 text-xs text-text-muted">
+                      {provider.description}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  {provider.id === "plaid" ? (
+                    <PlaidLinkButton
+                      label="Connect with Plaid"
+                      variant="default"
+                      className="w-full"
+                      onSuccess={onPlaidSuccess}
+                      onError={onPlaidError}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={connecting !== null}
+                      className="w-full rounded-[var(--radius-sm)] bg-primary px-3 py-2 text-sm font-semibold text-text-inverse disabled:opacity-60"
+                      onClick={() => onPick(provider.id)}
+                    >
+                      {connecting === provider.id
+                        ? "Connecting…"
+                        : `Connect with ${provider.label}`}
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="mt-3">
-                {provider.id === "plaid" ? (
-                  <PlaidLinkButton
-                    label="Connect with Plaid"
-                    variant="default"
-                    onSuccess={onPlaidSuccess}
-                    onError={onPlaidError}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    disabled={connecting !== null}
-                    className="w-full rounded-[var(--radius-sm)] bg-primary px-3 py-2 text-sm font-semibold text-text-inverse disabled:opacity-60"
-                    onClick={() => onPick(provider.id)}
-                  >
-                    {connecting === provider.id
-                      ? "Connecting…"
-                      : `Connect with ${provider.label}`}
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

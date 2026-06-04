@@ -12,6 +12,7 @@ import { AppError } from "../../lib/errors.js";
 import { formatMoneyAmount } from "../../lib/money.js";
 import { createLogger } from "../../lib/logger.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
+import { refreshFireProfile } from "../investment-analytics.js";
 import { getSnaptradeClient, resolveSnaptradeRedirectUri } from "./client.js";
 import { getSnaptradeCredentials } from "./user-store.js";
 
@@ -90,8 +91,14 @@ async function upsertSecurity(
   db: ReturnType<typeof getDb>,
   ticker: string,
   name: string,
+  currentPrice?: string,
 ): Promise<string> {
   const normalized = ticker.toUpperCase().slice(0, 32);
+  const price =
+    currentPrice && Number.parseFloat(currentPrice) > 0
+      ? formatMoneyAmount(currentPrice)
+      : undefined;
+
   const [existing] = await db
     .select({ id: securities.id })
     .from(securities)
@@ -99,6 +106,12 @@ async function upsertSecurity(
     .limit(1);
 
   if (existing) {
+    if (price) {
+      await db
+        .update(securities)
+        .set({ currentPrice: price, asOf: new Date() })
+        .where(eq(securities.id, existing.id));
+    }
     return existing.id;
   }
 
@@ -108,11 +121,48 @@ async function upsertSecurity(
       ticker: normalized,
       name: name.slice(0, 200) || normalized,
       assetType: "equity",
-      currentPrice: "0",
+      currentPrice: price ?? "0",
     })
     .returning();
 
   return created!.id;
+}
+
+async function fetchAccountActivities(
+  client: ReturnType<typeof getSnaptradeClient>,
+  creds: { snaptradeUserId: string; userSecret: string },
+  snaptradeAccountId: string,
+): Promise<SnaptradeActivity[]> {
+  const collected: SnaptradeActivity[] = [];
+  const windows = [
+    { start: daysAgoIso(730), end: daysAgoIso(365) },
+    { start: daysAgoIso(365), end: daysAgoIso(0) },
+  ];
+
+  for (const window of windows) {
+    const activitiesResponse =
+      await client.accountInformation.getAccountActivities({
+        accountId: snaptradeAccountId,
+        userId: creds.snaptradeUserId,
+        userSecret: creds.userSecret,
+        startDate: window.start,
+        endDate: window.end,
+        limit: 1000,
+      });
+
+    const batch = (activitiesResponse.data?.data ??
+      activitiesResponse.data ??
+      []) as SnaptradeActivity[];
+    collected.push(...batch);
+  }
+
+  const seen = new Set<string>();
+  return collected.filter((activity) => {
+    const id = activity.id;
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 }
 
 export async function createSnaptradePortalUrl(
@@ -301,6 +351,7 @@ export async function syncSnaptradeForUser(
             db,
             ticker,
             position.symbol?.description ?? ticker,
+            parseMoney(position.price ?? 0),
           );
 
           const quantity = parseMoney(position.units ?? 0);
@@ -339,19 +390,11 @@ export async function syncSnaptradeForUser(
       }
 
       try {
-        const activitiesResponse =
-          await client.accountInformation.getAccountActivities({
-            accountId: snaptradeAccountId,
-            userId: creds.snaptradeUserId,
-            userSecret: creds.userSecret,
-            startDate: daysAgoIso(730),
-            endDate: daysAgoIso(0),
-            limit: 1000,
-          });
-
-        const activities = (activitiesResponse.data?.data ??
-          activitiesResponse.data ??
-          []) as SnaptradeActivity[];
+        const activities = await fetchAccountActivities(
+          client,
+          creds,
+          snaptradeAccountId,
+        );
 
         for (const activity of activities) {
           const externalId = activity.id;
@@ -369,6 +412,7 @@ export async function syncSnaptradeForUser(
               db,
               ticker,
               activity.symbol?.description ?? ticker,
+              activity.price != null ? parseMoney(activity.price) : undefined,
             );
           }
 
@@ -406,6 +450,8 @@ export async function syncSnaptradeForUser(
 
     await ensureAccountsAssignedToOwner(userId, accountIds);
   }
+
+  await refreshFireProfile(userId);
 
   log.info(
     {

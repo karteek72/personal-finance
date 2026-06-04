@@ -7,6 +7,10 @@ import {
   securities,
 } from "../db/schema.js";
 import { formatMoneyAmount, roundPercent } from "../lib/money.js";
+import {
+  buildInvestmentBehavioralAlerts,
+  buildInvestmentHistorySummary,
+} from "./investment-analytics.js";
 import { resolveHouseholdContext } from "./household-access.js";
 
 export interface InvestmentHolding {
@@ -36,6 +40,37 @@ export interface InvestmentsResponse {
   }>;
   holdings: InvestmentHolding[];
   behavioralAlerts: Array<{ type: string; title: string; desc: string }>;
+  investmentHistory: {
+    lookbackYears: number;
+    totalContributed: string;
+    estimatedValueToday: string;
+    monthlyAverageInvest: string;
+    transactionCount: number;
+  } | null;
+}
+
+function holdingMarketValue(input: {
+  quantity: string;
+  costBasis: string;
+  institutionValue: string | null;
+  currentPrice: string;
+}): { value: number; unitPrice: number; cost: number } {
+  const qty = Number.parseFloat(input.quantity);
+  const basis = Number.parseFloat(input.costBasis);
+  const cost = qty * basis;
+
+  const institution = Number.parseFloat(input.institutionValue ?? "0");
+  if (institution > 0) {
+    const unitPrice = qty > 0 ? institution / qty : basis;
+    return { value: institution, unitPrice, cost };
+  }
+
+  const price = Number.parseFloat(input.currentPrice);
+  if (price > 0) {
+    return { value: qty * price, unitPrice: price, cost };
+  }
+
+  return { value: cost, unitPrice: basis, cost };
 }
 
 export async function getInvestments(
@@ -60,6 +95,7 @@ export async function getInvestments(
       accountId: holdings.accountId,
       quantity: holdings.quantity,
       costBasis: holdings.costBasis,
+      institutionValue: holdings.institutionValue,
       ticker: securities.ticker,
       name: securities.name,
       sector: securities.sector,
@@ -74,10 +110,12 @@ export async function getInvestments(
   let totalCostBasis = 0;
   const mapped: InvestmentHolding[] = holdingRows.map((row) => {
     const qty = Number.parseFloat(row.quantity);
-    const price = Number.parseFloat(row.currentPrice);
-    const basis = Number.parseFloat(row.costBasis);
-    const value = qty * price;
-    const cost = qty * basis;
+    const { value, unitPrice, cost } = holdingMarketValue({
+      quantity: row.quantity,
+      costBasis: row.costBasis,
+      institutionValue: row.institutionValue,
+      currentPrice: row.currentPrice,
+    });
     portfolioValue += value;
     totalCostBasis += cost;
     return {
@@ -86,8 +124,8 @@ export async function getInvestments(
       sector: row.sector,
       assetType: row.assetType,
       quantity: qty,
-      costBasis: formatMoneyAmount(basis),
-      currentPrice: formatMoneyAmount(price),
+      costBasis: formatMoneyAmount(Number.parseFloat(row.costBasis)),
+      currentPrice: formatMoneyAmount(unitPrice),
       value: formatMoneyAmount(value),
       gainLoss: formatMoneyAmount(value - cost),
       gainLossPercent: cost > 0 ? roundPercent(((value - cost) / cost) * 100) : 0,
@@ -96,26 +134,18 @@ export async function getInvestments(
   mapped.sort((a, b) => Number.parseFloat(b.value) - Number.parseFloat(a.value));
 
   const totalGainLoss = portfolioValue - totalCostBasis;
-  const topHolding = mapped[0];
-  const behavioralAlerts: InvestmentsResponse["behavioralAlerts"] = [];
-  if (topHolding && portfolioValue > 0) {
-    const share = (Number.parseFloat(topHolding.value) / portfolioValue) * 100;
-    if (share > 30) {
-      behavioralAlerts.push({
-        type: "warning",
-        title: "Concentration risk",
-        desc: `${topHolding.ticker} is ${Math.round(share)}% of your portfolio — consider diversifying.`,
-      });
-    }
-  }
-  behavioralAlerts.push({
-    type: "info",
-    title: "Dollar-cost averaging",
-    desc: "Your recurring monthly buys keep lowering your average cost basis.",
-  });
+  const behavioralAlerts = await buildInvestmentBehavioralAlerts(ctx.userIds);
+  const investmentHistory = await buildInvestmentHistorySummary(ctx.userIds);
+
+  const accountBalanceTotal = investmentAccounts.reduce(
+    (sum, account) => sum + Number.parseFloat(account.balanceCurrent ?? "0"),
+    0,
+  );
+  const displayPortfolioValue =
+    portfolioValue > 0 ? portfolioValue : accountBalanceTotal;
 
   return {
-    portfolioValue: formatMoneyAmount(portfolioValue),
+    portfolioValue: formatMoneyAmount(displayPortfolioValue),
     totalCostBasis: formatMoneyAmount(totalCostBasis),
     totalGainLoss: formatMoneyAmount(totalGainLoss),
     totalGainLossPercent:
@@ -131,6 +161,7 @@ export async function getInvestments(
     })),
     holdings: mapped,
     behavioralAlerts,
+    investmentHistory,
   };
 }
 

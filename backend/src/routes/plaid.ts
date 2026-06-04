@@ -32,7 +32,9 @@ const exchangeTokenBodySchema = z.object({
 function resolvePlaidRedirectUri(env: {
   PLAID_ENV: string;
   PLAID_REDIRECT_URI?: string;
+  PLAID_OAUTH_ENABLED?: boolean;
 }): string | undefined {
+  if (!env.PLAID_OAUTH_ENABLED) return undefined;
   const uri = env.PLAID_REDIRECT_URI?.trim();
   if (!uri) return undefined;
   if (env.PLAID_ENV === "production" && !uri.startsWith("https://")) {
@@ -72,7 +74,10 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
     const redirectUri = resolvePlaidRedirectUri(app.config.env);
     if (redirectUri) {
       linkTokenRequest.redirect_uri = redirectUri;
-    } else if (app.config.env.PLAID_REDIRECT_URI) {
+    } else if (
+      app.config.env.PLAID_REDIRECT_URI &&
+      app.config.env.PLAID_OAUTH_ENABLED
+    ) {
       request.log.warn(
         "PLAID_REDIRECT_URI ignored — production requires HTTPS. Use ngrok or deploy for OAuth banks.",
       );

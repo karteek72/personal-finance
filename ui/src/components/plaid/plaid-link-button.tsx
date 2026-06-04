@@ -130,6 +130,8 @@ export function PlaidLinkButton({
 }: PlaidLinkButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [fetchAttempt, setFetchAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +139,7 @@ export function PlaidLinkButton({
     async function fetchLinkToken() {
       try {
         setLoading(true);
+        setInitError(null);
         const response = await api.createPlaidLinkToken("web", itemId);
         if (!cancelled) {
           storePlaidLinkToken(response.linkToken);
@@ -144,11 +147,13 @@ export function PlaidLinkButton({
         }
       } catch (error) {
         if (!cancelled) {
-          onError?.(
+          const message =
             error instanceof Error
               ? error.message
-              : "Failed to initialize Plaid Link",
-          );
+              : "Failed to initialize Plaid Link";
+          setInitError(message);
+          setLinkToken(null);
+          onError?.(message);
         }
       } finally {
         if (!cancelled) {
@@ -161,7 +166,19 @@ export function PlaidLinkButton({
     return () => {
       cancelled = true;
     };
-  }, [itemId, onError]);
+  }, [itemId, onError, fetchAttempt]);
+
+  if (initError) {
+    return (
+      <button
+        type="button"
+        className={className ?? defaultClassName}
+        onClick={() => setFetchAttempt((n) => n + 1)}
+      >
+        Retry Plaid setup
+      </button>
+    );
+  }
 
   if (loading || !linkToken) {
     if (variant === "icon") {

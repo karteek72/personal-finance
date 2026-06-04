@@ -3,7 +3,6 @@ import { getDb } from "../db/client.js";
 import {
   accounts,
   budgets,
-  fireProfiles,
   lifestyleHabits,
   recurringSeries,
   savingsGoals,
@@ -16,6 +15,10 @@ import {
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
 import { detectRecurringFromTransactions } from "./detect-recurring.js";
+import {
+  computeFireProfileInputs,
+  refreshFireProfile,
+} from "./investment-analytics.js";
 import { resolveHouseholdContext } from "./household-access.js";
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -418,22 +421,21 @@ export async function getFire(userId: string): Promise<FireResponse | null> {
   if (!hasActiveAccounts) {
     return null;
   }
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(fireProfiles)
-    .where(inArray(fireProfiles.userId, ctx.userIds))
-    .limit(1);
-  if (!row) {
+
+  await refreshFireProfile(userId);
+
+  const live = await computeFireProfileInputs(userId, ctx.userIds);
+  if (!live) {
     return null;
   }
+
   return {
-    currentAge: row.currentAge,
-    currentNetWorth: formatMoneyAmount(row.currentNetWorth),
-    monthlySpend: formatMoneyAmount(row.monthlySpend),
-    monthlyInvest: formatMoneyAmount(row.monthlyInvest),
-    withdrawalRate: roundDecimal(Number.parseFloat(row.withdrawalRate)),
-    realReturn: roundDecimal(Number.parseFloat(row.realReturn)),
+    currentAge: live.currentAge,
+    currentNetWorth: live.currentNetWorth,
+    monthlySpend: live.monthlySpend,
+    monthlyInvest: live.monthlyInvest,
+    withdrawalRate: live.withdrawalRate,
+    realReturn: live.realReturn,
   };
 }
 

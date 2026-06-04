@@ -6,6 +6,7 @@ import {
   drizzleActiveTransactionWhere,
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
+import { computeInvestmentGrowthScore } from "./investment-analytics.js";
 import { emptyWellnessResponse, type WellnessResponse } from "./insights-store.js";
 import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
 
@@ -93,6 +94,7 @@ function buildDimensions(input: {
   expenseRatio: number;
   goalsOnTrack: number;
   goalCount: number;
+  investmentGrowth: { score: number; description: string; trend: string };
 }): WellnessResponse["dimensions"] {
   const savingsScore = scoreFromRatio(input.savingsRate, 20, true);
   const debtScore = scoreFromRatio(30, Math.max(input.utilization, 0.01), false);
@@ -141,10 +143,10 @@ function buildDimensions(input: {
     },
     {
       name: "Investment Growth",
-      score: 50,
+      score: input.investmentGrowth.score,
       weight: 10,
-      description: "Connect investment accounts for growth tracking",
-      trend: "neutral",
+      description: input.investmentGrowth.description,
+      trend: input.investmentGrowth.trend,
     },
     {
       name: "Goal Pace",
@@ -174,6 +176,9 @@ export async function computeWellnessFromTransactions(
   if (!hasActiveAccounts) {
     return emptyWellnessResponse();
   }
+
+  const investmentGrowth = await computeInvestmentGrowthScore(userIds);
+  const defaultInvestmentGrowth = investmentGrowth;
 
   const db = getDb();
   const txScope = drizzleActiveTransactionWhere(userIds, accountIds);
@@ -205,6 +210,7 @@ export async function computeWellnessFromTransactions(
       expenseRatio,
       goalsOnTrack: 0,
       goalCount: 0,
+      investmentGrowth: defaultInvestmentGrowth,
     });
     history.push({ month: mk.slice(5), score: compositeScore(dims) });
   }
@@ -242,6 +248,7 @@ export async function computeWellnessFromTransactions(
     expenseRatio,
     goalsOnTrack,
     goalCount: goalRows.length,
+    investmentGrowth,
   });
   const score = compositeScore(dimensions);
   const priorDims = priorTotals
@@ -255,6 +262,7 @@ export async function computeWellnessFromTransactions(
             : 100,
         goalsOnTrack,
         goalCount: goalRows.length,
+        investmentGrowth,
       })
     : null;
   const priorScore = priorDims ? compositeScore(priorDims) : score;

@@ -38,7 +38,9 @@ export function InvestmentsPanel() {
   if (isLoading) return <FeaturePanelLoading />;
 
   const investmentAccounts = (data?.accounts ?? []).filter((a) => a.type === "investment");
-  const portfolioValue = investmentAccounts.reduce((s, a) => s + Number.parseFloat(a.balanceCurrent ?? "0"), 0);
+  const portfolioValue = investments?.portfolioValue
+    ? Number.parseFloat(investments.portfolioValue)
+    : investmentAccounts.reduce((s, a) => s + Number.parseFloat(a.balanceCurrent ?? "0"), 0);
 
   const holdings: Holding[] = (investments?.holdings ?? []).map((h) => ({
     ticker: h.ticker,

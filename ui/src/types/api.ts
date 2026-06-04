@@ -464,6 +464,13 @@ export interface InvestmentsResponse {
   }[];
   holdings: InvestmentHolding[];
   behavioralAlerts: { type: string; title: string; desc: string }[];
+  investmentHistory: {
+    lookbackYears: number;
+    totalContributed: string;
+    estimatedValueToday: string;
+    monthlyAverageInvest: string;
+    transactionCount: number;
+  } | null;
 }
 
 export interface BudgetsResponse {

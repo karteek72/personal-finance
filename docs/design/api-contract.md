@@ -175,8 +175,8 @@ Backed by the demo dataset (Drizzle tables + derived rollups). All scoped to the
 | Method | Path | Response |
 |--------|------|----------|
 | GET | `/wealth/net-worth` | `NetWorthResponse` — current totals + monthly snapshot trend + asset/liability breakdown |
-| GET | `/wealth/investments` | `InvestmentsResponse` — holdings, securities, allocation, behavioral alerts |
-| GET | `/wealth/fire` | `FireResponse` — age, net worth, monthly spend/invest, withdrawal rate, real return (`404` if no profile) |
+| GET | `/wealth/investments` | `InvestmentsResponse` — holdings, securities, allocation, behavioral alerts, `investmentHistory` (3y contribution rollup from synced brokerage activity) |
+| GET | `/wealth/fire` | `FireResponse` — age, net worth, monthly spend/invest, withdrawal rate, real return (computed live from accounts + investment activity; `404` only when no accounts) |
 
 ---
 

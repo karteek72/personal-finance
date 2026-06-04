@@ -190,5 +190,12 @@
       "title": "You invest more than you dine out",
       "desc": "You invested $2,100 last month vs $487 on dining."
     }
-  ]
+  ],
+  "investmentHistory": {
+    "lookbackYears": 3,
+    "totalContributed": "75600.00",
+    "estimatedValueToday": "89200.00",
+    "monthlyAverageInvest": "2100.00",
+    "transactionCount": 36
+  }
 }

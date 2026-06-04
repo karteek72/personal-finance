@@ -554,6 +554,14 @@ export function AccountsView() {
             <ConnectAccountButton
               label="Connect your first account"
               onSuccess={handleConnected}
+              onError={(message) => {
+                notifications.push(
+                  "error",
+                  "Could not link account",
+                  message,
+                  "account-connect",
+                );
+              }}
             />
           </div>
         </Card>

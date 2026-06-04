@@ -24,6 +24,11 @@ const envSchema = z.object({
     (value) => (value === "" || value === undefined ? undefined : value),
     z.string().url().optional(),
   ),
+  /** Set to true only after registering PLAID_REDIRECT_URI in the Plaid dashboard. */
+  PLAID_OAUTH_ENABLED: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
   APP_URL: z.string().url().default("http://localhost:4000"),
   /** Base URL for household invite links (web app). */
   UI_APP_URL: z.string().url().default("http://localhost:3002"),
@@ -74,6 +79,15 @@ const envSchema = z.object({
   SNAPTRADE_REDIRECT_URI: z.preprocess(
     (value) => (value === "" || value === undefined ? undefined : value),
     z.string().url().optional(),
+  ),
+  /** Personal SnapTrade keys allow one registered user — reuse in local dev. */
+  SNAPTRADE_SHARED_USER_ID: z.preprocess(
+    (value) => (value === "" || value === undefined ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+  SNAPTRADE_SHARED_USER_SECRET: z.preprocess(
+    (value) => (value === "" || value === undefined ? undefined : value),
+    z.string().min(1).optional(),
   ),
 });
 

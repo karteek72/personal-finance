@@ -29,19 +29,10 @@ export function FirePanel() {
   const gate = useFeaturePanelGate("FIRE projection");
   const { data: fire, isLoading, isError } = useFire();
 
-  if (!gate.ready) return gate.node;
-  if (isLoading) return <FeaturePanelLoading />;
-  if (isError || !fire) {
-    return <FeatureEmptyState feature="FIRE projection" variant="insufficient-data" />;
-  }
-
-  const CURRENT_AGE = fire.currentAge;
-  const CURRENT_NET_WORTH = Number.parseFloat(fire.currentNetWorth);
-
   const [monthlySpend, setMonthlySpend] = useState(4200);
   const [monthlyInvest, setMonthlyInvest] = useState(2100);
-  const [withdrawalRate, setWithdrawalRate] = useState(4); // %
-  const [realReturn, setRealReturn] = useState(6); // %
+  const [withdrawalRate, setWithdrawalRate] = useState(4);
+  const [realReturn, setRealReturn] = useState(6);
 
   const seeded = useRef(false);
   useEffect(() => {
@@ -54,24 +45,48 @@ export function FirePanel() {
     }
   }, [fire]);
 
-  const fireNumber = (monthlySpend * 12) / (withdrawalRate / 100);
-  const years = yearsToTarget(CURRENT_NET_WORTH, monthlyInvest, fireNumber, realReturn / 100);
-  const fireAge = CURRENT_AGE + years;
-  const savingsRate = Math.round((monthlyInvest / (monthlyInvest + monthlySpend)) * 100);
+  const currentAge = fire?.currentAge ?? 35;
+  const currentNetWorth = fire
+    ? Number.parseFloat(fire.currentNetWorth)
+    : 0;
 
-  // Projection curve points (yearly balances up to FIRE or 40y)
+  const fireNumber = (monthlySpend * 12) / (withdrawalRate / 100);
+  const years = yearsToTarget(
+    currentNetWorth,
+    monthlyInvest,
+    fireNumber,
+    realReturn / 100,
+  );
+  const fireAge = currentAge + years;
+  const savingsRate = Math.round(
+    (monthlyInvest / (monthlyInvest + monthlySpend)) * 100,
+  );
+
   const curve = useMemo(() => {
     const pts: number[] = [];
-    let balance = CURRENT_NET_WORTH;
+    let balance = currentNetWorth;
     const cap = Math.min(Math.ceil(years) + 2, 45);
     for (let y = 0; y <= cap; y++) {
       pts.push(balance);
-      for (let m = 0; m < 12; m++) balance = balance * (1 + realReturn / 100 / 12) + monthlyInvest;
+      for (let m = 0; m < 12; m++) {
+        balance = balance * (1 + realReturn / 100 / 12) + monthlyInvest;
+      }
     }
     return pts;
-  }, [monthlyInvest, realReturn, years]);
+  }, [currentNetWorth, monthlyInvest, realReturn, years]);
 
   const maxVal = Math.max(...curve, fireNumber);
+
+  if (!gate.ready) return gate.node;
+  if (isLoading) return <FeaturePanelLoading />;
+  if (isError || !fire) {
+    return (
+      <FeatureEmptyState
+        feature="FIRE projection"
+        variant="insufficient-data"
+      />
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -116,7 +131,7 @@ export function FirePanel() {
           </div>
         </div>
         <div className="mt-2 flex justify-between text-[10px] text-text-muted">
-          <span>Now (age {CURRENT_AGE})</span>
+          <span>Now (age {currentAge})</span>
           <span>Age {fireAge.toFixed(0)}</span>
         </div>
       </div>
@@ -152,14 +167,14 @@ export function FirePanel() {
         <p className="mb-2 text-sm font-bold text-text">Accelerators</p>
         <div className="space-y-2 text-sm">
           {[
-            { label: "Invest $300/mo more", delta: yearsToTarget(CURRENT_NET_WORTH, monthlyInvest + 300, fireNumber, realReturn / 100) },
-            { label: "Cut $400/mo of spending (lowers FIRE number too)", delta: yearsToTarget(CURRENT_NET_WORTH, monthlyInvest + 400, ((monthlySpend - 400) * 12) / (withdrawalRate / 100), realReturn / 100) },
+            { label: "Invest $300/mo more", delta: yearsToTarget(currentNetWorth, monthlyInvest + 300, fireNumber, realReturn / 100) },
+            { label: "Cut $400/mo of spending (lowers FIRE number too)", delta: yearsToTarget(currentNetWorth, monthlyInvest + 400, ((monthlySpend - 400) * 12) / (withdrawalRate / 100), realReturn / 100) },
           ].map((row) => {
             const saved = years - row.delta;
             return (
               <div key={row.label} className="flex items-center justify-between rounded-[var(--radius-sm)] border border-border px-3 py-2">
                 <span className="text-text">{row.label}</span>
-                <span className="font-semibold text-success">−{saved.toFixed(1)} yrs → age {(CURRENT_AGE + row.delta).toFixed(0)}</span>
+                <span className="font-semibold text-success">−{saved.toFixed(1)} yrs → age {(currentAge + row.delta).toFixed(0)}</span>
               </div>
             );
           })}
