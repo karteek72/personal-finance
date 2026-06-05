@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { QueryActivityBar } from "@/components/layout/query-activity-bar";
 import { Sidebar } from "@/components/layout/sidebar";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { TopBar } from "@/components/layout/top-bar";
 import { InsightNotificationsSync } from "@/components/notifications/insight-notifications-sync";
 import { CoachAssistant } from "@/components/preview/coach-assistant";
@@ -44,6 +45,7 @@ export default function DashboardLayout({
             <QueryActivityBar />
             <div className="animate-fade-in mx-auto w-full min-w-0 max-w-5xl xl:max-w-7xl">
               {children}
+              <SiteFooter />
             </div>
           </main>
         </div>
