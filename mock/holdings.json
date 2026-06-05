@@ -41,6 +41,46 @@
       "institutionValue": "1488.80"
     },
     {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "securityId": "c0000000-0000-4000-8000-00000000000c",
+      "ticker": "AAPL  260620C00220000",
+      "quantity": "16",
+      "costBasis": "4.2500",
+      "institutionValue": "8160.00"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "securityId": "c0000000-0000-4000-8000-00000000000d",
+      "ticker": "AAPL  260718C00230000",
+      "quantity": "5",
+      "costBasis": "3.8000",
+      "institutionValue": "2100.00"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "securityId": "c0000000-0000-4000-8000-00000000000e",
+      "ticker": "TSLA  260627P00175000",
+      "quantity": "3",
+      "costBasis": "2.1000",
+      "institutionValue": "555.00"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "securityId": "c0000000-0000-4000-8000-00000000000f",
+      "ticker": "MSFT  260815C00300000",
+      "quantity": "6",
+      "costBasis": "5.5000",
+      "institutionValue": "3720.00"
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "securityId": "c0000000-0000-4000-8000-000000000010",
+      "ticker": "NVDA  260718C00135000",
+      "quantity": "5",
+      "costBasis": "7.2000",
+      "institutionValue": "4250.00"
+    },
+    {
       "accountId": "a1b2c3d4-e5f6-4789-a012-345678901008",
       "securityId": "c0000000-0000-4000-8000-000000000006",
       "ticker": "VTI",

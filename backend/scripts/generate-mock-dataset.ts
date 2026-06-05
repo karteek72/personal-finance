@@ -14,13 +14,24 @@
  *     with edge cases: pending, transfers, CC payments, refunds, duplicate
  *     charges, large/unusual purchases, ATM/overdraft/late fees, salary +
  *     side income, subscription price increase, investment buys/sells/dividends/
- *     contributions.
+ *     contributions, options (calls/puts with short-dated + swing expirations).
  *   - Derived feature fixtures for every preview feature.
  *
  * Scripts are not part of `tsc` build (tsconfig include = src/**). Run via tsx.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+
+import { formatMoneyAmount } from "../src/lib/money.js";
+import { cashImpactForInvestmentTx } from "../src/services/investment-analytics.js";
+import {
+  aggregateStockPositions,
+  buildPortfolioBreakdown,
+  holdingMarketValue,
+  isOptionAssetType,
+  mapHoldingRow,
+  type InvestmentPosition,
+} from "../src/services/holdings-mapper.js";
 
 /* ----------------------------- helpers ----------------------------- */
 
@@ -161,6 +172,12 @@ const SECS: SecDef[] = [
   { ticker: "VBTLX", name: "Vanguard Total Bond Market", assetType: "mutual_fund", sector: "Fixed Income", price: 9.78 },
   { ticker: "BTC", name: "Bitcoin", assetType: "crypto", sector: "Crypto", price: 68120.0 },
   { ticker: "ETH", name: "Ethereum", assetType: "crypto", sector: "Crypto", price: 3412.0 },
+  // Fidelity brokerage options — OCC symbols; sector encodes type · underlying · expiration
+  { ticker: "AAPL  260620C00220000", name: "AAPL $220 Call · Jun 20, 2026", assetType: "option", sector: "Call · AAPL · exp Jun 20, 2026", price: 5.1 },
+  { ticker: "AAPL  260718C00230000", name: "AAPL $230 Call · Jul 18, 2026", assetType: "option", sector: "Call · AAPL · exp Jul 18, 2026", price: 4.2 },
+  { ticker: "TSLA  260627P00175000", name: "TSLA $175 Put · Jun 27, 2026", assetType: "option", sector: "Put · TSLA · exp Jun 27, 2026", price: 1.85 },
+  { ticker: "MSFT  260815C00300000", name: "MSFT $300 Call · Aug 15, 2026", assetType: "option", sector: "Call · MSFT · exp Aug 15, 2026", price: 6.2 },
+  { ticker: "NVDA  260718C00135000", name: "NVDA $135 Call · Jul 18, 2026", assetType: "option", sector: "Call · NVDA · exp Jul 18, 2026", price: 8.5 },
 ];
 const secIdByTicker = new Map(SECS.map((s, i) => [s.ticker, secId(i + 1)]));
 
@@ -171,6 +188,11 @@ const HOLDINGS: HoldingDef[] = [
   { accountId: BROKERAGE, ticker: "MSFT", quantity: 12, costBasis: 301.0 },
   { accountId: BROKERAGE, ticker: "TSLA", quantity: 10, costBasis: 241.5 },
   { accountId: BROKERAGE, ticker: "AMZN", quantity: 8, costBasis: 131.2 },
+  { accountId: BROKERAGE, ticker: "AAPL  260620C00220000", quantity: 16, costBasis: 4.25 },
+  { accountId: BROKERAGE, ticker: "AAPL  260718C00230000", quantity: 5, costBasis: 3.8 },
+  { accountId: BROKERAGE, ticker: "TSLA  260627P00175000", quantity: 3, costBasis: 2.1 },
+  { accountId: BROKERAGE, ticker: "MSFT  260815C00300000", quantity: 6, costBasis: 5.5 },
+  { accountId: BROKERAGE, ticker: "NVDA  260718C00135000", quantity: 5, costBasis: 7.2 },
   { accountId: ROTH, ticker: "VTI", quantity: 30, costBasis: 201.3 },
   { accountId: ROTH, ticker: "VXUS", quantity: 50, costBasis: 55.4 },
   { accountId: K401, ticker: "FXAIX", quantity: 120, costBasis: 141.0 },
@@ -179,12 +201,26 @@ const HOLDINGS: HoldingDef[] = [
   { accountId: CRYPTO, ticker: "ETH", quantity: 1.2, costBasis: 2210.0 },
 ];
 
-const priceOf = (t: string): number => SECS.find((s) => s.ticker === t)!.price;
-// set investment account balances from holdings
+const secOf = (t: string): SecDef => SECS.find((s) => s.ticker === t)!;
+const priceOf = (t: string): number => secOf(t).price;
+
+function holdingInstitutionValue(h: HoldingDef): number {
+  const sec = secOf(h.ticker);
+  return holdingMarketValue({
+    quantity: h.quantity.toString(),
+    costBasis: h.costBasis.toFixed(4),
+    institutionValue: null,
+    currentPrice: sec.price.toFixed(4),
+    assetType: sec.assetType,
+    ticker: h.ticker,
+  }).value;
+}
+
+// set investment account balances from holdings (options use contract ×100 premium)
 for (const acc of ACCOUNTS) {
   if (acc.type !== "investment" || acc.subtype === "hsa") continue;
   const total = HOLDINGS.filter((h) => h.accountId === acc.id).reduce(
-    (s, h) => s + h.quantity * priceOf(h.ticker),
+    (s, h) => s + holdingInstitutionValue(h),
     0,
   );
   acc.balanceCurrent = round2(total);
@@ -542,6 +578,18 @@ for (const { y, mo } of months) {
 // one sell (TSLA trim, a loss)
 addInv({ accountId: BROKERAGE, ticker: "TSLA", date: "2026-02-12", name: "Sell TSLA", type: "sell", quantity: 3, price: 192.0, amount: 576.0, fees: 0 });
 
+// options book — premium per share; amount = contracts × premium × 100
+addInv({ accountId: BROKERAGE, ticker: "AAPL  260718C00230000", date: "2026-04-15", name: "Buy AAPL Jul 230 Call", type: "buy", quantity: 5, price: 3.8, amount: 1900, fees: 0.65 });
+addInv({ accountId: BROKERAGE, ticker: "MSFT  260815C00300000", date: "2026-05-10", name: "Buy MSFT Aug 300 Call", type: "buy", quantity: 4, price: 5.5, amount: 2200, fees: 0.65 });
+addInv({ accountId: BROKERAGE, ticker: "AAPL  260620C00220000", date: "2026-05-08", name: "Buy AAPL Jun 220 Call", type: "buy", quantity: 6, price: 4.25, amount: 2550, fees: 0.65 });
+addInv({ accountId: BROKERAGE, ticker: "NVDA  260718C00135000", date: "2026-05-18", name: "Buy NVDA Jul 135 Call", type: "buy", quantity: 5, price: 7.2, amount: 3600, fees: 0.65 });
+addInv({ accountId: BROKERAGE, ticker: "TSLA  260627P00175000", date: "2026-05-22", name: "Buy TSLA Jun 175 Put", type: "buy", quantity: 3, price: 2.1, amount: 630, fees: 0.65 });
+addInv({ accountId: BROKERAGE, ticker: "AAPL  260620C00220000", date: "2026-05-28", name: "Buy AAPL Jun 220 Call", type: "buy", quantity: 10, price: 4.85, amount: 4850, fees: 0.65 });
+addInv({ accountId: BROKERAGE, ticker: "MSFT  260815C00300000", date: "2026-06-01", name: "Buy MSFT Aug 300 Call", type: "buy", quantity: 2, price: 5.65, amount: 1130, fees: 0.65 });
+// current month (Jun 2026) — months[] ends at May; add deploy activity for monthlyActivity card
+addInv({ accountId: K401, ticker: "FXAIX", date: dateStr(2026, 6, 1), name: "401(k) Contribution", type: "contribution", quantity: 8, price: priceOf("FXAIX"), amount: 1500, fees: 0 });
+addInv({ accountId: ROTH, ticker: "VTI", date: dateStr(2026, 6, 3), name: "Roth IRA Contribution", type: "contribution", quantity: 1.86, price: priceOf("VTI"), amount: 500, fees: 0 });
+
 /* ----------------------------- derivations ----------------------------- */
 
 const spendMonths = months.map(({ y, mo }) => monthKey(y, mo));
@@ -816,26 +864,323 @@ const safeToSpend = 47;
 const daysRemaining = daysInMonth(2026, 5) - 4;
 
 /* ----- investments response ----- */
-const holdingRows = HOLDINGS.map((h) => {
-  const price = priceOf(h.ticker);
-  const value = round2(h.quantity * price);
-  const cost = round2(h.quantity * h.costBasis);
-  const sec = SECS.find((s) => s.ticker === h.ticker)!;
+
+const INVESTMENT_ACCOUNT_META = new Map(
+  ACCOUNTS.filter((a) => a.type === "investment").map((a) => [
+    a.id,
+    { name: a.name, institutionName: a.institutionName, mask: a.mask },
+  ]),
+);
+
+const MOCK_AS_OF = new Date(dateStr(TODAY.y, TODAY.mo, TODAY.d));
+
+function parseExpirationLabel(label: string | null | undefined): Date | null {
+  if (!label) return null;
+  const parsed = new Date(label);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function buildMockInvestmentBehavioralAlerts(
+  positions: InvestmentPosition[],
+): Array<{ type: string; title: string; desc: string }> {
+  const alerts: Array<{ type: string; title: string; desc: string }> = [];
+  let portfolioValue = 0;
+  let stocksValue = 0;
+  let optionsValue = 0;
+  const stockByTicker = new Map<string, number>();
+  const optionByUnderlying = new Map<string, number>();
+  let expiringOptionCount = 0;
+  let shortDatedOptionCount = 0;
+  let swingDatedOptionCount = 0;
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  for (const position of positions) {
+    const value = Number.parseFloat(position.value);
+    portfolioValue += value;
+    if (isOptionAssetType(position.assetType, position.ticker)) {
+      optionsValue += value;
+      const underlying =
+        position.underlyingTicker ?? position.ticker.split(/\s+/)[0] ?? position.ticker;
+      optionByUnderlying.set(
+        underlying,
+        (optionByUnderlying.get(underlying) ?? 0) + value,
+      );
+      const exp = parseExpirationLabel(position.expirationLabel);
+      if (exp && exp >= MOCK_AS_OF) {
+        const daysToExp = (exp.getTime() - MOCK_AS_OF.getTime()) / dayMs;
+        if (daysToExp <= 30) expiringOptionCount += 1;
+        if (daysToExp <= 21) shortDatedOptionCount += 1;
+        else if (daysToExp <= 90) swingDatedOptionCount += 1;
+      }
+    } else if (
+      position.assetType === "equity" ||
+      position.assetType === "etf" ||
+      position.assetType === "mutual_fund"
+    ) {
+      stocksValue += value;
+      stockByTicker.set(
+        position.ticker,
+        (stockByTicker.get(position.ticker) ?? 0) + value,
+      );
+    }
+  }
+
+  if (stocksValue > 0) {
+    const ranked = [...stockByTicker.entries()].sort((a, b) => b[1] - a[1]);
+    const [topTicker, topValue] = ranked[0] ?? [];
+    if (topTicker && topValue) {
+      const share = (topValue / stocksValue) * 100;
+      if (share > 30) {
+        alerts.push({
+          type: "warning",
+          title: "Stock concentration",
+          desc: `${topTicker} is ${Math.round(share)}% of your stock & ETF holdings — consider diversifying equity exposure.`,
+        });
+      }
+    }
+  }
+
+  if (portfolioValue > 0 && optionsValue > 0) {
+    const optionsShare = (optionsValue / portfolioValue) * 100;
+    if (optionsShare > 35) {
+      alerts.push({
+        type: "warning",
+        title: "High options exposure",
+        desc: `Options are ${Math.round(optionsShare)}% of portfolio value (${formatMoneyAmount(optionsValue)}). Options carry leverage and time-decay risk distinct from stocks.`,
+      });
+    } else if (optionsShare > 15) {
+      alerts.push({
+        type: "info",
+        title: "Options allocation",
+        desc: `Options represent ${Math.round(optionsShare)}% of portfolio value. Monitor expirations and underlying concentration separately from stocks.`,
+      });
+    }
+  }
+
+  if (optionByUnderlying.size > 0 && optionsValue > 0) {
+    const ranked = [...optionByUnderlying.entries()].sort((a, b) => b[1] - a[1]);
+    const [topUnderlying, topValue] = ranked[0] ?? [];
+    if (topUnderlying && topValue) {
+      const share = (topValue / optionsValue) * 100;
+      if (share > 40) {
+        alerts.push({
+          type: "warning",
+          title: "Options tied to one name",
+          desc: `${topUnderlying} underlies ${Math.round(share)}% of your options value — single-name derivative risk.`,
+        });
+      }
+    }
+  }
+
+  if (expiringOptionCount > 0) {
+    alerts.push({
+      type: "info",
+      title: "Options expiring soon",
+      desc: `${expiringOptionCount} option position${expiringOptionCount === 1 ? "" : "s"} expire within 30 days — review roll or close decisions.`,
+    });
+  }
+
+  const optionsShare =
+    portfolioValue > 0 ? (optionsValue / portfolioValue) * 100 : 0;
+  if (
+    optionsShare >= 20 &&
+    (shortDatedOptionCount > 0 || expiringOptionCount > 0)
+  ) {
+    alerts.push({
+      type: "warning",
+      title: "Short-dated options exposure",
+      desc: `Options are ${Math.round(optionsShare)}% of portfolio value with contracts expiring within ~30 days. Theta decay is high — treat these as short-term trades, not long-term holdings.`,
+    });
+  } else if (swingDatedOptionCount > 0 && optionsShare >= 10) {
+    alerts.push({
+      type: "info",
+      title: "Swing-style options book",
+      desc: "You hold options with mid-range expirations alongside stocks. A swing approach can work — define exit rules before entry and cap risk per underlying.",
+    });
+  }
+
+  alerts.push({
+    type: "positive",
+    title: "Dollar-cost averaging",
+    desc: "You've made buys in 11 of the last 14 months — consistent investing builds long-term wealth.",
+  });
+
+  return alerts;
+}
+
+function buildMockInvestmentMonthlyActivity(): {
+  cashContributions: string;
+  purchaseDeployments: string;
+  totalDeployed: string;
+} {
+  const monthPrefix = monthKey(TODAY.y, TODAY.mo);
+  let cashContributions = 0;
+  let purchaseDeployments = 0;
+
+  for (const row of invTxns) {
+    if (!row.date.startsWith(monthPrefix)) continue;
+    const sec = row.ticker ? secOf(row.ticker) : null;
+    const impact = cashImpactForInvestmentTx({
+      type: row.type,
+      date: row.date,
+      amount: m(row.amount),
+      quantity: row.quantity === null ? null : row.quantity.toString(),
+      price: row.price === null ? null : row.price.toFixed(4),
+      ticker: row.ticker,
+      assetType: sec?.assetType ?? null,
+      securityId: row.ticker ? secIdByTicker.get(row.ticker) ?? null : null,
+      name: row.name,
+    });
+    if (impact <= 0) continue;
+    if (row.type === "contribution") {
+      cashContributions += impact;
+    } else if (row.type === "buy") {
+      purchaseDeployments += impact;
+    }
+  }
+
+  const totalDeployed = cashContributions + purchaseDeployments;
   return {
+    cashContributions: formatMoneyAmount(cashContributions),
+    purchaseDeployments: formatMoneyAmount(purchaseDeployments),
+    totalDeployed: formatMoneyAmount(totalDeployed),
+  };
+}
+
+function buildMockInvestmentHistory(): {
+  lookbackYears: number;
+  totalContributed: string;
+  estimatedValueToday: string;
+  currentPortfolioValue: string;
+  monthlyAverageInvest: string;
+  transactionCount: number;
+  buyTransactionCount: number;
+} {
+  const lookbackYears = 3;
+  const since = monthKey(TODAY.y - lookbackYears, TODAY.mo);
+  let totalContributed = 0;
+  let buyTransactionCount = 0;
+  let contributionCount = 0;
+
+  for (const row of invTxns) {
+    if (row.date < `${since}-01`) continue;
+    const sec = row.ticker ? secOf(row.ticker) : null;
+    const impact = cashImpactForInvestmentTx({
+      type: row.type,
+      date: row.date,
+      amount: m(row.amount),
+      quantity: row.quantity === null ? null : row.quantity.toString(),
+      price: row.price === null ? null : row.price.toFixed(4),
+      ticker: row.ticker,
+      assetType: sec?.assetType ?? null,
+      securityId: row.ticker ? secIdByTicker.get(row.ticker) ?? null : null,
+      name: row.name,
+    });
+    if (impact <= 0) continue;
+    totalContributed += impact;
+    if (row.type === "buy") buyTransactionCount += 1;
+    else if (row.type === "contribution") contributionCount += 1;
+  }
+
+  let portfolioValue = 0;
+  let totalCost = 0;
+  for (const h of HOLDINGS) {
+    const sec = secOf(h.ticker);
+    const mv = holdingMarketValue({
+      quantity: h.quantity.toString(),
+      costBasis: h.costBasis.toFixed(4),
+      institutionValue: null,
+      currentPrice: sec.price.toFixed(4),
+      assetType: sec.assetType,
+      ticker: h.ticker,
+    });
+    portfolioValue += mv.value;
+    totalCost += mv.cost;
+  }
+
+  const growthMultiple =
+    totalCost > 0 ? Math.max(portfolioValue / totalCost, 1) : 1;
+  const estimatedValueToday =
+    growthMultiple > 1
+      ? totalContributed * growthMultiple
+      : Math.min(totalContributed, portfolioValue);
+
+  return {
+    lookbackYears,
+    totalContributed: formatMoneyAmount(totalContributed),
+    estimatedValueToday: formatMoneyAmount(estimatedValueToday),
+    currentPortfolioValue: formatMoneyAmount(portfolioValue),
+    monthlyAverageInvest: formatMoneyAmount(
+      totalContributed / (lookbackYears * 12),
+    ),
+    transactionCount: buyTransactionCount + contributionCount,
+    buyTransactionCount,
+  };
+}
+
+const investmentPositions: InvestmentPosition[] = HOLDINGS.map((h, index) => {
+  const sec = secOf(h.ticker);
+  const account = INVESTMENT_ACCOUNT_META.get(h.accountId);
+  return mapHoldingRow({
+    holdingId: `mock-holding-${index + 1}`,
+    accountId: h.accountId,
+    accountName: account?.name ?? "Investment account",
+    institutionName: account?.institutionName ?? "",
+    accountMask: account?.mask ?? null,
+    quantity: h.quantity.toString(),
+    costBasis: h.costBasis.toFixed(4),
+    institutionValue: m(holdingInstitutionValue(h)),
     ticker: h.ticker,
     name: sec.name,
     sector: sec.sector,
     assetType: sec.assetType,
-    quantity: h.quantity,
-    costBasis: m(h.costBasis),
-    currentPrice: m(price),
-    value: m(value),
-    gainLoss: m(value - cost),
-    gainLossPercent: round2(((value - cost) / cost) * 100),
-  };
+    currentPrice: sec.price.toFixed(4),
+  });
 });
-const portfolioValue = round2(holdingRows.reduce((s, h) => s + Number.parseFloat(h.value), 0));
-const totalCostBasis = round2(HOLDINGS.reduce((s, h) => s + h.quantity * h.costBasis, 0));
+
+investmentPositions.sort(
+  (a, b) => Number.parseFloat(b.value) - Number.parseFloat(a.value),
+);
+
+const optionPositions = investmentPositions.filter((p) =>
+  isOptionAssetType(p.assetType, p.ticker),
+);
+const stockAggregates = aggregateStockPositions(investmentPositions);
+const portfolioBreakdown = buildPortfolioBreakdown(investmentPositions);
+
+const portfolioValue = round2(
+  investmentPositions.reduce((s, p) => s + Number.parseFloat(p.value), 0),
+);
+const totalCostBasis = round2(
+  investmentPositions.reduce(
+    (s, p) =>
+      s +
+      p.quantity *
+        Number.parseFloat(p.costBasis) *
+        (isOptionAssetType(p.assetType, p.ticker) ? 100 : 1),
+    0,
+  ),
+);
+
+const holdingRows = investmentPositions.map((p) => ({
+  ticker: p.ticker,
+  name: p.name,
+  sector: p.sector,
+  assetType: p.assetType,
+  quantity: p.quantity,
+  costBasis: p.costBasis,
+  currentPrice: p.currentPrice,
+  value: p.value,
+  gainLoss: p.gainLoss,
+  gainLossPercent: p.gainLossPercent,
+  ...(isOptionAssetType(p.assetType, p.ticker)
+    ? {
+        underlyingTicker: p.underlyingTicker ?? null,
+        optionType: p.optionType ?? null,
+        expirationLabel: p.expirationLabel ?? null,
+      }
+    : {}),
+}));
 
 /* ----- wellness ----- */
 const wellnessHistory = ["2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05"];
@@ -1148,7 +1493,7 @@ const holdingsFile = {
     ticker: h.ticker,
     quantity: h.quantity.toString(),
     costBasis: h.costBasis.toFixed(4),
-    institutionValue: m(h.quantity * priceOf(h.ticker)),
+    institutionValue: m(holdingInstitutionValue(h)),
   })),
 };
 const investmentTxnsFile = {
@@ -1209,7 +1554,7 @@ const manifest = {
     "all-account-types-checking-savings-cash-credit-brokerage-roth-401k-crypto-hsa",
     "fourteen-months-transactions-mom-yoy",
     "edge-cases-pending-transfers-refunds-duplicates-fees-large-purchases",
-    "investments-holdings-securities-buys-sells-dividends-contributions",
+    "investments-holdings-securities-options-buys-sells-dividends-contributions",
     "planning-budgets-goals-recurring-networth",
     "insights-wellness-dna-patterns-behavioral",
     "protect-inflation-resilience",
@@ -1383,13 +1728,21 @@ const investmentsResponse = {
   totalCostBasis: m(totalCostBasis),
   totalGainLoss: m(portfolioValue - totalCostBasis),
   totalGainLossPercent: round2(((portfolioValue - totalCostBasis) / totalCostBasis) * 100),
-  accounts: ACCOUNTS.filter((a) => a.type === "investment").map((a) => ({ accountId: a.id, name: a.name, institutionName: a.institutionName, subtype: a.subtype, value: m(a.balanceCurrent) })),
+  accounts: ACCOUNTS.filter((a) => a.type === "investment").map((a) => ({
+    accountId: a.id,
+    name: a.name,
+    institutionName: a.institutionName,
+    subtype: a.subtype,
+    value: m(a.balanceCurrent),
+  })),
   holdings: holdingRows,
-  behavioralAlerts: [
-    { type: "warning", title: "Concentration risk", desc: "AAPL is 35% of your taxable brokerage — consider diversifying." },
-    { type: "info", title: "Dollar-cost averaging working", desc: "Your monthly buys lowered your average cost basis by 4%." },
-    { type: "positive", title: "You invest more than you dine out", desc: "You invested $2,100 last month vs $487 on dining." },
-  ],
+  positions: investmentPositions,
+  stockAggregates,
+  optionPositions,
+  portfolioBreakdown,
+  behavioralAlerts: buildMockInvestmentBehavioralAlerts(investmentPositions),
+  investmentHistory: buildMockInvestmentHistory(),
+  monthlyActivity: buildMockInvestmentMonthlyActivity(),
 };
 
 const budgetsResponse = { periodMonth: latestMonth, safeToSpend: m(safeToSpend), daysRemaining, budgets: budgetsRows, goals: goalsRows.map((g) => ({ name: g.name, emoji: g.emoji, color: g.color, target: m(g.target), current: m(g.current), deadline: g.deadline })) };
@@ -1498,7 +1851,8 @@ console.log("Generated SpendFlow demo dataset:");
 console.log(`  Accounts:              ${ACCOUNTS.length}`);
 console.log(`  Transactions:          ${txns.length} (Apr 2025 - Jun 2026)`);
 console.log(`  Investment txns:       ${invTxns.length}`);
-console.log(`  Securities / holdings: ${SECS.length} / ${HOLDINGS.length}`);
+console.log(`  Securities / holdings: ${SECS.length} / ${HOLDINGS.length} (${optionPositions.length} options)`);
+console.log(`  Options book value:    $${portfolioBreakdown.optionsValue} (${portfolioBreakdown.optionsSharePercent}% of portfolio)`);
 console.log(`  Net worth:             $${m(netWorth)}  (assets ${m(totalAssets)} - liab ${m(totalLiabilities)})`);
 console.log(`  mock/ files:           ${mockFiles.length}`);
 console.log(`  ui/src/mocks/ files:   ${uiMockFiles.length}`);

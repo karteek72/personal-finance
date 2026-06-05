@@ -1,15 +1,15 @@
 {
-  "portfolioValue": "74060.10",
-  "totalCostBasis": "55601.60",
-  "totalGainLoss": "18458.50",
-  "totalGainLossPercent": 33.2,
+  "portfolioValue": "92845.10",
+  "totalCostBasis": "71831.60",
+  "totalGainLoss": "21013.50",
+  "totalGainLossPercent": 29.25,
   "accounts": [
     {
       "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
       "name": "Fidelity Brokerage",
       "institutionName": "Fidelity",
       "subtype": "brokerage",
-      "value": "24377.70"
+      "value": "43162.70"
     },
     {
       "accountId": "a1b2c3d4-e5f6-4789-a012-345678901008",
@@ -40,20 +40,31 @@
       "value": "3180.00"
     }
   ],
-  "positions": [],
-  "stockAggregates": [],
-  "optionPositions": [],
-  "portfolioBreakdown": {
-    "stocksValue": "63847.70",
-    "optionsValue": "0.00",
-    "otherValue": "10212.40",
-    "stocksSharePercent": 86,
-    "optionsSharePercent": 0,
-    "stockPositionCount": 9,
-    "optionPositionCount": 0,
-    "totalPositionCount": 11
-  },
   "holdings": [
+    {
+      "ticker": "FXAIX",
+      "name": "Fidelity 500 Index Fund",
+      "sector": "Diversified",
+      "assetType": "mutual_fund",
+      "quantity": 120,
+      "costBasis": "141.00",
+      "currentPrice": "185.40",
+      "value": "22248.00",
+      "gainLoss": "5328.00",
+      "gainLossPercent": 31.49
+    },
+    {
+      "ticker": "BTC",
+      "name": "Bitcoin",
+      "sector": "Crypto",
+      "assetType": "crypto",
+      "quantity": 0.15,
+      "costBasis": "42100.00",
+      "currentPrice": "68120.00",
+      "value": "10218.00",
+      "gainLoss": "3903.00",
+      "gainLossPercent": 61.81
+    },
     {
       "ticker": "AAPL",
       "name": "Apple Inc.",
@@ -65,6 +76,33 @@
       "value": "8496.00",
       "gainLoss": "2488.00",
       "gainLossPercent": 41.41
+    },
+    {
+      "ticker": "AAPL  260620C00220000",
+      "name": "AAPL $220 Call · Jun 20, 2026",
+      "sector": "Call · AAPL · exp Jun 20, 2026",
+      "assetType": "option",
+      "quantity": 16,
+      "costBasis": "4.2500",
+      "currentPrice": "5.1000",
+      "value": "8160.00",
+      "gainLoss": "1360.00",
+      "gainLossPercent": 20,
+      "underlyingTicker": "AAPL",
+      "optionType": "Call",
+      "expirationLabel": "Jun 20, 2026"
+    },
+    {
+      "ticker": "VTI",
+      "name": "Vanguard Total Stock Market ETF",
+      "sector": "Diversified",
+      "assetType": "etf",
+      "quantity": 30,
+      "costBasis": "201.30",
+      "currentPrice": "268.70",
+      "value": "8061.00",
+      "gainLoss": "2022.00",
+      "gainLossPercent": 33.48
     },
     {
       "ticker": "VOO",
@@ -91,6 +129,87 @@
       "gainLossPercent": 43.26
     },
     {
+      "ticker": "NVDA  260718C00135000",
+      "name": "NVDA $135 Call · Jul 18, 2026",
+      "sector": "Call · NVDA · exp Jul 18, 2026",
+      "assetType": "option",
+      "quantity": 5,
+      "costBasis": "7.2000",
+      "currentPrice": "8.5000",
+      "value": "4250.00",
+      "gainLoss": "650.00",
+      "gainLossPercent": 18.06,
+      "underlyingTicker": "NVDA",
+      "optionType": "Call",
+      "expirationLabel": "Jul 18, 2026"
+    },
+    {
+      "ticker": "ETH",
+      "name": "Ethereum",
+      "sector": "Crypto",
+      "assetType": "crypto",
+      "quantity": 1.2,
+      "costBasis": "2210.00",
+      "currentPrice": "3412.00",
+      "value": "4094.40",
+      "gainLoss": "1442.40",
+      "gainLossPercent": 54.39
+    },
+    {
+      "ticker": "MSFT  260815C00300000",
+      "name": "MSFT $300 Call · Aug 15, 2026",
+      "sector": "Call · MSFT · exp Aug 15, 2026",
+      "assetType": "option",
+      "quantity": 6,
+      "costBasis": "5.5000",
+      "currentPrice": "6.2000",
+      "value": "3720.00",
+      "gainLoss": "420.00",
+      "gainLossPercent": 12.73,
+      "underlyingTicker": "MSFT",
+      "optionType": "Call",
+      "expirationLabel": "Aug 15, 2026"
+    },
+    {
+      "ticker": "VXUS",
+      "name": "Vanguard Total International ETF",
+      "sector": "Diversified",
+      "assetType": "etf",
+      "quantity": 50,
+      "costBasis": "55.40",
+      "currentPrice": "62.10",
+      "value": "3105.00",
+      "gainLoss": "335.00",
+      "gainLossPercent": 12.09
+    },
+    {
+      "ticker": "AAPL  260718C00230000",
+      "name": "AAPL $230 Call · Jul 18, 2026",
+      "sector": "Call · AAPL · exp Jul 18, 2026",
+      "assetType": "option",
+      "quantity": 5,
+      "costBasis": "3.8000",
+      "currentPrice": "4.2000",
+      "value": "2100.00",
+      "gainLoss": "200.00",
+      "gainLossPercent": 10.53,
+      "underlyingTicker": "AAPL",
+      "optionType": "Call",
+      "expirationLabel": "Jul 18, 2026"
+    },
+    {
+      "ticker": "VBTLX",
+      "name": "Vanguard Total Bond Market",
+      "sector": "Fixed Income",
+      "assetType": "mutual_fund",
+      "quantity": 200,
+      "costBasis": "10.50",
+      "currentPrice": "9.78",
+      "value": "1956.00",
+      "gainLoss": "-144.00",
+      "gainLossPercent": -6.86
+    },
+    {
       "ticker": "TSLA",
       "name": "Tesla Inc.",
       "sector": "Consumer Discretionary",
@@ -115,30 +234,28 @@
       "gainLossPercent": 41.84
     },
     {
-      "ticker": "VTI",
-      "name": "Vanguard Total Stock Market ETF",
-      "sector": "Diversified",
-      "assetType": "etf",
-      "quantity": 30,
-      "costBasis": "201.30",
-      "currentPrice": "268.70",
-      "value": "8061.00",
-      "gainLoss": "2022.00",
-      "gainLossPercent": 33.48
-    },
+      "ticker": "TSLA  260627P00175000",
+      "name": "TSLA $175 Put · Jun 27, 2026",
+      "sector": "Put · TSLA · exp Jun 27, 2026",
+      "assetType": "option",
+      "quantity": 3,
+      "costBasis": "2.1000",
+      "currentPrice": "1.8500",
+      "value": "555.00",
+      "gainLoss": "-75.00",
+      "gainLossPercent": -11.9,
+      "underlyingTicker": "TSLA",
+      "optionType": "Put",
+      "expirationLabel": "Jun 27, 2026"
+    }
+  ],
+  "positions": [
     {
-      "ticker": "VXUS",
-      "name": "Vanguard Total International ETF",
-      "sector": "Diversified",
-      "assetType": "etf",
-      "quantity": 50,
-      "costBasis": "55.40",
-      "currentPrice": "62.10",
-      "value": "3105.00",
-      "gainLoss": "335.00",
-      "gainLossPercent": 12.09
-    },
-    {
+      "holdingId": "mock-holding-13",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901009",
+      "accountName": "Fidelity 401(k)",
+      "institutionName": "Fidelity",
+      "accountMask": "9912",
       "ticker": "FXAIX",
       "name": "Fidelity 500 Index Fund",
       "sector": "Diversified",
@@ -151,18 +268,11 @@
       "gainLossPercent": 31.49
     },
     {
-      "ticker": "VBTLX",
-      "name": "Vanguard Total Bond Market",
-      "sector": "Fixed Income",
-      "assetType": "mutual_fund",
-      "quantity": 200,
-      "costBasis": "10.50",
-      "currentPrice": "9.78",
-      "value": "1956.00",
-      "gainLoss": "-144.00",
-      "gainLossPercent": -6.86
-    },
-    {
+      "holdingId": "mock-holding-15",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901010",
+      "accountName": "Coinbase",
+      "institutionName": "Coinbase",
+      "accountMask": "0xA1",
       "ticker": "BTC",
       "name": "Bitcoin",
       "sector": "Crypto",
@@ -175,6 +285,119 @@
       "gainLossPercent": 61.81
     },
     {
+      "holdingId": "mock-holding-1",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "AAPL",
+      "name": "Apple Inc.",
+      "sector": "Technology",
+      "assetType": "equity",
+      "quantity": 40,
+      "costBasis": "150.20",
+      "currentPrice": "212.40",
+      "value": "8496.00",
+      "gainLoss": "2488.00",
+      "gainLossPercent": 41.41
+    },
+    {
+      "holdingId": "mock-holding-6",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "AAPL  260620C00220000",
+      "name": "AAPL $220 Call · Jun 20, 2026",
+      "sector": "Call · AAPL · exp Jun 20, 2026",
+      "assetType": "option",
+      "quantity": 16,
+      "costBasis": "4.2500",
+      "currentPrice": "5.1000",
+      "value": "8160.00",
+      "gainLoss": "1360.00",
+      "gainLossPercent": 20,
+      "underlyingTicker": "AAPL",
+      "optionType": "Call",
+      "expirationLabel": "Jun 20, 2026"
+    },
+    {
+      "holdingId": "mock-holding-11",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901008",
+      "accountName": "Vanguard Roth IRA",
+      "institutionName": "Vanguard",
+      "accountMask": "5567",
+      "ticker": "VTI",
+      "name": "Vanguard Total Stock Market ETF",
+      "sector": "Diversified",
+      "assetType": "etf",
+      "quantity": 30,
+      "costBasis": "201.30",
+      "currentPrice": "268.70",
+      "value": "8061.00",
+      "gainLoss": "2022.00",
+      "gainLossPercent": 33.48
+    },
+    {
+      "holdingId": "mock-holding-2",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "VOO",
+      "name": "Vanguard S&P 500 ETF",
+      "sector": "Diversified",
+      "assetType": "etf",
+      "quantity": 15,
+      "costBasis": "381.40",
+      "currentPrice": "495.30",
+      "value": "7429.50",
+      "gainLoss": "1708.50",
+      "gainLossPercent": 29.86
+    },
+    {
+      "holdingId": "mock-holding-3",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "MSFT",
+      "name": "Microsoft Corp.",
+      "sector": "Technology",
+      "assetType": "equity",
+      "quantity": 12,
+      "costBasis": "301.00",
+      "currentPrice": "431.20",
+      "value": "5174.40",
+      "gainLoss": "1562.40",
+      "gainLossPercent": 43.26
+    },
+    {
+      "holdingId": "mock-holding-10",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "NVDA  260718C00135000",
+      "name": "NVDA $135 Call · Jul 18, 2026",
+      "sector": "Call · NVDA · exp Jul 18, 2026",
+      "assetType": "option",
+      "quantity": 5,
+      "costBasis": "7.2000",
+      "currentPrice": "8.5000",
+      "value": "4250.00",
+      "gainLoss": "650.00",
+      "gainLossPercent": 18.06,
+      "underlyingTicker": "NVDA",
+      "optionType": "Call",
+      "expirationLabel": "Jul 18, 2026"
+    },
+    {
+      "holdingId": "mock-holding-16",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901010",
+      "accountName": "Coinbase",
+      "institutionName": "Coinbase",
+      "accountMask": "0xA1",
       "ticker": "ETH",
       "name": "Ethereum",
       "sector": "Crypto",
@@ -185,33 +408,536 @@
       "value": "4094.40",
       "gainLoss": "1442.40",
       "gainLossPercent": 54.39
+    },
+    {
+      "holdingId": "mock-holding-9",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "MSFT  260815C00300000",
+      "name": "MSFT $300 Call · Aug 15, 2026",
+      "sector": "Call · MSFT · exp Aug 15, 2026",
+      "assetType": "option",
+      "quantity": 6,
+      "costBasis": "5.5000",
+      "currentPrice": "6.2000",
+      "value": "3720.00",
+      "gainLoss": "420.00",
+      "gainLossPercent": 12.73,
+      "underlyingTicker": "MSFT",
+      "optionType": "Call",
+      "expirationLabel": "Aug 15, 2026"
+    },
+    {
+      "holdingId": "mock-holding-12",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901008",
+      "accountName": "Vanguard Roth IRA",
+      "institutionName": "Vanguard",
+      "accountMask": "5567",
+      "ticker": "VXUS",
+      "name": "Vanguard Total International ETF",
+      "sector": "Diversified",
+      "assetType": "etf",
+      "quantity": 50,
+      "costBasis": "55.40",
+      "currentPrice": "62.10",
+      "value": "3105.00",
+      "gainLoss": "335.00",
+      "gainLossPercent": 12.09
+    },
+    {
+      "holdingId": "mock-holding-7",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "AAPL  260718C00230000",
+      "name": "AAPL $230 Call · Jul 18, 2026",
+      "sector": "Call · AAPL · exp Jul 18, 2026",
+      "assetType": "option",
+      "quantity": 5,
+      "costBasis": "3.8000",
+      "currentPrice": "4.2000",
+      "value": "2100.00",
+      "gainLoss": "200.00",
+      "gainLossPercent": 10.53,
+      "underlyingTicker": "AAPL",
+      "optionType": "Call",
+      "expirationLabel": "Jul 18, 2026"
+    },
+    {
+      "holdingId": "mock-holding-14",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901009",
+      "accountName": "Fidelity 401(k)",
+      "institutionName": "Fidelity",
+      "accountMask": "9912",
+      "ticker": "VBTLX",
+      "name": "Vanguard Total Bond Market",
+      "sector": "Fixed Income",
+      "assetType": "mutual_fund",
+      "quantity": 200,
+      "costBasis": "10.50",
+      "currentPrice": "9.78",
+      "value": "1956.00",
+      "gainLoss": "-144.00",
+      "gainLossPercent": -6.86
+    },
+    {
+      "holdingId": "mock-holding-4",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "TSLA",
+      "name": "Tesla Inc.",
+      "sector": "Consumer Discretionary",
+      "assetType": "equity",
+      "quantity": 10,
+      "costBasis": "241.50",
+      "currentPrice": "178.90",
+      "value": "1789.00",
+      "gainLoss": "-626.00",
+      "gainLossPercent": -25.92
+    },
+    {
+      "holdingId": "mock-holding-5",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "AMZN",
+      "name": "Amazon.com Inc.",
+      "sector": "Consumer Discretionary",
+      "assetType": "equity",
+      "quantity": 8,
+      "costBasis": "131.20",
+      "currentPrice": "186.10",
+      "value": "1488.80",
+      "gainLoss": "439.20",
+      "gainLossPercent": 41.84
+    },
+    {
+      "holdingId": "mock-holding-8",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "TSLA  260627P00175000",
+      "name": "TSLA $175 Put · Jun 27, 2026",
+      "sector": "Put · TSLA · exp Jun 27, 2026",
+      "assetType": "option",
+      "quantity": 3,
+      "costBasis": "2.1000",
+      "currentPrice": "1.8500",
+      "value": "555.00",
+      "gainLoss": "-75.00",
+      "gainLossPercent": -11.9,
+      "underlyingTicker": "TSLA",
+      "optionType": "Put",
+      "expirationLabel": "Jun 27, 2026"
     }
   ],
+  "stockAggregates": [
+    {
+      "ticker": "FXAIX",
+      "name": "Fidelity 500 Index Fund",
+      "sector": "Diversified",
+      "assetType": "mutual_fund",
+      "totalQuantity": 120,
+      "currentPrice": "185.40",
+      "totalValue": "22248.00",
+      "totalCost": "16920.00",
+      "gainLoss": "5328.00",
+      "gainLossPercent": 31.49,
+      "accountCount": 1,
+      "lots": [
+        {
+          "accountId": "a1b2c3d4-e5f6-4789-a012-345678901009",
+          "accountName": "Fidelity 401(k)",
+          "quantity": 120,
+          "value": "22248.00",
+          "costBasis": "141.00"
+        }
+      ]
+    },
+    {
+      "ticker": "BTC",
+      "name": "Bitcoin",
+      "sector": "Crypto",
+      "assetType": "crypto",
+      "totalQuantity": 0.15,
+      "currentPrice": "68120.00",
+      "totalValue": "10218.00",
+      "totalCost": "6315.00",
+      "gainLoss": "3903.00",
+      "gainLossPercent": 61.81,
+      "accountCount": 1,
+      "lots": [
+        {
+          "accountId": "a1b2c3d4-e5f6-4789-a012-345678901010",
+          "accountName": "Coinbase",
+          "quantity": 0.15,
+          "value": "10218.00",
+          "costBasis": "42100.00"
+        }
+      ]
+    },
+    {
+      "ticker": "AAPL",
+      "name": "Apple Inc.",
+      "sector": "Technology",
+      "assetType": "equity",
+      "totalQuantity": 40,
+      "currentPrice": "212.40",
+      "totalValue": "8496.00",
+      "totalCost": "6008.00",
+      "gainLoss": "2488.00",
+      "gainLossPercent": 41.41,
+      "accountCount": 1,
+      "lots": [
+        {
+          "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+          "accountName": "Fidelity Brokerage",
+          "quantity": 40,
+          "value": "8496.00",
+          "costBasis": "150.20"
+        }
+      ]
+    },
+    {
+      "ticker": "VTI",
+      "name": "Vanguard Total Stock Market ETF",
+      "sector": "Diversified",
+      "assetType": "etf",
+      "totalQuantity": 30,
+      "currentPrice": "268.70",
+      "totalValue": "8061.00",
+      "totalCost": "6039.00",
+      "gainLoss": "2022.00",
+      "gainLossPercent": 33.48,
+      "accountCount": 1,
+      "lots": [
+        {
+          "accountId": "a1b2c3d4-e5f6-4789-a012-345678901008",
+          "accountName": "Vanguard Roth IRA",
+          "quantity": 30,
+          "value": "8061.00",
+          "costBasis": "201.30"
+        }
+      ]
+    },
+    {
+      "ticker": "VOO",
+      "name": "Vanguard S&P 500 ETF",
+      "sector": "Diversified",
+      "assetType": "etf",
+      "totalQuantity": 15,
+      "currentPrice": "495.30",
+      "totalValue": "7429.50",
+      "totalCost": "5721.00",
+      "gainLoss": "1708.50",
+      "gainLossPercent": 29.86,
+      "accountCount": 1,
+      "lots": [
+        {
+          "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+          "accountName": "Fidelity Brokerage",
+          "quantity": 15,
+          "value": "7429.50",
+          "costBasis": "381.40"
+        }
+      ]
+    },
+    {
+      "ticker": "MSFT",
+      "name": "Microsoft Corp.",
+      "sector": "Technology",
+      "assetType": "equity",
+      "totalQuantity": 12,
+      "currentPrice": "431.20",
+      "totalValue": "5174.40",
+      "totalCost": "3612.00",
+      "gainLoss": "1562.40",
+      "gainLossPercent": 43.26,
+      "accountCount": 1,
+      "lots": [
+        {
+          "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+          "accountName": "Fidelity Brokerage",
+          "quantity": 12,
+          "value": "5174.40",
+          "costBasis": "301.00"
+        }
+      ]
+    },
+    {
+      "ticker": "ETH",
+      "name": "Ethereum",
+      "sector": "Crypto",
+      "assetType": "crypto",
+      "totalQuantity": 1.2,
+      "currentPrice": "3412.00",
+      "totalValue": "4094.40",
+      "totalCost": "2652.00",
+      "gainLoss": "1442.40",
+      "gainLossPercent": 54.39,
+      "accountCount": 1,
+      "lots": [
+        {
+          "accountId": "a1b2c3d4-e5f6-4789-a012-345678901010",
+          "accountName": "Coinbase",
+          "quantity": 1.2,
+          "value": "4094.40",
+          "costBasis": "2210.00"
+        }
+      ]
+    },
+    {
+      "ticker": "VXUS",
+      "name": "Vanguard Total International ETF",
+      "sector": "Diversified",
+      "assetType": "etf",
+      "totalQuantity": 50,
+      "currentPrice": "62.10",
+      "totalValue": "3105.00",
+      "totalCost": "2770.00",
+      "gainLoss": "335.00",
+      "gainLossPercent": 12.09,
+      "accountCount": 1,
+      "lots": [
+        {
+          "accountId": "a1b2c3d4-e5f6-4789-a012-345678901008",
+          "accountName": "Vanguard Roth IRA",
+          "quantity": 50,
+          "value": "3105.00",
+          "costBasis": "55.40"
+        }
+      ]
+    },
+    {
+      "ticker": "VBTLX",
+      "name": "Vanguard Total Bond Market",
+      "sector": "Fixed Income",
+      "assetType": "mutual_fund",
+      "totalQuantity": 200,
+      "currentPrice": "9.78",
+      "totalValue": "1956.00",
+      "totalCost": "2100.00",
+      "gainLoss": "-144.00",
+      "gainLossPercent": -6.86,
+      "accountCount": 1,
+      "lots": [
+        {
+          "accountId": "a1b2c3d4-e5f6-4789-a012-345678901009",
+          "accountName": "Fidelity 401(k)",
+          "quantity": 200,
+          "value": "1956.00",
+          "costBasis": "10.50"
+        }
+      ]
+    },
+    {
+      "ticker": "TSLA",
+      "name": "Tesla Inc.",
+      "sector": "Consumer Discretionary",
+      "assetType": "equity",
+      "totalQuantity": 10,
+      "currentPrice": "178.90",
+      "totalValue": "1789.00",
+      "totalCost": "2415.00",
+      "gainLoss": "-626.00",
+      "gainLossPercent": -25.92,
+      "accountCount": 1,
+      "lots": [
+        {
+          "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+          "accountName": "Fidelity Brokerage",
+          "quantity": 10,
+          "value": "1789.00",
+          "costBasis": "241.50"
+        }
+      ]
+    },
+    {
+      "ticker": "AMZN",
+      "name": "Amazon.com Inc.",
+      "sector": "Consumer Discretionary",
+      "assetType": "equity",
+      "totalQuantity": 8,
+      "currentPrice": "186.10",
+      "totalValue": "1488.80",
+      "totalCost": "1049.60",
+      "gainLoss": "439.20",
+      "gainLossPercent": 41.84,
+      "accountCount": 1,
+      "lots": [
+        {
+          "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+          "accountName": "Fidelity Brokerage",
+          "quantity": 8,
+          "value": "1488.80",
+          "costBasis": "131.20"
+        }
+      ]
+    }
+  ],
+  "optionPositions": [
+    {
+      "holdingId": "mock-holding-6",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "AAPL  260620C00220000",
+      "name": "AAPL $220 Call · Jun 20, 2026",
+      "sector": "Call · AAPL · exp Jun 20, 2026",
+      "assetType": "option",
+      "quantity": 16,
+      "costBasis": "4.2500",
+      "currentPrice": "5.1000",
+      "value": "8160.00",
+      "gainLoss": "1360.00",
+      "gainLossPercent": 20,
+      "underlyingTicker": "AAPL",
+      "optionType": "Call",
+      "expirationLabel": "Jun 20, 2026"
+    },
+    {
+      "holdingId": "mock-holding-10",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "NVDA  260718C00135000",
+      "name": "NVDA $135 Call · Jul 18, 2026",
+      "sector": "Call · NVDA · exp Jul 18, 2026",
+      "assetType": "option",
+      "quantity": 5,
+      "costBasis": "7.2000",
+      "currentPrice": "8.5000",
+      "value": "4250.00",
+      "gainLoss": "650.00",
+      "gainLossPercent": 18.06,
+      "underlyingTicker": "NVDA",
+      "optionType": "Call",
+      "expirationLabel": "Jul 18, 2026"
+    },
+    {
+      "holdingId": "mock-holding-9",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "MSFT  260815C00300000",
+      "name": "MSFT $300 Call · Aug 15, 2026",
+      "sector": "Call · MSFT · exp Aug 15, 2026",
+      "assetType": "option",
+      "quantity": 6,
+      "costBasis": "5.5000",
+      "currentPrice": "6.2000",
+      "value": "3720.00",
+      "gainLoss": "420.00",
+      "gainLossPercent": 12.73,
+      "underlyingTicker": "MSFT",
+      "optionType": "Call",
+      "expirationLabel": "Aug 15, 2026"
+    },
+    {
+      "holdingId": "mock-holding-7",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "AAPL  260718C00230000",
+      "name": "AAPL $230 Call · Jul 18, 2026",
+      "sector": "Call · AAPL · exp Jul 18, 2026",
+      "assetType": "option",
+      "quantity": 5,
+      "costBasis": "3.8000",
+      "currentPrice": "4.2000",
+      "value": "2100.00",
+      "gainLoss": "200.00",
+      "gainLossPercent": 10.53,
+      "underlyingTicker": "AAPL",
+      "optionType": "Call",
+      "expirationLabel": "Jul 18, 2026"
+    },
+    {
+      "holdingId": "mock-holding-8",
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901007",
+      "accountName": "Fidelity Brokerage",
+      "institutionName": "Fidelity",
+      "accountMask": "3301",
+      "ticker": "TSLA  260627P00175000",
+      "name": "TSLA $175 Put · Jun 27, 2026",
+      "sector": "Put · TSLA · exp Jun 27, 2026",
+      "assetType": "option",
+      "quantity": 3,
+      "costBasis": "2.1000",
+      "currentPrice": "1.8500",
+      "value": "555.00",
+      "gainLoss": "-75.00",
+      "gainLossPercent": -11.9,
+      "underlyingTicker": "TSLA",
+      "optionType": "Put",
+      "expirationLabel": "Jun 27, 2026"
+    }
+  ],
+  "portfolioBreakdown": {
+    "stocksValue": "59747.70",
+    "optionsValue": "18785.00",
+    "otherValue": "14312.40",
+    "stocksSharePercent": 64.35,
+    "optionsSharePercent": 20.23,
+    "stockPositionCount": 11,
+    "optionPositionCount": 5,
+    "totalPositionCount": 16
+  },
   "behavioralAlerts": [
     {
       "type": "warning",
-      "title": "Concentration risk",
-      "desc": "AAPL is 35% of your taxable brokerage — consider diversifying."
+      "title": "Stock concentration",
+      "desc": "FXAIX is 37% of your stock & ETF holdings — consider diversifying equity exposure."
     },
     {
       "type": "info",
-      "title": "Dollar-cost averaging working",
-      "desc": "Your monthly buys lowered your average cost basis by 4%."
+      "title": "Options allocation",
+      "desc": "Options represent 20% of portfolio value. Monitor expirations and underlying concentration separately from stocks."
+    },
+    {
+      "type": "warning",
+      "title": "Options tied to one name",
+      "desc": "AAPL underlies 55% of your options value — single-name derivative risk."
+    },
+    {
+      "type": "info",
+      "title": "Options expiring soon",
+      "desc": "2 option positions expire within 30 days — review roll or close decisions."
+    },
+    {
+      "type": "warning",
+      "title": "Short-dated options exposure",
+      "desc": "Options are 20% of portfolio value with contracts expiring within ~30 days. Theta decay is high — treat these as short-term trades, not long-term holdings."
     },
     {
       "type": "positive",
-      "title": "You invest more than you dine out",
-      "desc": "You invested $2,100 last month vs $487 on dining."
+      "title": "Dollar-cost averaging",
+      "desc": "You've made buys in 11 of the last 14 months — consistent investing builds long-term wealth."
     }
   ],
   "investmentHistory": {
     "lookbackYears": 3,
-    "totalContributed": "75600.00",
-    "estimatedValueToday": "89200.00",
-    "currentPortfolioValue": "86145.04",
-    "monthlyAverageInvest": "2100.00",
-    "transactionCount": 36,
-    "buyTransactionCount": 34
+    "totalContributed": "49758.91",
+    "estimatedValueToday": "64315.30",
+    "currentPortfolioValue": "92845.10",
+    "monthlyAverageInvest": "1382.19",
+    "transactionCount": 42,
+    "buyTransactionCount": 12
   },
-  "monthlyActivity": null
+  "monthlyActivity": {
+    "cashContributions": "2000.00",
+    "purchaseDeployments": "1130.00",
+    "totalDeployed": "3130.00"
+  }
 }

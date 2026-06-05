@@ -40,6 +40,7 @@ function scoreVerdict(s: number) {
 export function ResiliencePanel() {
   const gate = useFeaturePanelGate("financial resilience");
   const { data, isLoading, isError } = useResilience();
+  const [active, setActive] = useState<string>("");
 
   if (!gate.ready) return gate.node;
   if (isLoading) return <FeaturePanelLoading />;
@@ -64,8 +65,11 @@ export function ResiliencePanel() {
     recommendedMonths: s.recommendedMonths,
   }));
 
-  const [active, setActive] = useState<string>(SCENARIOS[0]?.id ?? "job");
-  const scenario = SCENARIOS.find((s) => s.id === active) ?? SCENARIOS[0]!;
+  const resolvedActive = SCENARIOS.some((s) => s.id === active)
+    ? active
+    : (SCENARIOS[0]?.id ?? "");
+  const scenario =
+    SCENARIOS.find((s) => s.id === resolvedActive) ?? SCENARIOS[0]!;
   const overall =
     data?.immunityScore ??
     Math.round(SCENARIOS.reduce((sum, s) => sum + scenarioScore(s), 0) / SCENARIOS.length);
@@ -104,7 +108,7 @@ export function ResiliencePanel() {
         <div className="flex flex-wrap gap-2">
           {SCENARIOS.map((s) => {
             const sc = scenarioScore(s);
-            const isActive = active === s.id;
+            const isActive = resolvedActive === s.id;
             return (
               <button
                 key={s.id}

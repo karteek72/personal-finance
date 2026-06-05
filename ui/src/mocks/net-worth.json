@@ -1,7 +1,7 @@
 {
   "current": {
-    "netWorth": "86145.04",
-    "totalAssets": "91311.05",
+    "netWorth": "104930.04",
+    "totalAssets": "110096.05",
     "totalLiabilities": "5166.01"
   },
   "trend": [
@@ -11,55 +11,55 @@
     },
     {
       "month": "2025-05",
-      "netWorth": "62934.23"
+      "netWorth": "64379.23"
     },
     {
       "month": "2025-06",
-      "netWorth": "65232.47"
+      "netWorth": "68122.47"
     },
     {
       "month": "2025-07",
-      "netWorth": "66802.70"
+      "netWorth": "71137.70"
     },
     {
       "month": "2025-08",
-      "netWorth": "68966.86"
+      "netWorth": "74746.86"
     },
     {
       "month": "2025-09",
-      "netWorth": "71027.01"
+      "netWorth": "78252.01"
     },
     {
       "month": "2025-10",
-      "netWorth": "72605.40"
+      "netWorth": "81275.40"
     },
     {
       "month": "2025-11",
-      "netWorth": "74769.07"
+      "netWorth": "84884.07"
     },
     {
       "month": "2025-12",
-      "netWorth": "76473.87"
+      "netWorth": "88033.87"
     },
     {
       "month": "2026-01",
-      "netWorth": "78411.97"
+      "netWorth": "91416.97"
     },
     {
       "month": "2026-02",
-      "netWorth": "80224.59"
+      "netWorth": "94674.59"
     },
     {
       "month": "2026-03",
-      "netWorth": "82276.57"
+      "netWorth": "98171.57"
     },
     {
       "month": "2026-04",
-      "netWorth": "84210.81"
+      "netWorth": "101550.81"
     },
     {
       "month": "2026-05",
-      "netWorth": "86145.04"
+      "netWorth": "104930.04"
     }
   ]
 }

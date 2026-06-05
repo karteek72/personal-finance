@@ -14,7 +14,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "46344.06"
+          "value": "57615.06"
         },
         {
           "type": "credit",
@@ -25,9 +25,9 @@
     },
     {
       "month": "2025-05",
-      "totalAssets": "67968.84",
+      "totalAssets": "69413.84",
       "totalLiabilities": "5034.61",
-      "netWorth": "62934.23",
+      "netWorth": "64379.23",
       "breakdown": [
         {
           "type": "cash",
@@ -37,7 +37,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "48720.68"
+          "value": "60569.68"
         },
         {
           "type": "credit",
@@ -48,9 +48,9 @@
     },
     {
       "month": "2025-06",
-      "totalAssets": "71088.12",
+      "totalAssets": "73978.12",
       "totalLiabilities": "5855.65",
-      "netWorth": "65232.47",
+      "netWorth": "68122.47",
       "breakdown": [
         {
           "type": "cash",
@@ -60,7 +60,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "51097.30"
+          "value": "63524.30"
         },
         {
           "type": "credit",
@@ -71,9 +71,9 @@
     },
     {
       "month": "2025-07",
-      "totalAssets": "71715.46",
+      "totalAssets": "76050.46",
       "totalLiabilities": "4912.76",
-      "netWorth": "66802.70",
+      "netWorth": "71137.70",
       "breakdown": [
         {
           "type": "cash",
@@ -83,7 +83,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "53473.92"
+          "value": "66478.92"
         },
         {
           "type": "credit",
@@ -94,9 +94,9 @@
     },
     {
       "month": "2025-08",
-      "totalAssets": "74306.67",
+      "totalAssets": "80086.67",
       "totalLiabilities": "5339.81",
-      "netWorth": "68966.86",
+      "netWorth": "74746.86",
       "breakdown": [
         {
           "type": "cash",
@@ -106,7 +106,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "55850.53"
+          "value": "69433.53"
         },
         {
           "type": "credit",
@@ -117,9 +117,9 @@
     },
     {
       "month": "2025-09",
-      "totalAssets": "76281.00",
+      "totalAssets": "83506.00",
       "totalLiabilities": "5253.99",
-      "netWorth": "71027.01",
+      "netWorth": "78252.01",
       "breakdown": [
         {
           "type": "cash",
@@ -129,7 +129,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "58227.15"
+          "value": "72388.15"
         },
         {
           "type": "credit",
@@ -140,9 +140,9 @@
     },
     {
       "month": "2025-10",
-      "totalAssets": "77539.80",
+      "totalAssets": "86209.80",
       "totalLiabilities": "4934.40",
-      "netWorth": "72605.40",
+      "netWorth": "81275.40",
       "breakdown": [
         {
           "type": "cash",
@@ -152,7 +152,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "60603.77"
+          "value": "75342.77"
         },
         {
           "type": "credit",
@@ -163,9 +163,9 @@
     },
     {
       "month": "2025-11",
-      "totalAssets": "80355.84",
+      "totalAssets": "90470.84",
       "totalLiabilities": "5586.77",
-      "netWorth": "74769.07",
+      "netWorth": "84884.07",
       "breakdown": [
         {
           "type": "cash",
@@ -175,7 +175,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "62980.39"
+          "value": "78297.39"
         },
         {
           "type": "credit",
@@ -186,9 +186,9 @@
     },
     {
       "month": "2025-12",
-      "totalAssets": "81805.35",
+      "totalAssets": "93365.35",
       "totalLiabilities": "5331.48",
-      "netWorth": "76473.87",
+      "netWorth": "88033.87",
       "breakdown": [
         {
           "type": "cash",
@@ -198,7 +198,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "65357.01"
+          "value": "81252.01"
         },
         {
           "type": "credit",
@@ -209,9 +209,9 @@
     },
     {
       "month": "2026-01",
-      "totalAssets": "83496.20",
+      "totalAssets": "96501.20",
       "totalLiabilities": "5084.23",
-      "netWorth": "78411.97",
+      "netWorth": "91416.97",
       "breakdown": [
         {
           "type": "cash",
@@ -221,7 +221,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "67733.63"
+          "value": "84206.63"
         },
         {
           "type": "credit",
@@ -232,9 +232,9 @@
     },
     {
       "month": "2026-02",
-      "totalAssets": "85634.86",
+      "totalAssets": "100084.86",
       "totalLiabilities": "5410.27",
-      "netWorth": "80224.59",
+      "netWorth": "94674.59",
       "breakdown": [
         {
           "type": "cash",
@@ -244,7 +244,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "70110.24"
+          "value": "87161.24"
         },
         {
           "type": "credit",
@@ -255,9 +255,9 @@
     },
     {
       "month": "2026-03",
-      "totalAssets": "87833.80",
+      "totalAssets": "103728.80",
       "totalLiabilities": "5557.23",
-      "netWorth": "82276.57",
+      "netWorth": "98171.57",
       "breakdown": [
         {
           "type": "cash",
@@ -267,7 +267,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "72486.86"
+          "value": "90115.86"
         },
         {
           "type": "credit",
@@ -278,9 +278,9 @@
     },
     {
       "month": "2026-04",
-      "totalAssets": "89920.77",
+      "totalAssets": "107260.77",
       "totalLiabilities": "5709.96",
-      "netWorth": "84210.81",
+      "netWorth": "101550.81",
       "breakdown": [
         {
           "type": "cash",
@@ -290,7 +290,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "74863.48"
+          "value": "93070.48"
         },
         {
           "type": "credit",
@@ -301,9 +301,9 @@
     },
     {
       "month": "2026-05",
-      "totalAssets": "91311.05",
+      "totalAssets": "110096.05",
       "totalLiabilities": "5166.01",
-      "netWorth": "86145.04",
+      "netWorth": "104930.04",
       "breakdown": [
         {
           "type": "cash",
@@ -313,7 +313,7 @@
         {
           "type": "investment",
           "label": "Investments",
-          "value": "77240.10"
+          "value": "96025.10"
         },
         {
           "type": "credit",
