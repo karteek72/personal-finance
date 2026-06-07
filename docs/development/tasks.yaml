@@ -453,3 +453,630 @@ tasks:
     acceptance_criteria:
       - Device token stored per user
       - Test push from dev script
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Analytics intelligence redesign — see docs/architecture/analytics-architecture.md
+  # The first-gen analytics layer shipped fabricated/duplicated/stubbed metrics.
+  # These tasks are scoped for parallel work by independent agents.
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # ── Phase 3.7 — Analytics foundation (P1, must-have) ─────────────────────
+
+  - id: TASK-ANALYTICS-001
+    title: Canonical signed_amount column + cashflow indexes
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Sign convention is implicit (expenses positive, depository income negative) and abs()
+      is sprinkled per-query (defect B14). Add a STORED generated column signed_amount
+      (expense -> -abs(amount), income -> +abs(amount), transfer -> 0) and indexes so all
+      cashflow SQL can use SUM(signed_amount) with no per-query sign branching.
+    acceptance_criteria:
+      - Drizzle migration adds transactions.signed_amount GENERATED ALWAYS AS STORED
+      - Indexes tx_user_date_idx (user_id,date) and tx_user_cat_date_idx (user_id,category,date)
+      - schema.ts reflects the generated column
+      - Existing aggregation queries unaffected (column is additive)
+
+  - id: TASK-ANALYTICS-002
+    title: Metric layer module (services/metrics) + metric envelope type
+    status: backlog
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - docs/design/api-contract.md
+    description: |
+      "Savings rate" is defined 4 different ways across services (defect B13). Create
+      services/metrics/ with one exported function per metric (single definition), each
+      returning the metric envelope {value, unit, grain, asOf, class, basis, confidence,
+      trend, caveats}. Other services must consume the metric layer, never re-query raw tables.
+    acceptance_criteria:
+      - services/metrics/ with typed MetricEnvelope (no any)
+      - Single savingsRate, freeCashFlow, burnRate, emergencyMonths implementations
+      - Savings/return rates emitted as 0-1 fraction with unit:"percent"
+      - compute-wellness / compute-wrapped / transaction-store reuse the metric layer
+      - Unit tests with a golden transaction dataset -> expected values
+
+  - id: TASK-ANALYTICS-003
+    title: Capture real credit limit from Plaid; real utilization
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Credit utilization is fabricated as balance*2.5 (defect B1). Persist the real limit
+      from Plaid (accounts.balances.limit / liabilities) on accounts or credit_card_liabilities,
+      and compute utilization = sum(balance)/sum(limit). When limit unknown, return
+      confidence 0 instead of fabricating.
+    acceptance_criteria:
+      - credit_limit captured on sync (Plaid) and stored
+      - Utilization metric uses real limit; confidence 0 when missing
+      - Remove the balance*2.5 estimate from compute-wellness.ts
+
+  - id: TASK-ANALYTICS-004
+    title: balance_snapshots table + net-worth-month pipeline
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      getNetWorth reads net_worth_snapshots which nothing writes in production -> empty trend
+      (defect B10). Add balance_snapshots (account_id, as_of_date, balances, credit_limit) and
+      write idempotently on every sync (plaid/teller/snaptrade). Build mart_net_worth_month and
+      back getNetWorth trend from it.
+    acceptance_criteria:
+      - balance_snapshots migration + write on each sync job (upsert by date)
+      - Net-worth monthly trend derived from snapshots, not seed-only table
+      - getNetWorth.trend returns real history when snapshots exist
+
+  - id: TASK-ANALYTICS-005
+    title: dim_category spend-class + fixed/variable/discretionary metrics
+    status: backlog
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/config/categories.ts
+    description: |
+      No fixed/variable/discretionary or essential split exists. Add dim_category
+      (spend_class, is_essential, cpi_weight_eligible) seeded from the existing taxonomy,
+      with user override via rules. Expose spend-class and essential/non-essential breakdowns
+      through the metric layer.
+    acceptance_criteria:
+      - dim_category table + seed for all SPEND_CATEGORIES
+      - Metrics for fixed/variable/discretionary and essential vs non-essential
+      - Essential burn used as emergency-fund denominator
+
+  - id: TASK-ANALYTICS-006
+    title: Remove fabricated wellness metrics; rebuild Financial Health score
+    status: backlog
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+      - TASK-ANALYTICS-003
+      - TASK-ANALYTICS-004
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Remove fabricated dims/values (B2 "Inflation Beat"=savings*0.85, B3 fake history reusing
+      current balances, B4 single-month emergency denominator, B5 goal on-track at >=50%,
+      B7 fabricated salary) and rebuild Health per analytics-architecture.md section 6
+      (7 weighted sub-scores) with composite confidence.
+    acceptance_criteria:
+      - Health = weighted sub-scores; no fabricated dimensions remain
+      - Emergency fund uses trailing essential burn; goal pace is deadline-aware
+      - History trend recomputed per-month (no reuse of current balances)
+      - Composite confidence surfaced in response
+
+  - id: TASK-ANALYTICS-007
+    title: Data-quality / confidence / reconciliation endpoint
+    status: backlog
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      No data-quality layer exists beyond an isLive boolean (defect B16). Add
+      GET /analytics/data-quality: categorization coverage, sync freshness, transfer-pair
+      coverage, reconciliation gap (SUM(signed_amount) vs balance delta), pending ratio,
+      cost-basis completeness. Feed a 0-1 confidence into metric envelopes.
+    acceptance_criteria:
+      - GET /analytics/data-quality returns the coverage/freshness/reconciliation metrics
+      - Metric envelopes derive confidence from data-quality signals
+
+  # ── Phase 3.8 — Advanced analytics (P2, high-value) ──────────────────────
+
+  - id: TASK-ANALYTICS-008
+    title: Merchant normalization + dim_merchant
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Recurring/concentration logic keys on raw merchant strings, fragmenting series
+      (defect B12). Add dim_merchant (canonical_key, display_name) with a normalizer
+      (strip store numbers, *, SQ */TST* prefixes, trailing digits, city/state) and
+      transactions.merchant_id. Powers HHI and recurring v2.
+    acceptance_criteria:
+      - dim_merchant table + normalizer with unit tests on real-world merchant strings
+      - transactions.merchant_id backfilled and set on ingest
+      - Merchant concentration (HHI, top-5 share) metric available
+
+  - id: TASK-ANALYTICS-009
+    title: Recurring engine v2 (creep / zombie / duplicate, all cadences)
+    status: backlog
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-008
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Extend detect-recurring to weekly/monthly/quarterly/annual; detect price creep
+      (regression over charge series), zombie (cadence broken/cancelled), duplicate
+      (two series same category and similar amount), free-trial->paid jump. Use dim_merchant keys.
+    acceptance_criteria:
+      - All four cadences detected; series keyed by canonical merchant
+      - priceCreep, zombie, duplicate flags with confidence
+      - Powers /analytics/recurring with flags
+
+  - id: TASK-ANALYTICS-010
+    title: Transfer pairing (transfer_links) + refund/reversal netting
+    status: backlog
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transfer-classification.ts
+    description: |
+      Bank<->bank and bank<->brokerage ACH are not paired, so net-investment and true savings
+      leak/double-count (defect B15). Add transfer_links and a pairing pass (opposite sign,
+      |Δamount| <= $1 or 1%, |Δdate| <= 4d, different account, household-wide). Net refunds
+      against the matching debit within 45 days.
+    acceptance_criteria:
+      - transfer_links populated post-sync with match_confidence
+      - Brokerage contributions paired to originating bank ACH
+      - Refunds netted from category spend; unmatched credits treated as income/rebate
+      - net-investment-rate and true-savings-rate use links
+
+  - id: TASK-ANALYTICS-011
+    title: Resilience composite score + sub-scores
+    status: backlog
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+      - TASK-ANALYTICS-004
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      No composite resilience score exists today (defect B8). Implement the weighted model in
+      analytics-architecture.md section 6 (Liquidity 0.30, IncomeStability 0.20,
+      ExpenseFlexibility 0.20, DebtBurden 0.20, InvestmentLiquidity 0.10) with interpretation
+      bands and a top improvement action per sub-score. Replace template-only resilience output.
+    acceptance_criteria:
+      - GET /analytics/resilience returns composite + 5 sub-scores + bands + actions
+      - Single-income-source penalty caps IncomeStability at 70
+      - No hardcoded shock amounts presented as computed
+
+  - id: TASK-ANALYTICS-012
+    title: Alert rule engine (table-driven)
+    status: backlog
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+      - TASK-ANALYTICS-009
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Add alert_rules (config-driven thresholds) evaluated post-sync: price creep, zombie/
+      duplicate subscription, overdraft/ATM fee, utilization spike, EF breach, runway < 3mo,
+      lifestyle inflation (heuristic), bill-cluster cash dip, wash-sale risk (heuristic),
+      idle-cash drag, stale sync, reconciliation gap. Heuristic alerts carry confidence.
+    acceptance_criteria:
+      - alert_rules table + evaluator run in worker after sync
+      - Alerts persisted and exposed to the existing notifications surface
+      - Heuristic alerts labeled basis:"heuristic" with confidence
+
+  - id: TASK-ANALYTICS-013
+    title: Investment snapshots — security_prices + holdings_snapshots on sync
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Holdings are a single upserted snapshot with no price history, so TWR/drawdown/portfolio
+      time series are impossible (defect B9). Add security_prices and holdings_snapshots and
+      write them idempotently on each investment sync.
+    acceptance_criteria:
+      - security_prices + holdings_snapshots migrations
+      - Both written per-date on snaptrade/import investment sync
+      - mart_portfolio_daily (value, cost) view
+
+  - id: TASK-ANALYTICS-014
+    title: Tax lots (FIFO) — realized & unrealized P/L
+    status: backlog
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-013
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Build a FIFO lot engine (tax_lots) from investment_transactions to compute realized P/L
+      (proceeds - matched cost), unrealized P/L (qty*price - qty*cost), and holding-period
+      (short/long term) with wash-sale flags.
+    acceptance_criteria:
+      - tax_lots populated; sells consume lots FIFO
+      - Realized/unrealized P/L + short/long-term split exposed via metric layer
+      - Wash-sale repurchase (<=30d of a realized loss) flagged
+
+  - id: TASK-ANALYTICS-015
+    title: XIRR + dividend trend + fee/cash drag
+    status: backlog
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-013
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Replace estimatedValueToday hand-wave (defect B9) with money-weighted return (XIRR) over
+      dated cashflows incl. terminal value. Add dividend income trend + TTM yield, fee drag
+      (fees/avg value annualized), cash drag (idle cash share).
+    acceptance_criteria:
+      - XIRR implementation with tests (known cashflow series)
+      - Dividend trend + TTM yield from investment_transactions type=dividend
+      - Fee drag and cash drag metrics in /analytics/investments/performance
+
+  - id: TASK-ANALYTICS-016
+    title: Materialized marts + seasonally-adjusted category deltas
+    status: backlog
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-001
+      - TASK-ANALYTICS-005
+      - TASK-ANALYTICS-008
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Add mart_cashflow_month, mart_category_month, mart_recurring (+ existing net-worth/portfolio
+      marts) refreshed CONCURRENTLY at end of sync. Compute real deltaVsPriorMonth using
+      trailing-6mo median (seasonally adjusted), replacing the hardcoded 0 (defect B11).
+      Keep the in-progress month live.
+    acceptance_criteria:
+      - Materialized views + refresh-marts worker step
+      - getCategories returns real seasonally-adjusted deltaVsPriorMonth
+      - Current month served live; closed months from marts
+
+  - id: TASK-ANALYTICS-017
+    title: Personal CPI + nominal vs real spending
+    status: backlog
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-009
+      - TASK-ANALYTICS-010
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/protect-analytics.ts
+    description: |
+      Replace the static CATEGORY_INFLATION table (defect B6) with a measured personal CPI
+      (Laspeyres) over the user's repeat-purchase / fixed-bill basket. Add nominal vs real
+      spend and real savings rate. National/BLS comparison is external and must be marked.
+    acceptance_criteria:
+      - Personal CPI computed from recurring merchants + fixed bills (basis:factual)
+      - Nominal vs real spend series + real savings rate
+      - National CPI sourced/marked external (no hardcoded 3.1 presented as fact)
+
+  # ── Phase 3.9 — Advanced intelligence (P3) ───────────────────────────────
+
+  - id: TASK-ANALYTICS-018
+    title: TWR + benchmark comparison + max drawdown
+    status: backlog
+    priority: P3
+    area: backend
+    phase: 3.9
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-013
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Using daily holdings_snapshots, compute time-weighted return, max drawdown
+      (min(value/running_peak - 1)), and benchmark delta vs an external index series (SPY/VT).
+      Mark benchmark data external.
+    acceptance_criteria:
+      - TWR (geometric link) + max drawdown from daily portfolio values
+      - Benchmark delta with basis:"external" and source noted
+      - Exposed in /analytics/investments/performance
+
+  - id: TASK-ANALYTICS-019
+    title: Investment behavior heuristics with evidence + confidence
+    status: backlog
+    priority: P3
+    area: backend
+    phase: 3.9
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-014
+      - TASK-ANALYTICS-018
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Extend behavioral analysis: overtrading (turnover), performance chasing, panic selling,
+      buy-high/sell-low, tax-inefficiency. Every signal is basis:"heuristic", returns a
+      confidence and the specific trades that triggered it. Never present as fact.
+    acceptance_criteria:
+      - Each heuristic returns confidence + evidence trade ids
+      - GET /analytics/investments/behavior labels all as heuristic
+      - Caveats explain confidence limits
+
+  - id: TASK-ANALYTICS-020
+    title: Planning engine — runway, payoff, goals, scenarios, surplus
+    status: backlog
+    priority: P3
+    area: backend
+    phase: 3.9
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+      - TASK-ANALYTICS-011
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Build /analytics/planning: runway forecast (optional Monte Carlo), debt payoff simulator
+      (avalanche/snowball), deadline-aware goal pacing, sinking funds for detected annual bills,
+      scenario engine (income -X%, market -Y%), upcoming-obligations calendar, and the
+      surplus-allocation rule (cash EF -> high-interest debt -> invest).
+    acceptance_criteria:
+      - /analytics/planning/{runway,payoff,goals,scenarios,calendar}
+      - Payoff sim returns ETA + interest saved for avalanche vs snowball
+      - Surplus allocation suggestion per the section-3 rule
+
+  # ── Phase 3.7/3.8 — Frontend analytics bug fixes ─────────────────────────
+
+  - id: TASK-UI-ANALYTICS-001
+    title: Normalize savingsRate scale across views + document contract
+    status: ready
+    priority: P1
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      savingsRate is treated as 0-1 on the dashboard but 0-100 in Wrapped/mocks (defect F1) ->
+      mock mode shows ~2585%. Normalize at the API-client boundary to a single 0-1 fraction
+      and multiply by 100 exactly once at display. Fix mock fixtures + computeMockSummary.
+    acceptance_criteria:
+      - Dashboard, wrapped-banner, and mocks agree on a single savingsRate scale
+      - Mock mode shows correct ~26% not ~2585%
+      - No remaining double *100 or missing *100
+
+  - id: TASK-UI-ANALYTICS-002
+    title: Fix UTC off-by-one in analytics date range + date labels
+    status: ready
+    priority: P1
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      lib/date-ranges.ts serializes local dates with toISOString() (UTC) and transaction-row /
+      subscriptions parse YYYY-MM-DD as UTC midnight (defect F2), shifting filters and labels by
+      a day / month edge. Format from local Y/M/D; parse date-only strings as local.
+    acceptance_criteria:
+      - analyticsDateRange() emits local calendar from/to (no toISOString slice)
+      - transaction-row and subscription dates render the same calendar day as stored
+      - Unit test around a UTC-negative timezone month boundary
+
+  - id: TASK-UI-ANALYTICS-003
+    title: Loading/empty guards + divide-by-zero/NaN fixes
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Leaks/Subscriptions/cash-flow strips render $0 while loading as if real (F3); resilience
+      runway can show Infinity when burn is 0 and merchants sparkline divides by zero on a single
+      point (F4). Add loading + explicit empty states; guard zero denominators.
+    acceptance_criteria:
+      - Leaks, subscriptions, cash-flow strips show loader then explicit empty state
+      - Runway never renders Infinity/NaN; sparkline handles len<=1
+      - No $0/0.00 presented as measured during fetch
+
+  - id: TASK-UI-ANALYTICS-004
+    title: Surface isLive (computed vs placeholder) on preview panels
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      isLive exists in types/api.ts but no panel reads it (defect F5). Add a small badge/banner
+      so users can tell computed metrics from placeholder/demo (budgets, recurring, wellness,
+      merchants, coach, DNA). Later extend to render envelope confidence.
+    acceptance_criteria:
+      - Panels with isLive show a Live vs Preview indicator
+      - Indicator consistent and accessible
+      - Hook ready to display metric-envelope confidence when available
+
+  - id: TASK-UI-ANALYTICS-005
+    title: Fix FIRE accelerator math + inflation/time-machine copy
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      fire-panel "cut $400/mo spending" accelerator adds $400 to investing instead of reducing
+      the FIRE number, and labels monthlyInvest/(invest+spend) as a savings rate (F6).
+      inflation-panel hardcodes "faster than average"; time-machine shows a 1.45x constant as a
+      factual backtest. Fix math and make copy conditional/clearly illustrative.
+    acceptance_criteria:
+      - Cut-spending accelerator lowers monthlySpend, keeps monthlyInvest
+      - FIRE "savings rate" relabeled or computed from income
+      - Inflation copy conditional on personal vs national rate
+      - Time-machine constant labeled as illustrative, not a backtest
+
+  - id: TASK-UI-ANALYTICS-006
+    title: Preserve category deltas + chart correctness fixes
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      category-analytics-panel overwrites real deltaVsPriorMonth with 0 (F7); interactive-area-chart
+      header always says "spent" even on Income/Net; cash-flow strip expense bar widths can exceed
+      100%. Preserve backend deltas, make the header track the active metric, scale bars to a shared max.
+    acceptance_criteria:
+      - deltaVsPriorMonth from backend preserved (no zeroing)
+      - Area-chart header reflects the active metric (spent/income/net)
+      - Bar widths clamp to 100% against a shared max
+
+  - id: TASK-UI-ANALYTICS-007
+    title: Consolidate money formatters + chart tooltip currency
+    status: ready
+    priority: P3
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Two money formatters (lib/format-money.ts vs lib/chart-utils.ts) with different locale rules;
+      chart/trend/donut tooltips use raw toLocaleString without currency/2-dp (defect F8).
+      Consolidate to one formatter honoring the project money standard.
+    acceptance_criteria:
+      - Single shared money formatter used by dashboard and charts
+      - Tooltips show currency symbol + 2 decimals consistently
+      - Compact formatter respects currency code
+
+  # ── Docs ─────────────────────────────────────────────────────────────────
+
+  - id: TASK-DOCS-ANALYTICS-001
+    title: Sync api-contract, system-overview, and PRD with analytics redesign
+    status: ready
+    priority: P1
+    area: docs
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - docs/design/api-contract.md
+      - docs/architecture/system-overview.md
+      - docs/design/product-requirements.md
+    description: |
+      Land the analytics design into the shared contract docs so all clients align: add the
+      metric envelope and the /analytics/* endpoints to api-contract.md; document the snapshot
+      tables, dimensions, transfer_links, tax_lots, and materialized marts in system-overview.md;
+      add the analytics KPI section to product-requirements.md.
+    acceptance_criteria:
+      - api-contract.md documents the metric envelope + /analytics/* request/response shapes
+      - system-overview.md describes new tables + mart refresh on sync
+      - product-requirements.md lists the analytics KPIs and phases 3.7-3.9

@@ -63,6 +63,8 @@ Plaid Link (web/iOS SDK) ─┘
 
 ## Current phase
 
-**Active:** Phase 3.6 statement import (web). Track work in [`docs/development/TASK_BOARD.md`](docs/development/TASK_BOARD.md).
+**Active:** Phase 3.7–3.9 analytics intelligence redesign. The first-gen analytics layer shipped fabricated/duplicated/stubbed metrics — see [`docs/architecture/analytics-architecture.md`](docs/architecture/analytics-architecture.md) for the audit, taxonomy, data model, and scoring frameworks. Track and claim work in [`docs/development/TASK_BOARD.md`](docs/development/TASK_BOARD.md) (`TASK-ANALYTICS-*`, `TASK-UI-ANALYTICS-*`).
+
+**Done:** Phase 3.6 statement import (web) + GDPR export.
 
 **Deferred:** iPhone app (`ios/`) — **lowest priority (P4)**; partial shell only; no new iOS features until import path ships on web.
