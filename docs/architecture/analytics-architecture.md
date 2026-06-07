@@ -818,3 +818,32 @@ Fixes (all server-side compute so web + iOS match):
 
 > Analysis note: this matches the user's report (streaks/challenges empty, "spend by reason" $0). The
 > root cause is missing **generation/tagging**, not a calculation bug — the read path is fine.
+
+---
+
+## 19. Household membership & account changes — refresh completeness (H-series)
+
+**What works:** scope is resolved live as "all `isActive` accounts for the household `userIds`"
+(`active-account-scope.ts`), and `accounts.is_active` defaults to **true**, so a newly added/synced
+account enters every metric automatically on the next read. Household `userIds` =
+owner + every `household_members` row with a non-null `userId` (`household-access.ts`), so a linked
+family member's accounts are included once they exist under that member's user id.
+
+**Caveats / gaps:**
+- A member who is **invited but has not accepted** has `userId = null` → contributes nothing yet
+  (expected). Owner-owned accounts **assigned** to a member stay under the owner's id, so they remain
+  in scope regardless.
+- **H1 (P2, ui):** `useHouseholdMutations.invalidate()` invalidates only `household`,
+  `household-insights`, `accounts`, `chart-data`, `transactions` — **not** wellness, dna, patterns,
+  behavioral, merchants, net-worth, investments, fire, recurring, budgets, summary, categories,
+  money-flow. So after adding/assigning/linking a member, most panels show **pre-member** numbers
+  until they refetch on their own. **Fix:** call the shared `invalidateFinancialQueries` (the ~22-key
+  set) from household mutations.
+- **H2 (P2, backend):** linking/adding a household member does **not** trigger a recompute, so
+  **persisted** analytics (marts, protect profiles, wellness) stay stale for the household until the
+  next sync or a manual recalculate. **Fix:** trigger `recomputeAllAnalytics` (RC1) for the household
+  when membership changes (member accepts/links, account assigned), so persisted metrics include the
+  member immediately. Depends on `TASK-RECOMPUTE-001`.
+
+Net: new **accounts** flow into all metrics automatically; **member** changes need H1 + H2 so the
+whole dashboard (not just a subset) reflects them without waiting for the next sync.

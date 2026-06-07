@@ -2405,3 +2405,54 @@ tasks:
       - Users can tag/untag a transaction's reason from the UI
       - Spend-by-reason renders from tags; an explanatory empty state shows when no tags exist
       - Streaks/challenges render with clear empty states until populated
+  - id: TASK-HOUSEHOLD-001
+    title: Household mutations should invalidate the full financial query set (H1)
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/hooks/use-household.ts
+      - ui/src/lib/invalidate-financial-queries.ts
+    description: |
+      Defect H1 (analytics-architecture.md section 19). useHouseholdMutations.invalidate() only
+      invalidates household, household-insights, accounts, chart-data, transactions — so after
+      adding/assigning/linking a family member, panels like wellness, dna, patterns, behavioral,
+      merchants, net-worth, investments, fire, recurring, budgets, summary, categories, money-flow
+      keep showing pre-member numbers. Replace the hand-rolled subset with the shared
+      invalidateFinancialQueries helper (plus the household/household-insights keys) so the whole
+      dashboard refreshes when membership or account assignment changes.
+    acceptance_criteria:
+      - Household member add/update/delete/assign invalidates the full financial query set
+      - Wellness/investments/net-worth/fire/etc. refetch after a membership change
+      - Uses the shared invalidateFinancialQueries helper (no divergent hand-rolled list)
+  - id: TASK-HOUSEHOLD-002
+    title: Recompute household analytics when membership changes (H2)
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECOMPUTE-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/household-invitations.ts
+      - backend/src/services/household-store.ts
+    description: |
+      Defect H2 (analytics-architecture.md section 19). Adding/linking a household member (invite
+      accepted, member linked to a user, account assigned) does not trigger a recompute, so persisted
+      analytics (marts, protect profiles, wellness) stay stale for the household until the next sync
+      or manual recalculate. Trigger recomputeAllAnalytics (TASK-RECOMPUTE-001) for the affected
+      household when membership/account-assignment changes, so persisted metrics include the member
+      immediately. Keep it idempotent and avoid blocking the request unnecessarily (enqueue if slow).
+    acceptance_criteria:
+      - Member accept/link and account assignment trigger a household recompute
+      - Persisted analytics reflect the new member without waiting for the next sync
+      - Recompute is idempotent and does not block the mutation response unduly
+      - typecheck passes

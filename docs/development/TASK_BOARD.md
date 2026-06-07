@@ -277,6 +277,19 @@ Streaks/challenges (B1/B2) should run inside the recompute orchestrator (RC1).
 
 ---
 
+### Household membership & account changes — refresh completeness
+
+New accounts (isActive default true) auto-enter all metrics via live scope. But household member
+changes only do a partial UI refresh and never trigger a recompute, so most panels show pre-member
+numbers until the next sync. Design: `analytics-architecture.md` §19.
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-HOUSEHOLD-001 | ui | Household mutations invalidate full financial query set (H1) | — |
+| TASK-HOUSEHOLD-002 | backend | Recompute household analytics on membership change (H2) | RECOMPUTE-001 |
+
+---
+
 ## Recently completed
 
 | ID | Title |
