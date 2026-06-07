@@ -421,3 +421,41 @@ state mirrored to the URL (`useSearchParams`) and fetched via TanStack Query. It
 aggregation — it only passes query params and renders `rows`. The merchants page is the
 reference implementation (`TASK-PAGINATE-002` + `TASK-PAGINATE-004`); transactions, holdings,
 subscriptions, categories, and money-flow follow the same pattern (`TASK-PAGINATE-005/006`).
+
+---
+
+## 11. Calculation-correctness audit (C-series defects)
+
+Findings from validating the math in every shipped analytics feature. Each defect lists the
+**file:line**, the **symptom** the user sees, the **root cause**, and the **expected fix**. These
+map 1:1 to `TASK-CALC-*` tasks. Severity: **P1** = wrong numbers shown as fact; **P2** = wrong
+period/representation; **P3** = limitation/inconsistency.
+
+> Sign convention note: most of these assume expense `amount` is stored positive and income
+> positive (income often summed with `ABS`). A single signed-amount convention
+> (`TASK-ANALYTICS-001`) would remove a whole class of these. Until then, fixes must not assume a
+> sign without checking the column.
+
+| ID | Sev | File:line | Symptom → Root cause → Fix |
+|----|-----|-----------|----------------------------|
+| **C1** | P1 | `compute-patterns.ts:27-52` | "Average spend by day of week" numbers are absurdly high. The query does `SUM(amount)` grouped by `extract(dow)` over **all history** — it's a lifetime total per weekday, not an average. **Fix:** divide by the number of occurrences of that weekday in the data window, i.e. `SUM(amount) / COUNT(DISTINCT date)` per dow (average spend on a typical Mon/Tue/…). Keep the UI label or change to "Total"; pick one and make data match. |
+| **C2** | P1 | `compute-wellness.ts:17-22,100,102` | Debt-Health and Income-to-Expense scores move the wrong way (high credit utilization scores *well*; low expense ratio scores *poorly*). `scoreFromRatio(value,target,false)` returns `(target/value)*100`, which **increases** with the bad quantity. **Fix:** for lower-is-better metrics, score should be `clamp((ideal/actual)*100)` so higher actual → lower score. Verify both call sites and add unit tests with known inputs. |
+| **C3** | P1 | `compute-wellness.ts:84,200,226` | Credit utilization & Debt-Health are fiction — `creditLimit = balance * 2.5`. **Fix:** use the real limit (`TASK-ANALYTICS-003`). If limit unknown, **omit** utilization and exclude the dimension with a caveat — never fabricate. |
+| **C4** | P2 | `compute-wellness.ts:197-216` | The wellness "history" line is misleading: every past month reuses **current** balances (`accountMetrics` has no date), so emergency-fund, utilization and investment dims are flat across history; only income/expense vary. **Fix:** requires balance snapshots (`TASK-ANALYTICS-004`). Until then, only chart the dimensions that are truly historical (cash-flow), or label clearly. |
+| **C5** | P1 | `compute-wellness.ts:139` | "Inflation Beat" dimension is fabricated: `savingsScore * 0.85`. **Fix:** compute from personal inflation vs nominal savings/return (see `TASK-ANALYTICS-017` personal CPI) or remove from the composite. |
+| **C6** | P1 | `investment-analytics.ts:765-829` (used `compute-wellness.ts:145`) | "Investment Growth" score is an arbitrary point formula (`40 + investRate*2 + tier`), unrelated to actual returns. **Fix:** replace with a real metric (contribution rate or, post-snapshots, return) or drop from the composite. Covered with `TASK-ANALYTICS-006`. |
+| **C7** | P1 | `investment-analytics.ts:652-657` | "Estimated value today" is fabricated: lifetime contributions × (current holdings value / cost). **Fix:** report actual cost basis vs current market value (unrealized gain), not contributions × a ratio. Remove the synthetic estimate. |
+| **C8** | P1 | `transaction-store.ts:562` vs `compute-wellness.ts:55`, `compute-wrapped.ts:163`, `protect-analytics.ts:287` | Savings rate is a **fraction (0–1)** in `getSummary` but a **percent (0–100)** in wellness/wrapped/protect, and definitions differ (income−expense vs income−cashBurn). The UI then multiplies inconsistently. **Fix:** one definition + one representation (emit a 0–1 fraction with `unit:"percent"`, multiply by 100 once in UI). Ties to `TASK-UI-ANALYTICS-001` and the metric layer `TASK-ANALYTICS-002`. |
+| **C9** | P2 | `transaction-store.ts:660` | Money-flow ignores the selected period (`void from; void to;`) — it always shows all-time. **Fix:** apply the `from/to` date filter to every money-flow query. |
+| **C10** | P2 | `transaction-store.ts:756,787` | Trends ignore the period (`void from; void to;`) **and** `slice(0,8)` takes the first 8 categories **alphabetically**, not the top 8 by spend. **Fix:** apply date filter; rank categories by total spend before slicing (or paginate per `TASK-PAGINATE-005`). |
+| **C11** | P2 | `transaction-store.ts:647` | Category "vs prior month" delta is hardcoded `deltaVsPriorMonth: 0`, so any delta the UI shows is fake. **Fix:** compute the real delta against the prior comparable period, or remove the field and its UI. |
+| **C12** | P2 | `transaction-store.ts:725-728` | Money-flow `transfersOut` = `ABS(sum)` of **all** transfers (both legs of each transfer), double-counting. **Fix:** count one direction (outflow only) or net the paired legs (`transfer_links`, `TASK-ANALYTICS-009`). |
+| **C13** | P2 | `compute-wrapped.ts:180-195` | "No-spend days" counts **future** days for the current year (loops to Dec 31). **Fix:** cap the end of the range at `min(today, year-end)`. |
+| **C14** | P2 | `detect-recurring.ts:140,144` | Subscriptions always show `status:"active"` and a `nextChargeDate` that can be in the past for stopped subs. **Fix:** mark inactive when last charge is older than ~1.5× cadence; set `nextChargeDate` null when stale. Annual cadence also unsupported (P3). |
+| **C15** | P3 | `lifestyle-habits.ts:61` vs `detect-recurring.ts:26` | Category/subcategory string literals drift between services ("Subscriptions & Digital" vs "Subscriptions & Software"; habit subcategory names may not exist in `config/categories.ts`), so matchers silently never fire. **Fix:** import category/subcategory names from the single source (`config/categories.ts`); add a test asserting every literal exists. |
+| **C16** | P2 | `investment-analytics.ts:686-690` | Net worth treats only `credit` accounts as liabilities; `loan`/mortgage account types are added as **assets**. **Fix:** classify loan/mortgage/liability account types as liabilities (confirm the enum in `schema.ts`). |
+| **U1** | P2 | `ui/.../panels/merchants-panel.tsx` (income tab) | The "Income by month (primary + side)" chart has no y-axis, no value labels, and no tooltip — bars are unreadable, and "Income stability = 100 − CV%" can go negative/>100. **Fix:** add a labeled y-axis or per-bar value labels + hover tooltip, clarify the legend, and clamp/relabel stability. Every chart must let a user read the actual numbers. |
+
+**Cross-cutting recommendation:** the durable fix for C2, C5, C6, C8 is the single metric layer
+(`TASK-ANALYTICS-002`): each KPI defined once, with a unit, and unit-tested against hand-computed
+fixtures so a small model can verify correctness without guessing.

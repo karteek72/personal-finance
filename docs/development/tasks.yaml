@@ -1246,3 +1246,381 @@ tasks:
       - Each listed value returned pre-computed by the backend
       - UI components drop the corresponding client calculations
       - Values identical across web and (future) iOS because the source is shared
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Calculation-correctness audit (C-series) — analytics-architecture.md section 11
+  # Wrong NUMBERS shown to the user across shipped features. Each task is scoped to a
+  # single defect with exact file:line, the bad math, and the expected formula so a
+  # small model can implement without re-deriving intent. Verify the amount sign
+  # convention (expense positive?) before assuming it in any fix.
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: TASK-CALC-001
+    title: "Fix C1 — day-of-week 'average' is a lifetime sum"
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/compute-patterns.ts
+      - ui/src/components/preview/panels/patterns-panel.tsx
+    description: |
+      The Patterns panel labels a chart "Average spend by day of week" but
+      compute-patterns.ts (lines ~27-52) runs SUM(amount) grouped by extract(dow from date)
+      over ALL history with no division. So each weekday shows the lifetime total of every
+      occurrence of that weekday — the numbers are far too large.
+
+      Fix: return the AVERAGE spend per occurrence of that weekday over the data window:
+        value = SUM(amount) / COUNT(DISTINCT date)   -- per dow group
+      (i.e. on a typical Monday, how much is spent). Keep the same filters already present
+      (expense, not transfer, not internal-transfer category, not pending). Do NOT change the
+      UI label unless you switch the metric; data and label must agree. The weekday/weekend
+      comparison in patterns-panel.tsx (lines ~41-46) is derived from these values and will
+      become correct once the per-day numbers are averages.
+    acceptance_criteria:
+      - dayOfWeek values are average-per-weekday-occurrence, not lifetime sums
+      - Division guards against zero occurrences (no NaN/Infinity)
+      - Existing filters preserved; UI label matches the metric
+      - A unit/integration check with a small fixture confirms the average math
+
+  - id: TASK-CALC-002
+    title: "Fix C2 — inverted wellness scores for lower-is-better dimensions"
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/compute-wellness.ts
+    description: |
+      scoreFromRatio (compute-wellness.ts:17-22) for the "lower is better" branch returns
+      (target/value)*100, and the call sites pass the IDEAL as `value` and the ACTUAL as
+      `target`:
+        debtScore         = scoreFromRatio(30, utilization, false)   // line ~100
+        incomeExpenseScore= scoreFromRatio(72, expenseRatio, false)  // line ~102
+      Result: HIGHER credit utilization scores BETTER, and LOWER expense ratio scores WORSE —
+      both inverted.
+
+      Fix: for lower-is-better metrics the score must DECREASE as the actual value rises, e.g.
+      clamp((ideal / max(actual, epsilon)) * 100). Decide a clear (value=actual, target=ideal)
+      convention and apply it consistently. Add unit tests: e.g. utilization 10% → high score,
+      90% → low score; expenseRatio 50% → high score, 110% → low score.
+    acceptance_criteria:
+      - Debt-Health score decreases as credit utilization rises
+      - Income-to-Expense score decreases as expense ratio rises
+      - scoreFromRatio has explicit, documented value/target semantics
+      - Unit tests cover both directions with known inputs
+
+  - id: TASK-CALC-003
+    title: "Fix C3/C5/C6 — remove fabricated wellness dimensions"
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/compute-wellness.ts
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Three wellness dimensions are fabricated and must not be shown as fact:
+        - C3 Debt-Health uses creditLimit = balance * 2.5 (compute-wellness.ts:84). Utilization
+          is fiction. Use the real limit when available (TASK-ANALYTICS-003); when unknown,
+          OMIT the dimension and add a caveat — never estimate the limit.
+        - C5 "Inflation Beat" = savingsScore * 0.85 (line ~139). Remove from the composite (or
+          base it on personal CPI from TASK-ANALYTICS-017).
+        - C6 "Investment Growth" = arbitrary point formula in
+          investment-analytics.ts:765-829 (computeInvestmentGrowthScore). Remove from the
+          composite or replace with a real contribution/return metric.
+      Re-normalize the composite weights after removing/omitting dimensions so they still sum
+      correctly. This overlaps TASK-ANALYTICS-006 (rebuild Health) — coordinate, do not duplicate.
+    acceptance_criteria:
+      - No dimension uses a fabricated credit limit, savingsScore*0.85, or the point-formula growth score
+      - Omitted dimensions are excluded from the weighted composite (weights re-normalized)
+      - Any data-gap dimension carries a caveat instead of a fake number
+
+  - id: TASK-CALC-004
+    title: "Fix C7 — fabricated investment 'estimated value today'"
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/investment-analytics.ts
+    description: |
+      buildInvestmentHistorySummary (investment-analytics.ts:652-657) computes
+      estimatedValueToday = totalContributed * (portfolioValue / totalCost) clamped ≥1. This
+      invents a return by applying current holdings' gain ratio to lifetime contributions.
+      Fix: report real figures only — current market value and cost basis (unrealized gain),
+      and total contributed separately. Do not synthesize an "estimated value". If a true
+      time-weighted return is wanted, that needs snapshots (TASK-ANALYTICS-018) and is out of
+      scope here.
+    acceptance_criteria:
+      - No metric multiplies contributions by a current-holdings ratio
+      - Summary shows market value, cost basis, unrealized gain, and contributions as distinct fields
+      - UI labels match what is actually computed
+
+  - id: TASK-CALC-005
+    title: "Fix C8 — unify savings-rate definition and scale"
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transaction-store.ts
+      - backend/src/services/compute-wellness.ts
+      - backend/src/services/compute-wrapped.ts
+      - backend/src/services/protect-analytics.ts
+    description: |
+      Savings rate is inconsistent across services:
+        - transaction-store.ts:562 returns a FRACTION (net/income, ~0.0-1.0)
+        - compute-wellness.ts:55-56 returns a PERCENT (0-100)
+        - compute-wrapped.ts:163-164,214 returns a PERCENT
+        - protect-analytics.ts:287-290 computes income vs cash-burn (different definition)
+      The UI then multiplies inconsistently (see TASK-UI-ANALYTICS-001).
+      Fix: pick ONE definition (recommended: (income - expense) / income, expense excluding
+      transfers/internal) and ONE representation (emit a 0-1 fraction with unit "percent"); the
+      client multiplies by 100 exactly once. Make all four services use a shared helper. This is
+      the concrete first slice of the metric layer (TASK-ANALYTICS-002).
+    acceptance_criteria:
+      - All services return savings rate from one shared definition + representation
+      - Documented unit (fraction, unit=percent) in api-contract.md
+      - UI multiplies once; the same month shows the same rate everywhere
+
+  - id: TASK-CALC-006
+    title: "Fix C9/C10 — money-flow & trends ignore the period; trends mis-ranked"
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transaction-store.ts
+    description: |
+      getMoneyFlow (transaction-store.ts:660 `void from; void to;`) and getTrends
+      (line ~756 `void from; void to;`) discard the selected date range and always aggregate
+      ALL history, so the user sees lifetime data under a period filter. Additionally getTrends
+      slices the first 8 categories in ALPHABETICAL order (line ~787 `.slice(0,8)` after
+      `ORDER BY category`), not the top 8 by spend.
+      Fix: apply the from/to date filter to every query in both functions; rank trend categories
+      by total spend (desc) before slicing. (Pagination is handled separately by TASK-PAGINATE-005.)
+    acceptance_criteria:
+      - Money-flow and trends respect from/to (verified: a narrow range returns less than all-time)
+      - Trend categories are the top-N by spend, not alphabetical
+      - No remaining `void from; void to;` discards in these functions
+
+  - id: TASK-CALC-007
+    title: "Fix C11 — category 'vs prior month' delta is hardcoded 0"
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transaction-store.ts
+    description: |
+      getCategories (transaction-store.ts:647) returns deltaVsPriorMonth: 0 for every category,
+      so any "vs last month" indicator in the UI is fake.
+      Fix: compute the real delta of each category's spend versus the prior comparable period
+      (same length immediately before from/to), or remove the field and the UI element that
+      renders it. Prefer computing it.
+    acceptance_criteria:
+      - deltaVsPriorMonth reflects the actual change vs the prior period (or the field is removed end-to-end)
+      - New-this-period categories handled (prior = 0) without divide-by-zero
+      - UI no longer displays a constant 0 delta
+
+  - id: TASK-CALC-008
+    title: "Fix C12 — money-flow transfersOut double-counts both legs"
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transaction-store.ts
+    description: |
+      getMoneyFlow transfersOut (transaction-store.ts:725-728) sums ABS(amount) over ALL
+      is_transfer rows, counting both the outgoing and incoming leg of each internal transfer,
+      roughly doubling the figure.
+      Fix: count a single direction (outflow only) or net the paired legs. Until transfer_links
+      exist (TASK-ANALYTICS-009), restrict to the outflow side (e.g. negative/expense leg) so
+      the number reflects money that actually left.
+    acceptance_criteria:
+      - transfersOut counts each transfer once (one leg)
+      - A simple two-leg transfer fixture yields the single transfer amount, not 2x
+
+  - id: TASK-CALC-009
+    title: "Fix C13 — Wrapped 'no-spend days' counts future days"
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/compute-wrapped.ts
+    description: |
+      computeWrappedFromTransactions (compute-wrapped.ts:180-195) iterates Jan 1 → Dec 31 of the
+      year and counts days with no expense. For the current (in-progress) year this counts every
+      future day as a "no-spend day", inflating the number.
+      Fix: cap the end of the range at min(today, year-end). Only count elapsed days.
+    acceptance_criteria:
+      - No-spend days never includes dates after today
+      - Past complete years are unaffected
+      - Current-year value equals elapsed days minus days with spend
+
+  - id: TASK-CALC-010
+    title: "Fix C14 — recurring items always 'active' with stale next-charge dates"
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/detect-recurring.ts
+    description: |
+      detectRecurringFromTransactions (detect-recurring.ts) sets status:"active" for every
+      detected item (line ~144) and nextChargeDate = lastDate + medInterval (line ~140), which
+      can be in the past for subscriptions that stopped.
+      Fix: mark an item inactive (or "lapsed") when the last charge is older than ~1.5x its
+      cadence; set nextChargeDate to null when the predicted date is already in the past.
+      Note (P3): annual cadence is not detected (only 25-35d and 6-8d windows) — track as a
+      follow-up if desired.
+    acceptance_criteria:
+      - Items with a stale last charge are not labeled active
+      - nextChargeDate is null when it would fall in the past
+      - Active monthly/weekly items still compute a correct future date
+
+  - id: TASK-CALC-011
+    title: "Fix C15 — category/subcategory name drift across services"
+    status: ready
+    priority: P3
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/lifestyle-habits.ts
+      - backend/src/services/detect-recurring.ts
+      - backend/src/config/categories.ts
+    description: |
+      Hardcoded category/subcategory strings drift between services, so matchers silently never
+      fire. Examples: lifestyle-habits.ts uses "Subscriptions & Digital" while detect-recurring.ts
+      uses "Subscriptions & Software"; lifestyle habit subCategories (e.g. "Cafes & Coffee",
+      "Coffee Shops") may not exist in config/categories.ts.
+      Fix: import category/subcategory names from the single source (config/categories.ts) instead
+      of inlining literals, and add a test that asserts every referenced name exists in the
+      taxonomy. Reconcile the mismatched names to the canonical taxonomy.
+    acceptance_criteria:
+      - No analytics service hardcodes a category/subcategory string that isn't in config/categories.ts
+      - A test fails if a referenced category/subcategory name is not in the taxonomy
+      - Subscription habit/recurring matchers fire against real data
+
+  - id: TASK-CALC-012
+    title: "Fix C16 — net worth ignores loan/mortgage liabilities"
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/investment-analytics.ts
+      - backend/src/db/schema.ts
+    description: |
+      computeLiveNetWorth (investment-analytics.ts:686-690) treats only `credit` accounts as
+      liabilities; `loan`/mortgage account types fall into the else branch and are ADDED as
+      assets, overstating net worth.
+      Fix: classify all liability account types (credit, loan, mortgage, and any others in the
+      schema enum) as liabilities. Confirm the account `type` values in schema.ts before coding.
+    acceptance_criteria:
+      - Loan/mortgage balances reduce net worth, not increase it
+      - Account-type classification matches the schema enum (no type silently treated as an asset)
+      - A fixture with a mortgage yields assets − all liabilities
+
+  - id: TASK-CALC-013
+    title: "Fix C4 — wellness history reuses current balances for past months"
+    status: backlog
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-004
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/compute-wellness.ts
+    description: |
+      The wellness history loop (compute-wellness.ts:197-216) calls accountMetrics() (current
+      balances) for every past month, so emergency-fund, utilization and investment dimensions
+      are identical across all history points — only income/expense vary. The trend line is
+      misleading. Real per-month balances require the snapshot pipeline (TASK-ANALYTICS-004).
+      Until snapshots exist, chart only the truly historical (cash-flow) dimensions or clearly
+      mark the others as point-in-time.
+    acceptance_criteria:
+      - Balance-derived dimensions use historical snapshots once available
+      - Before snapshots, the history view does not imply month-varying balance metrics
+      - No past month silently uses today's balances without a caveat
+
+  - id: TASK-UI-CALC-001
+    title: "Fix U1 — Income-by-month chart has no axes, values, or tooltip"
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/merchants-panel.tsx
+    description: |
+      The "Income by month (primary + side)" stacked bar chart (merchants-panel.tsx income tab)
+      renders bars with no y-axis, no value labels, and no tooltip, so the user cannot read any
+      dollar amount — it "doesn't make sense". Also "Income stability = 100 − CV%" can go
+      negative or exceed 100.
+      Fix: add a readable y-axis (or per-bar value labels) and a hover tooltip showing the exact
+      primary/side/total for each month; clarify the x-axis (month) and legend; clamp/relabel the
+      stability metric to a sane 0-100 range. Apply this bar-with-labels pattern as the standard
+      for other unlabeled charts.
+    acceptance_criteria:
+      - Each bar's primary/side/total dollar values are readable (axis, labels, or tooltip)
+      - X-axis (month) and legend are unambiguous
+      - Income stability stays within 0-100 and is explained
+      - No values-less bar charts remain on this panel

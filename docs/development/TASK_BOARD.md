@@ -93,6 +93,30 @@ calculation to the backend so iOS reuses it. See `analytics-architecture.md` §1
 **Parallelizable now (no deps):** A-001, A-003, A-004, A-008, A-013, all UI-ANALYTICS tasks,
 PAGINATE-001, PAGINATE-003, and the docs tasks.
 
+### Calculation-correctness audit (C-series)
+
+Wrong NUMBERS shown across shipped features. Each task is scoped to one defect with exact
+file:line and the expected formula. Full root-cause table in `analytics-architecture.md` §11.
+
+| ID | Sev | Area | Defect |
+|----|-----|------|--------|
+| TASK-CALC-001 | P1 | backend | C1 day-of-week "average" is a lifetime sum |
+| TASK-CALC-002 | P1 | backend | C2 inverted wellness lower-is-better scores |
+| TASK-CALC-003 | P1 | backend | C3/C5/C6 fabricated wellness dimensions |
+| TASK-CALC-004 | P1 | backend | C7 fabricated investment "estimated value today" |
+| TASK-CALC-005 | P1 | backend | C8 savings-rate definition/scale inconsistent |
+| TASK-CALC-006 | P2 | backend | C9/C10 money-flow & trends ignore period; trends mis-ranked |
+| TASK-CALC-007 | P2 | backend | C11 category "vs prior month" delta hardcoded 0 |
+| TASK-CALC-008 | P2 | backend | C12 money-flow transfersOut double-counts legs |
+| TASK-CALC-009 | P2 | backend | C13 Wrapped no-spend-days counts future days |
+| TASK-CALC-010 | P2 | backend | C14 recurring items always "active" / stale next-charge |
+| TASK-CALC-011 | P3 | backend | C15 category-name drift across services |
+| TASK-CALC-012 | P2 | backend | C16 net worth ignores loan/mortgage liabilities |
+| TASK-CALC-013 | P2 | backend | C4 wellness history reuses current balances (needs A-004) |
+| TASK-UI-CALC-001 | P2 | ui | U1 income-by-month chart has no axes/values/tooltip |
+
+**Parallelizable now (no deps):** every C-series task except CALC-013 (blocked by A-004).
+
 ---
 
 ## Recently completed
