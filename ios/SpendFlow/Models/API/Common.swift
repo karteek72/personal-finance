@@ -101,3 +101,43 @@ struct RecomputeAnalyticsResponse: Codable, Sendable {
     let steps: [Step]
     let message: String?
 }
+
+// MARK: - Flexible API decoding
+
+enum APIDecoding {
+    static func decodeMoney<K: CodingKey>(
+        from container: KeyedDecodingContainer<K>,
+        forKey key: K
+    ) throws -> String {
+        if let value = try? container.decode(String.self, forKey: key) {
+            return value
+        }
+        if let value = try? container.decode(Double.self, forKey: key) {
+            return formatMoney(value)
+        }
+        if let value = try? container.decode(Int.self, forKey: key) {
+            return formatMoney(Double(value))
+        }
+        throw DecodingError.typeMismatch(
+            String.self,
+            DecodingError.Context(
+                codingPath: container.codingPath + [key],
+                debugDescription: "Expected money as string or number"
+            )
+        )
+    }
+
+    static func decodeOptionalMoney<K: CodingKey>(
+        from container: KeyedDecodingContainer<K>,
+        forKey key: K
+    ) throws -> String? {
+        if (try? container.decodeNil(forKey: key)) == true {
+            return nil
+        }
+        return try decodeMoney(from: container, forKey: key)
+    }
+
+    private static func formatMoney(_ value: Double) -> String {
+        String(format: "%.2f", value)
+    }
+}

@@ -13,7 +13,8 @@ final class MoneyFlowViewModel {
         defer { isLoading = false }
 
         do {
-            flow = try await api.getMoneyFlow()
+            let range = AnalyticsDateRange.rolling()
+            flow = try await api.getMoneyFlow(from: range.from, to: range.to)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -36,7 +37,7 @@ struct MoneyFlowView: View {
                 flowColumn(
                     title: "Income",
                     emoji: "💰",
-                    lines: flow.income.sources,
+                    lines: flow.income.sources.rows,
                     footerLabel: "Total in",
                     footerAmount: flow.income.total,
                     accent: SpendFlowTheme.success

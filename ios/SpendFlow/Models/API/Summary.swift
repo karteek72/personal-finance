@@ -8,6 +8,9 @@ struct TransactionSummary: Codable, Sendable {
     let topCategory: TopCategory
     let ccPaymentsExcluded: String
     let savingsRate: Double
+    let transactionCount: Int?
+    let pendingCount: Int?
+    let monthsInPeriod: Int?
 
     struct TopCategory: Codable, Sendable {
         let name: String
@@ -28,7 +31,7 @@ struct MoneyFlowResponse: Codable, Sendable {
     let monthlySeries: [MonthlyFlowPoint]
 
     struct FlowSection: Codable, Sendable {
-        let sources: [FlowLine]
+        let sources: Page<FlowLine>
         let total: String
     }
 
@@ -57,6 +60,14 @@ struct CategoryTotal: Codable, Identifiable, Sendable {
     let amount: String
     let percentage: Double
     let deltaVsPriorMonth: Double
+    let subcategories: [SubCategoryTotal]?
+}
+
+struct SubCategoryTotal: Codable, Identifiable, Sendable {
+    var id: String { name }
+    let name: String
+    let amount: String
+    let percentage: Double
 }
 
 struct CategoriesResponse: Codable, Sendable {

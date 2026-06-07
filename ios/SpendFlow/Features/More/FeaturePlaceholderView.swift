@@ -84,8 +84,10 @@ enum FeatureHubSection: String, CaseIterable, Identifiable, Sendable {
 }
 
 struct MoreHubView: View {
+    @Binding var navigationPath: NavigationPath
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             List {
                 ForEach(FeatureHubSection.allCases) { section in
                     Section(section.title) {
