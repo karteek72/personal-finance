@@ -797,6 +797,56 @@ export interface MerchantsResponse {
   isLive: boolean;
 }
 
+/**
+ * Standard list/pagination envelope (offset pagination with total count).
+ * Mirrors backend lib/list-query.ts — see analytics-architecture.md section 10.3.
+ */
+export interface Page<TRow> {
+  rows: TRow[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  sort: string;
+  dir: "asc" | "desc";
+  appliedFilters: Record<string, string>;
+}
+
+export interface ListQuery {
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+  dir?: "asc" | "desc";
+  q?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface MerchantRow {
+  name: string;
+  emoji: string;
+  visits: number;
+  total: string;
+  avgTransaction: string;
+  share: number;
+  trend: number;
+  lastSeen: string;
+  trail: number[];
+}
+
+export interface MerchantsSummary {
+  merchantCount: number;
+  totalSpend: string;
+  topMerchant: { name: string; total: string } | null;
+  mostVisited: { name: string; visits: number } | null;
+  fastestGrowing: { name: string; trend: number } | null;
+}
+
+export interface MerchantsTableResponse extends Page<MerchantRow> {
+  summary: MerchantsSummary;
+  isLive: boolean;
+}
+
 export interface CalendarResponse {
   month: string;
   events: { day: number; type: string; label: string; amount: string }[];
