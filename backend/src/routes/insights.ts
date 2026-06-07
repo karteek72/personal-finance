@@ -1,8 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
-import { AppError } from "../lib/errors.js";
 import { requireRequestUser } from "../lib/auth-http.js";
 import { parseListQuery } from "../lib/list-query.js";
 import {
+  emptyDnaResponse,
   getBehavioral,
   getDna,
   getPatterns,
@@ -20,10 +20,7 @@ export const insightRoutesV2: FastifyPluginAsync = async (app) => {
   app.get("/insights/dna", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
     const dna = await getDna(user.id);
-    if (!dna) {
-      throw AppError.notFound("No spending DNA found");
-    }
-    return dna;
+    return dna ?? emptyDnaResponse();
   });
 
   app.get("/insights/patterns", async (request) => {

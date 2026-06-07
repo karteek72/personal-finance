@@ -253,6 +253,30 @@ and ignored. Design: `analytics-architecture.md` §17.
 
 ---
 
+### Wellness history, recalculate-all & the dead Behavioral feature
+
+Wellness history is bars with no axis/values (W1). There's no way to force a full recompute, and no
+idempotency guarantee (RC). Behavioral is a read-only shell: `transaction_reasons`, `challenges`,
+`habit_streaks` are read but **nothing writes to them**, so streaks/challenges are empty and
+spend-by-reason is always $0 (B). Design: `analytics-architecture.md` §18.
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-WELLNESS-UI-001 | ui | Wellness score-history: axis, values, 0-100 scaling (W1) | — |
+| TASK-RECOMPUTE-001 | backend | recomputeAllAnalytics + POST /analytics/recompute (RC1) | — |
+| TASK-RECOMPUTE-UI-001 | ui | Recalculate-all button + cache invalidation (RC2) | RECOMPUTE-001 |
+| TASK-RECOMPUTE-002 | backend | Idempotency/determinism test for recompute (RC3) | RECOMPUTE-001, INTEGRITY-002 |
+| TASK-RECOMPUTE-003 | backend | Wire sync to full recompute after reconcile; fix ordering (RC4) | RECOMPUTE-001 |
+| TASK-BEHAVIORAL-001 | backend | Habit-streak engine — populate habit_streaks (B1) | — |
+| TASK-BEHAVIORAL-002 | backend | Challenge engine — auto-generate challenges (B2) | — |
+| TASK-BEHAVIORAL-003 | backend | Transaction reason tagging endpoint (B3a) | — |
+| TASK-BEHAVIORAL-UI-001 | ui | Reason-tagging UI + behavioral empty states (B3b) | BEHAVIORAL-003 |
+
+**Behavioral root cause:** missing generation/tagging, not a calc bug — the read path is fine.
+Streaks/challenges (B1/B2) should run inside the recompute orchestrator (RC1).
+
+---
+
 ## Recently completed
 
 | ID | Title |

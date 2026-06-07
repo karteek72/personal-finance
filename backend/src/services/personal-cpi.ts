@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { dimCategory, dimMerchant, transactions } from "../db/schema.js";
-import { roundDecimal } from "../lib/money.js";
+import { clampDbPercent, roundDecimal } from "../lib/money.js";
 import {
   drizzleActiveTransactionWhere,
   resolveActiveAccountScope,
@@ -15,6 +15,33 @@ export const NATIONAL_CPI_EXTERNAL = {
   source: "BLS CPI-U (external reference)",
   asOf: "2025-12",
 } as const;
+
+const MIN_CPI_PRICE_BASE = 1;
+const MAX_REASONABLE_YOY_PCT = 100;
+
+/** YoY-style inflation between two price points; null when inputs are unreliable. */
+export function inflationRateFromPrices(
+  priceNow: number,
+  priceBase: number,
+): number | null {
+  if (
+    !Number.isFinite(priceNow) ||
+    !Number.isFinite(priceBase) ||
+    priceBase < MIN_CPI_PRICE_BASE ||
+    priceNow <= 0
+  ) {
+    return null;
+  }
+  const rate = ((priceNow / priceBase) - 1) * 100;
+  if (rate < -95 || rate > MAX_REASONABLE_YOY_PCT) {
+    return null;
+  }
+  return clampDbPercent(rate);
+}
+
+function isReliableCpiItem(priceBase: number, priceNow: number): boolean {
+  return inflationRateFromPrices(priceNow, priceBase) != null;
+}
 
 export interface PersonalCpiBasketItem {
   id: string;
@@ -174,7 +201,7 @@ export async function computePersonalCpi(userIds: string[]): Promise<PersonalCpi
       if (historical) priceBase = historical;
     }
 
-    if (priceBase <= 0 || priceNow <= 0) continue;
+    if (!isReliableCpiItem(priceBase, priceNow)) continue;
 
     basketItems.push({
       id: key,
@@ -206,7 +233,9 @@ export async function computePersonalCpi(userIds: string[]): Promise<PersonalCpi
       45,
     );
 
-    if (!priceNow || !priceBase) continue;
+    if (!priceNow || !priceBase || !isReliableCpiItem(priceBase, priceNow)) {
+      continue;
+    }
 
     basketItems.push({
       id: bill.merchantKey,
@@ -235,7 +264,7 @@ export async function computePersonalCpi(userIds: string[]): Promise<PersonalCpi
 
   const personalRate =
     denominator > 0
-      ? roundDecimal((numerator / denominator - 1) * 100)
+      ? clampDbPercent((numerator / denominator - 1) * 100)
       : 0;
 
   const confidence = Math.min(

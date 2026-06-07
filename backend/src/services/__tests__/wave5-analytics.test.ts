@@ -5,7 +5,11 @@ import {
   seasonalDeltaPercent,
   trailingMonths,
 } from "../category-seasonal-delta.js";
-import { nominalToReal } from "../personal-cpi.js";
+import {
+  inflationRateFromPrices,
+  nominalToReal,
+} from "../personal-cpi.js";
+import { clampDbPercent } from "../../lib/money.js";
 
 test("seasonalDeltaPercent compares current to trailing median", () => {
   assert.equal(seasonalDeltaPercent(120, [80, 90, 100, 95, 85, 100]), 29.73);
@@ -26,4 +30,14 @@ test("trailingMonths walks backward from reference month", () => {
 test("nominalToReal deflates by personal CPI percent", () => {
   assert.equal(nominalToReal(103, 3), 100);
   assert.equal(nominalToReal(100, 0), 100);
+});
+
+test("inflationRateFromPrices rejects tiny base amounts and extreme spikes", () => {
+  assert.equal(inflationRateFromPrices(22.64, 0.06), null);
+  assert.equal(inflationRateFromPrices(30.415, 135.89), -77.62);
+});
+
+test("clampDbPercent fits PostgreSQL numeric(5, 2)", () => {
+  assert.equal(clampDbPercent(37_633.33), 999.99);
+  assert.equal(clampDbPercent(-1_500), -999.99);
 });

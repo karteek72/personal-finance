@@ -98,7 +98,7 @@ export async function getInflation(
     nationalCpi: roundDecimal(Number.parseFloat(profile.nationalCpi)),
     salaryRaise: roundDecimal(raise),
     nominalSavingsRate: roundDecimal(nominalSavings),
-    realSavingsRate: roundDecimal(nominalSavings * 100 - personal),
+    realSavingsRate: roundDecimal(nominalSavings - personal),
     realRaise: roundDecimal(raise - personal),
     powerLoss: formatMoneyAmount(profile.powerLoss ?? "0"),
     salary: formatMoneyAmount(salary),

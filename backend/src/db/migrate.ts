@@ -22,6 +22,7 @@ const MIGRATION_FILES = [
   "0013_fire_profile_age.sql",
   "0014_user_profile_analytics.sql",
   "0015_analytics_foundation.sql",
+  "0015_planning_intelligence.sql",
   "0016_analytics_merchants_portfolio.sql",
   "0017_investment_tax_lots.sql",
   "0018_analytics_transfers_resilience.sql",

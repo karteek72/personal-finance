@@ -736,3 +736,87 @@ expecting them to matter (dependents, target date, income), and they silently do
 or be removed. Add a **regression test** that saving profile age makes FIRE return
 `isDefaultAge=false` / the saved age (locks the one wired path), and an audit checklist so any new
 profile field ships with at least one consumer.
+
+---
+
+## 18. Wellness history chart, recalculate-all, and the dead Behavioral feature
+
+### 18.1 Wellness "Score history" chart (W-series)
+`wellness-panel.tsx:118-134` renders bars with month labels but:
+- **No y-axis / scale** — nothing tells the user the domain is 0–100.
+- **No per-bar value and no tooltip** — the score is never shown on or above a bar.
+- **Misleading height** — `maxBar = Math.max(...history, 1)` normalizes bars to the **max score in
+  the window**, not the 0–100 domain, so 60 vs 65 look wildly different and a flat-but-healthy
+  history looks volatile.
+
+**W1 (P2, ui):** add a y-axis/reference (0–100, with band lines at 55/70/85 to match the score
+bands), show each bar's score (label above the bar and/or an accessible tooltip), and scale bar
+height to the **0–100 domain**, not the window max. Same "make every chart self-explanatory" rule as
+U1 (income chart). Reuse whatever axis/tooltip pattern U1 establishes.
+
+### 18.2 Recalculate-all-metrics (RC-series)
+There is **no way to force a full recompute.** `post-sync-analytics.ts:runPostSyncAnalytics` runs
+only `refreshAnalyticsMarts` + `refreshProtectProfiles` + `evaluateUserAlerts`; most metrics are
+computed **live on read**, and a handful are persisted on sync (marts, protect profiles, alerts,
+transfer links + reconcile, FIRE profile, balance snapshots). The user wants a **button** to
+recompute everything when data looks wrong, and — crucially — **recompute must be deterministic**:
+running it N times must yield the same numbers (the "numbers should match no matter how many times I
+refresh" expectation).
+
+- **RC1 (P1, backend):** add `recomputeAllAnalytics(userId)` — a single idempotent orchestrator that
+  re-runs every persisted refresher (marts force=true, protect profiles, alerts, `refreshTransferLinks`
+  + `reconcileLinkedTransferLegs`, `refreshFireProfile`, balance snapshots, and the wellness/DNA/
+  streak/challenge generators once they exist) — and expose `POST /analytics/recompute`. Return a
+  summary of what was refreshed. Re-running must not change any persisted row.
+- **RC2 (P1, ui):** a recalculate button/icon (header or each insights panel) that calls the endpoint,
+  shows progress, then invalidates all financial queries (reuse `invalidate-financial-queries.ts`).
+- **RC3 (P2, backend):** an **idempotency/determinism test** — run `recomputeAllAnalytics` twice on a
+  seeded dataset and assert identical persisted rows and identical metric outputs. Depends on M2
+  (seeded RNG) so projections don't drift. This is what makes "refresh = same number" true.
+
+#### 18.2.1 What "refresh accounts" does today (and the ordering bug)
+Each provider sync (`plaid/sync.ts:465-467`, `snaptrade/sync.ts:715-717`, `teller/sync.ts:236-238`)
+pulls the latest data, then runs, **in this order**:
+1. `runPostSyncAnalytics` → **marts + protect profiles + alerts only**
+2. `backfillTransactionMerchantIds`
+3. `refreshTransferLinks` → internally `reconcileLinkedTransferLegs` (flips `is_transfer`)
+
+Two problems:
+- **Ordering (RC4):** transfer **reconciliation runs *after* the analytics**, so marts / protect /
+  alerts are computed from **pre-reconciliation** data and only catch up on the *next* sync. Transfer
+  pairing + reconcile must run **before** the analytics refresh.
+- **Coverage:** `runPostSyncAnalytics` is a **subset** of "all metrics." Wellness, DNA, patterns,
+  wrapped, recurring, and (future) streaks/challenges are **computed live on read** — so they reflect
+  the latest data the next time the page loads — but the FIRE profile is only refreshed on **SnapTrade**
+  sync (not Plaid/Teller; it's refreshed on read instead), and there is no single "recompute
+  everything" step.
+- **RC4 (P1, backend):** make every sync path call `recomputeAllAnalytics` (RC1) **after** transfer
+  reconcile, replacing the partial `runPostSyncAnalytics`, so a refresh deterministically rebuilds all
+  persisted analytics from the just-synced data in the correct order.
+
+### 18.3 Behavioral feature is a read-only shell (B-series)
+`getBehavioral` (`insights-store.ts:179`) reads three tables — `transaction_reasons`, `challenges`,
+`habit_streaks` — but a repo-wide search shows **nothing ever writes to them** (they appear only in
+the reader, `export-user-data.ts`, and `purge-derived-financial-data.ts`). Therefore:
+- **Habit streaks** are always empty.
+- **Active challenges** are always empty.
+- **Spend by reason** is always `$0.00` for every reason: `reasonTotals` is built from
+  `transaction_reasons`, which is never populated, and there is **no tagging UI and no inference**.
+
+Fixes (all server-side compute so web + iOS match):
+- **B1 (P1, backend):** **Habit-streak engine** — derive streaks from transactions and persist to
+  `habit_streaks`: e.g. current/best no-spend-day streak, consecutive under-budget months,
+  days-since-last [discretionary category], consecutive months saving > 0. Run inside RC1 / post-sync.
+- **B2 (P2, backend):** **Challenge engine** — auto-generate data-driven challenges into `challenges`
+  with progress computed from transactions (e.g. "No-spend weekend", "Dining < $X this month", "Save
+  $Y this month"), mark complete when met; allow user dismiss/accept. Run inside RC1 / post-sync.
+- **B3 (P2):** **Spend-by-reason needs tagging to exist.** Reasons (impulse/social/etc.) are not in
+  the data, so the honest fix is a **tagging UX**: `B3a (backend)` an endpoint to set/clear a
+  transaction's reason → `transaction_reasons`; `B3b (ui)` a reason picker on the transaction row /
+  behavioral panel plus an empty-state that explains tagging. Optional `B3c`: low-confidence
+  heuristic *suggestions* (late-night, weekend, discretionary category) clearly labeled as guesses —
+  never presented as fact (honesty rule). Until tags exist, the panel should show an explanatory
+  empty-state, not silent `$0`.
+
+> Analysis note: this matches the user's report (streaks/challenges empty, "spend by reason" $0). The
+> root cause is missing **generation/tagging**, not a calculation bug — the read path is fine.

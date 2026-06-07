@@ -63,6 +63,17 @@ export interface DnaResponse {
   narrative: string;
   peerRarity: string | null;
   axes: Array<{ label: string; you: number; peers: number }>;
+  isLive?: boolean;
+}
+
+export function emptyDnaResponse(): DnaResponse {
+  return {
+    archetype: "—",
+    narrative: "",
+    peerRarity: null,
+    axes: [],
+    isLive: false,
+  };
 }
 
 export async function getDna(userId: string): Promise<DnaResponse | null> {
@@ -71,8 +82,8 @@ export async function getDna(userId: string): Promise<DnaResponse | null> {
   if (!hasActiveAccounts) {
     return null;
   }
-  void ctx;
-  return null;
+  const { computeDnaFromTransactions } = await import("./compute-dna.js");
+  return computeDnaFromTransactions(ctx.userIds);
 }
 
 export interface PatternRow {

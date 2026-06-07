@@ -8,10 +8,17 @@ import {
   resilienceScenarios,
   transactions,
 } from "../db/schema.js";
-import { formatMoneyAmount, roundDecimal } from "../lib/money.js";
+import {
+  clampDbMoney,
+  clampDbPercent,
+  formatDbMoney,
+  formatDbPercent,
+  roundDecimal,
+} from "../lib/money.js";
 import { computeSavingsRate } from "./metrics/savings-rate.js";
 import {
   computePersonalCpi,
+  inflationRateFromPrices,
   NATIONAL_CPI_EXTERNAL,
 } from "./personal-cpi.js";
 import {
@@ -208,15 +215,15 @@ export async function refreshProtectProfiles(userId: string): Promise<boolean> {
     .insert(resilienceProfiles)
     .values({
       userId,
-      liquidCash: formatMoneyAmount(liquidCash),
-      monthlyBurn: formatMoneyAmount(burn),
+      liquidCash: formatDbMoney(liquidCash, 14),
+      monthlyBurn: formatDbMoney(burn, 12),
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
       target: resilienceProfiles.userId,
       set: {
-        liquidCash: formatMoneyAmount(liquidCash),
-        monthlyBurn: formatMoneyAmount(burn),
+        liquidCash: formatDbMoney(liquidCash, 14),
+        monthlyBurn: formatDbMoney(burn, 12),
         updatedAt: new Date(),
       },
     });
@@ -230,7 +237,7 @@ export async function refreshProtectProfiles(userId: string): Promise<boolean> {
       userId,
       name: template.name,
       emoji: template.emoji,
-      shockAmount: formatMoneyAmount(template.shockAmount(burn)),
+      shockAmount: formatDbMoney(template.shockAmount(burn), 12),
       shockType: template.shockType,
       recommendedMonths: String(template.recommendedMonths),
       detail: template.detail,
@@ -242,14 +249,16 @@ export async function refreshProtectProfiles(userId: string): Promise<boolean> {
 
   const inflationRows = categoryShares.map((row) => {
     const cpiItem = personalCpi.basket.find((b) => b.category === row.name);
-    const rate = cpiItem && cpiItem.priceBase > 0
-      ? roundDecimal(((cpiItem.priceNow / cpiItem.priceBase) - 1) * 100)
-      : personalCpi.personalRate;
+    const measured =
+      cpiItem != null
+        ? inflationRateFromPrices(cpiItem.priceNow, cpiItem.priceBase)
+        : null;
+    const rate = clampDbPercent(measured ?? personalCpi.personalRate);
     return {
       userId,
       name: row.name,
-      share: String(row.share),
-      inflationRate: String(rate),
+      share: formatDbPercent(row.share),
+      inflationRate: formatDbPercent(rate),
       severity: severityForRate(rate),
       sortOrder: 0,
     };
@@ -259,50 +268,51 @@ export async function refreshProtectProfiles(userId: string): Promise<boolean> {
     inflationRows[i]!.sortOrder = i;
   }
 
-  const personalRate =
-    personalCpi.personalRate > 0
+  const personalRate = clampDbPercent(
+    personalCpi.personalRate !== 0
       ? personalCpi.personalRate
       : inflationRows.length > 0
-        ? roundDecimal(
-            inflationRows.reduce(
-              (sum, row) =>
-                sum +
-                (Number.parseFloat(row.share) / 100) *
-                  Number.parseFloat(row.inflationRate),
-              0,
-            ),
+        ? inflationRows.reduce(
+            (sum, row) =>
+              sum +
+              (Number.parseFloat(row.share) / 100) *
+                Number.parseFloat(row.inflationRate),
+            0,
           )
-        : 0;
+        : 0,
+  );
 
   const annualSalary = Math.max(monthlyIncome, burn) * 12;
-  const nominalSavingsRate = computeSavingsRate({
-    income: monthlyIncome,
-    expense: burn,
-  });
-  const powerLoss = roundDecimal((annualSalary * personalRate) / 100);
+  const nominalSavingsPercent = clampDbPercent(
+    computeSavingsRate({
+      income: monthlyIncome,
+      expense: burn,
+    }) * 100,
+  );
+  const powerLoss = clampDbMoney((annualSalary * personalRate) / 100, 14);
 
   await db
     .insert(inflationProfiles)
     .values({
       userId,
-      personalRate: String(personalRate),
-      nationalCpi: String(NATIONAL_CPI_EXTERNAL.rate),
-      salary: formatMoneyAmount(annualSalary),
-      raisePercent: String(DEFAULT_RAISE_PERCENT),
-      nominalSavingsRate: String(nominalSavingsRate),
-      powerLoss: formatMoneyAmount(powerLoss),
+      personalRate: formatDbPercent(personalRate),
+      nationalCpi: formatDbPercent(NATIONAL_CPI_EXTERNAL.rate),
+      salary: formatDbMoney(annualSalary, 14),
+      raisePercent: formatDbPercent(DEFAULT_RAISE_PERCENT),
+      nominalSavingsRate: formatDbPercent(nominalSavingsPercent),
+      powerLoss: formatDbMoney(powerLoss, 14),
       baseDate: monthsAgo(LOOKBACK_MONTHS),
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
       target: inflationProfiles.userId,
       set: {
-        personalRate: String(personalRate),
-        nationalCpi: String(NATIONAL_CPI_EXTERNAL.rate),
-        salary: formatMoneyAmount(annualSalary),
-        raisePercent: String(DEFAULT_RAISE_PERCENT),
-        nominalSavingsRate: String(nominalSavingsRate),
-        powerLoss: formatMoneyAmount(powerLoss),
+        personalRate: formatDbPercent(personalRate),
+        nationalCpi: formatDbPercent(NATIONAL_CPI_EXTERNAL.rate),
+        salary: formatDbMoney(annualSalary, 14),
+        raisePercent: formatDbPercent(DEFAULT_RAISE_PERCENT),
+        nominalSavingsRate: formatDbPercent(nominalSavingsPercent),
+        powerLoss: formatDbMoney(powerLoss, 14),
         baseDate: monthsAgo(LOOKBACK_MONTHS),
         updatedAt: new Date(),
       },

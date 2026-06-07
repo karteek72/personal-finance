@@ -2172,3 +2172,236 @@ tasks:
       - Test proves saved age flows into the FIRE projection (isDefaultAge=false, age used)
       - Test proves withdrawalRate/realReturn round-trip into the projection
       - Doc/checklist requires every profile field to have a consumer
+  - id: TASK-WELLNESS-UI-001
+    title: Wellness score-history chart needs axis, values, and 0-100 scaling (W1)
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/wellness-panel.tsx
+    description: |
+      Defect W1 (analytics-architecture.md section 18.1). The Score history chart
+      (wellness-panel.tsx:118-134) shows bars with month labels but no y-axis, no per-bar value, no
+      tooltip, and bars are normalized to Math.max(...history) instead of the 0-100 score domain
+      (so 60 vs 65 look wildly different and the chart is misleading). Add a 0-100 y-axis/reference
+      (band lines at 55/70/85 to match score bands), show each bar's score (label above the bar
+      and/or an accessible tooltip), and scale bar height to the 0-100 domain. Follow the same
+      self-explanatory-chart pattern as TASK-UI-CALC-001 (income chart); reuse its axis/tooltip
+      approach.
+    acceptance_criteria:
+      - The history chart shows a 0-100 y-axis/reference with score bands
+      - Each bar shows its score value (label and/or tooltip)
+      - Bar heights are scaled to 0-100, not the window max
+  - id: TASK-RECOMPUTE-001
+    title: recomputeAllAnalytics orchestrator + POST /analytics/recompute (RC1)
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/post-sync-analytics.ts
+      - backend/src/services/refresh-marts.ts
+      - backend/src/services/transfer-pairing.ts
+      - backend/src/services/protect-analytics.ts
+      - backend/src/routes/analytics.ts
+    description: |
+      RC1 (analytics-architecture.md section 18.2). There is no way to force a full recompute;
+      runPostSyncAnalytics only refreshes marts + protect profiles + alerts. Add an idempotent
+      recomputeAllAnalytics(userId) orchestrator that re-runs every persisted refresher: marts
+      (force), protect profiles, alerts, refreshTransferLinks + reconcileLinkedTransferLegs,
+      refreshFireProfile, balance snapshots, and the wellness/DNA/streak/challenge generators once
+      they exist (TASK-BEHAVIORAL-001/002). Expose POST /analytics/recompute (authenticated, scoped
+      to the caller) that runs it and returns a summary of refreshed steps. Re-running must not
+      change any persisted row.
+    acceptance_criteria:
+      - recomputeAllAnalytics re-runs all persisted refreshers for the caller, idempotently
+      - POST /analytics/recompute triggers it and returns a per-step summary
+      - Running it twice produces no change in persisted rows
+      - typecheck passes
+  - id: TASK-RECOMPUTE-UI-001
+    title: Recalculate-all button that triggers recompute + invalidates caches (RC2)
+    status: ready
+    priority: P1
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECOMPUTE-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/lib/invalidate-financial-queries.ts
+      - ui/src/lib/api-client.ts
+    description: |
+      RC2 (analytics-architecture.md section 18.2). Add a recalculate button/icon (dashboard header
+      and/or insights panels) that calls POST /analytics/recompute, shows progress/disabled state
+      while running, then invalidates all financial queries (reuse invalidate-financial-queries.ts)
+      so live-computed metrics refetch. Surface success/error toast. Gate to live mode (not mocks).
+    acceptance_criteria:
+      - A visible recalculate control triggers the recompute endpoint
+      - While running it shows progress and prevents duplicate triggers
+      - On success all financial queries are invalidated and metrics refresh
+  - id: TASK-RECOMPUTE-002
+    title: Idempotency/determinism test for recompute (RC3)
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECOMPUTE-001
+      - TASK-INTEGRITY-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/planning-engine.ts
+    description: |
+      RC3 (analytics-architecture.md section 18.2). Add a test that runs recomputeAllAnalytics twice
+      on a seeded dataset and asserts identical persisted rows AND identical metric outputs, proving
+      "refresh = same number". Depends on TASK-INTEGRITY-002 (seeded RNG) so Monte-Carlo projections
+      do not drift between runs. Document any intentionally time-dependent metric (e.g. days-since)
+      and freeze the clock in the test.
+    acceptance_criteria:
+      - Test runs recompute twice and asserts persisted rows are byte-identical
+      - Metric endpoint outputs are identical across the two runs (clock frozen)
+      - Test runs in CI
+  - id: TASK-RECOMPUTE-003
+    title: Wire sync to full recompute after reconcile; fix ordering (RC4)
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECOMPUTE-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/plaid/sync.ts
+      - backend/src/services/snaptrade/sync.ts
+      - backend/src/services/teller/sync.ts
+      - backend/src/services/post-sync-analytics.ts
+    description: |
+      RC4 (analytics-architecture.md section 18.2.1). Today every sync runs runPostSyncAnalytics
+      (marts + protect + alerts) BEFORE refreshTransferLinks/reconcileLinkedTransferLegs, so the
+      analytics are computed from pre-reconciliation data and only catch up on the next sync. Also,
+      runPostSyncAnalytics is only a subset of all metrics, and the FIRE profile is refreshed on
+      SnapTrade sync only. Fix the order so transfer pairing + reconcile run FIRST, then call
+      recomputeAllAnalytics (TASK-RECOMPUTE-001) as the single post-sync step in all three sync
+      paths (plaid, snaptrade, teller). Ensure recomputeAllAnalytics includes refreshTransferLinks +
+      reconcile internally (or call reconcile then recompute) and refreshFireProfile for all
+      providers. Keep it idempotent.
+    acceptance_criteria:
+      - All three sync paths reconcile transfers before refreshing analytics
+      - Sync calls recomputeAllAnalytics (not the partial runPostSyncAnalytics) as the post-sync step
+      - FIRE profile is refreshed after every provider sync, not just SnapTrade
+      - A sync followed immediately by a read shows fully reconciled, recomputed metrics
+      - typecheck passes
+  - id: TASK-BEHAVIORAL-001
+    title: Habit-streak engine — populate habit_streaks from transactions (B1)
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/insights-store.ts
+      - backend/src/db/schema.ts
+    description: |
+      Defect B1 (analytics-architecture.md section 18.3). habit_streaks is read by getBehavioral but
+      NOTHING writes to it, so streaks are always empty. Build a streak engine that derives streaks
+      from transactions and upserts habit_streaks: e.g. current/best no-spend-day streak,
+      consecutive under-budget months, days-since-last [discretionary category], consecutive months
+      with positive savings. Compute deterministically and run inside recomputeAllAnalytics (RC1)
+      and post-sync. Keep label/currentDays/maxDays shape the reader expects.
+    acceptance_criteria:
+      - habit_streaks is populated from real transaction history (idempotent upsert)
+      - getBehavioral returns non-empty streaks when history supports them
+      - Streak math is deterministic (same input -> same output)
+      - typecheck passes
+  - id: TASK-BEHAVIORAL-002
+    title: Challenge engine — auto-generate challenges with progress (B2)
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/insights-store.ts
+      - backend/src/db/schema.ts
+    description: |
+      Defect B2 (analytics-architecture.md section 18.3). challenges is read by getBehavioral but
+      NOTHING writes to it, so it is always empty. Auto-generate data-driven challenges into
+      challenges with progress computed from transactions (e.g. "No-spend weekend", "Dining < $X
+      this month" using the user's own baseline, "Save $Y this month"), mark complete when met, and
+      let the user dismiss/accept. Run inside recomputeAllAnalytics (RC1) and post-sync. Keep the
+      title/goal/progressPercent/complete/color shape the reader expects.
+    acceptance_criteria:
+      - challenges is populated with relevant, data-driven challenges and live progress
+      - Completed challenges are marked complete; user can dismiss/accept
+      - getBehavioral returns non-empty challenges when data supports them
+      - typecheck passes
+  - id: TASK-BEHAVIORAL-003
+    title: Transaction reason tagging to populate spend-by-reason (B3a backend)
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/insights-store.ts
+      - backend/src/db/schema.ts
+    description: |
+      Defect B3 (analytics-architecture.md section 18.3). "Spend by reason" is always $0 because
+      transaction_reasons is never populated and there is no tagging path. Add authenticated,
+      scoped endpoints to set and clear a transaction's reason (impulse/social/etc. per REASON_META),
+      persisting to transaction_reasons. Validate the reason id and transaction ownership. This is
+      the honest fix (reasons are not inferable from bank data); inference is at most a labeled
+      suggestion (optional follow-up, never presented as fact).
+    acceptance_criteria:
+      - Endpoints set/clear a transaction reason, scoped to the caller's transactions
+      - getBehavioral spend-by-reason reflects tagged transactions (no longer all $0)
+      - Reason id and transaction ownership are validated
+      - typecheck passes
+  - id: TASK-BEHAVIORAL-UI-001
+    title: Reason-tagging UI + behavioral empty states (B3b ui)
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-BEHAVIORAL-003
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/behavioral-panel.tsx
+      - ui/src/components/transactions/transaction-row.tsx
+    description: |
+      B3b (analytics-architecture.md section 18.3). Add a reason picker to the transaction row and/or
+      behavioral panel that calls the tagging endpoint (TASK-BEHAVIORAL-003), and replace the silent
+      $0 spend-by-reason with an explanatory empty state ("Tag purchases with why you bought them to
+      see spend-by-reason"). Show streaks/challenges from B1/B2 with proper empty states when there
+      is not yet enough data. Do not present heuristic guesses as fact.
+    acceptance_criteria:
+      - Users can tag/untag a transaction's reason from the UI
+      - Spend-by-reason renders from tags; an explanatory empty state shows when no tags exist
+      - Streaks/challenges render with clear empty states until populated
