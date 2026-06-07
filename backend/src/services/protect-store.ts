@@ -7,6 +7,7 @@ import {
   resilienceScenarios,
 } from "../db/schema.js";
 import { formatMoneyAmount, roundDecimal } from "../lib/money.js";
+import { refreshProtectProfiles } from "./protect-analytics.js";
 import { resolveHouseholdContext } from "./household-access.js";
 
 export interface InflationResponse {
@@ -32,6 +33,7 @@ export async function getInflation(
   userId: string,
 ): Promise<InflationResponse | null> {
   const ctx = await resolveHouseholdContext(userId);
+  await refreshProtectProfiles(userId);
   const db = getDb();
   const [profile] = await db
     .select()
@@ -93,6 +95,7 @@ export async function getResilience(
   userId: string,
 ): Promise<ResilienceResponse | null> {
   const ctx = await resolveHouseholdContext(userId);
+  await refreshProtectProfiles(userId);
   const db = getDb();
   const [profile] = await db
     .select()

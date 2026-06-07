@@ -11,6 +11,7 @@ import {
 } from "../category-rules.js";
 import { classifyBankingTransaction } from "../classify-banking-transaction.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
+import { refreshProtectProfiles } from "../protect-analytics.js";
 import {
   PLAID_TXN_BATCH_SIZE,
   upsertPlaidTransactionBatch,
@@ -226,6 +227,8 @@ export async function syncTellerEnrollment(
     },
     "teller enrollment synced",
   );
+
+  await refreshProtectProfiles(enrollment.userId);
 
   return {
     enrollmentId: enrollment.tellerEnrollmentId,

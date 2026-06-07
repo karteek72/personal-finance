@@ -13,6 +13,7 @@ import { formatMoneyAmount, formatOptionPremium } from "../../lib/money.js";
 import { createLogger } from "../../lib/logger.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
 import { refreshFireProfile, repairNonContributionInvestmentTxns } from "../investment-analytics.js";
+import { refreshProtectProfiles } from "../protect-analytics.js";
 import {
   effectiveAssetType,
   isOccOptionTicker,
@@ -703,6 +704,7 @@ export async function syncSnaptradeForUser(
   const repairedTxns = await repairNonContributionInvestmentTxns([userId]);
 
   await refreshFireProfile(userId);
+  await refreshProtectProfiles(userId);
 
   log.info(
     {

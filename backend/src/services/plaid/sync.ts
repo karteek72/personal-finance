@@ -19,6 +19,7 @@ import {
 } from "../category-rules.js";
 import { classifyBankingTransaction } from "../classify-banking-transaction.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
+import { refreshProtectProfiles } from "../protect-analytics.js";
 import { mapPlaidTransaction } from "./map-transaction.js";
 import { syncCreditCardLiabilities } from "./sync-liabilities.js";
 import {
@@ -436,6 +437,8 @@ export async function syncPlaidItem(
     transactionPages: page,
     durationMs: elapsed(),
   });
+
+  await refreshProtectProfiles(item.userId);
 
   return result;
 }
