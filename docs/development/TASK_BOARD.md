@@ -117,6 +117,22 @@ file:line and the expected formula. Full root-cause table in `analytics-architec
 
 **Parallelizable now (no deps):** every C-series task except CALC-013 (blocked by A-004).
 
+### Intelligent budgets & savings goals
+
+Budgets only auto-suggest when none configured (top-10, vanish on first save); savings goals are
+display-only and never auto-created; `/planning/*` is read-only so the "+ Add" buttons do nothing.
+Add CRUD + smarter, additive suggestions, all server-side. Design: `analytics-architecture.md` §12.
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-PLAN-001 | backend | Budget & goal CRUD endpoints + schema (source/kind/status) | — |
+| TASK-PLAN-002 | backend | Smarter additive budget suggestions (more categories, robust baseline) | PLAN-001 |
+| TASK-PLAN-003 | backend | Auto-generate suggested savings goals from data | PLAN-001 |
+| TASK-UI-PLAN-001 | ui | Wire budgets panel: CRUD + accept suggestions + add-category | PLAN-001/002 |
+| TASK-UI-PLAN-002 | ui | Wire savings goals: CRUD + suggested-goals accept/edit/delete | PLAN-001/003 |
+
+**Start with `TASK-PLAN-001`** (CRUD + schema) — everything else builds on it.
+
 ---
 
 ## Recently completed

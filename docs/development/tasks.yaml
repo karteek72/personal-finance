@@ -1624,3 +1624,165 @@ tasks:
       - X-axis (month) and legend are unambiguous
       - Income stability stays within 0-100 and is explained
       - No values-less bar charts remain on this panel
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Intelligent budgets & savings goals — analytics-architecture.md section 12
+  # Budgets auto-suggest only when none are configured (top-10, 3-mo mean +10%) and
+  # vanish once one is saved; savings goals are display-only and never auto-created;
+  # /planning/* is read-only so the "+ Add" buttons do nothing. Add CRUD + smarter,
+  # additive suggestions, all computed server-side (thin-client rule).
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: TASK-PLAN-001
+    title: "Budget & savings-goal CRUD endpoints + schema (source/kind/status)"
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/routes/planning.ts
+      - backend/src/services/planning-store.ts
+      - backend/src/db/schema.ts
+    description: |
+      /planning/* is read-only today, so the UI cannot create/edit/delete budgets or goals
+      (section 12.1). Add write endpoints and the schema columns the intelligence needs.
+
+      Schema migration (new drizzle migration file):
+        - budgets: add `source text not null default 'user'` (user|suggested),
+          `class text` (essential|discretionary, nullable).
+        - savings_goals: add `kind text not null default 'custom'`
+          (emergency|debt|sinking|surplus|custom), `status text not null default 'active'`
+          (active|achieved|dismissed), `source text not null default 'user'`.
+
+      Endpoints (Zod-validated, scoped to user/household, typed errors):
+        - POST   /planning/budgets        { category, periodMonth, limit, emoji?, color? }
+                  (upsert on the existing user+category+period unique index)
+        - PATCH  /planning/budgets/:id    { limit?, emoji?, color? }
+        - DELETE /planning/budgets/:id
+        - POST   /planning/goals          { name, target, current?, deadline?, emoji?, color?, kind? }
+        - PATCH  /planning/goals/:id      { name?, target?, current?, deadline?, emoji?, color?, status? }
+        - DELETE /planning/goals/:id
+      Ownership must be enforced (a user can only mutate their own/household rows).
+    acceptance_criteria:
+      - Migration adds the new columns with safe defaults; existing rows unaffected
+      - All six endpoints exist, validate input, and enforce ownership (404/403 on others' rows)
+      - Budget POST upserts on the unique (user,category,period) index
+      - Documented in api-contract.md
+
+  - id: TASK-PLAN-002
+    title: "Smarter, additive budget suggestions (more categories, robust baseline)"
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PLAN-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/planning-store.ts
+    description: |
+      Replace the all-or-nothing top-10 suggestion logic in getBudgets (section 12.2):
+        - Suggest a limit for EVERY category the user spends in (appears in >=2 of the last 6
+          months OR exceeds a small monthly threshold), not just the top 10.
+        - Use the MEDIAN (or trimmed mean) of the last 6 months instead of the 3-month mean,
+          rounded to a sensible increment, with a buffer (e.g. +10%).
+        - MERGE with user budgets: when some budgets are configured, still return suggestions for
+          the UN-budgeted categories. Return them in a separate `suggestedBudgets[]` array; keep
+          persisted ones in `budgets[]`. Tag each with source ("user"|"suggested"), a short
+          `rationale`, and `confidence` from month coverage.
+        - Tag each budget `class` essential|discretionary from dim_category when available
+          (TASK-ANALYTICS-005); omit gracefully until then.
+      Keep all existing filters (expense, not transfer, not internal-transfer, not pending).
+    acceptance_criteria:
+      - getBudgets returns suggestions for all qualifying categories, merged with user budgets
+      - Suggested limits use a robust 6-month baseline (median/trimmed), not a 3-month mean
+      - Each suggestion carries source, rationale, and confidence
+      - Suggestions persist only when the user accepts (via TASK-PLAN-001 POST)
+
+  - id: TASK-PLAN-003
+    title: "Auto-generate suggested savings goals from data"
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PLAN-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/planning-store.ts
+      - backend/src/services/protect-analytics.ts
+    description: |
+      Generate SUGGESTED savings goals from the user's data (section 12.3) returned as
+      `suggestedGoals[]` (source:"suggested", not persisted until accepted via TASK-PLAN-001):
+        - Emergency fund: target = 3-6x monthly essential burn (resilience profile monthlyBurn);
+          current = liquid depository cash.
+        - Debt payoff: one per credit card / loan with balance > 0; target = balance
+          (current = 0 with caveat until balance snapshots, TASK-ANALYTICS-004).
+        - Sinking funds: for annual/irregular bills in recurring_series; target = bill amount,
+          suggested monthly set-aside = amount / months-until-due.
+        - Surplus saver: if monthly surplus (income - expense - invest) > 0, suggest a
+          round-number monthly goal sized to the surplus.
+      Each suggestion includes a human "why" string. Do not duplicate a suggestion the user has
+      already accepted/created (dedupe by kind + name/account).
+    acceptance_criteria:
+      - suggestedGoals[] generated from real account/transaction/recurring data with rationale text
+      - Suggestions are not persisted until accepted; dismissed suggestions don't reappear
+      - No suggestion duplicates an existing user goal
+      - All amounts computed server-side (no client math)
+
+  - id: TASK-UI-PLAN-001
+    title: "Wire budgets panel: CRUD + accept suggestions + add-category"
+    status: ready
+    priority: P1
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PLAN-001
+      - TASK-PLAN-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/budgets-panel.tsx
+    description: |
+      The "+ Add category budget" button (budgets-panel.tsx) is a no-op. Wire the budgets tab to
+      the new endpoints: add/edit/delete a category budget (modal or inline), and render
+      `suggestedBudgets[]` as dismissible suggestion cards with an "Add" action that persists via
+      POST. Show source/rationale; group by essential vs discretionary when `class` is present.
+      Use TanStack Query mutations with cache invalidation; no client-side recomputation of limits.
+    acceptance_criteria:
+      - User can add, edit, and delete a category budget; changes persist and refetch
+      - Suggested categories are shown and can be accepted (persisted) or dismissed
+      - No client-side computation of suggested limits (values come from the API)
+
+  - id: TASK-UI-PLAN-002
+    title: "Wire savings goals: CRUD + suggested-goals accept/edit/delete"
+    status: ready
+    priority: P1
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PLAN-001
+      - TASK-PLAN-003
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/budgets-panel.tsx
+    description: |
+      The "+ Add savings goal" button is a no-op and goals are display-only. Wire the goals tab:
+      add/edit/delete a goal, and render `suggestedGoals[]` (emergency fund, debt payoff, sinking
+      funds, surplus saver) as cards with the "why" text and Accept / Edit / Dismiss actions.
+      Accept persists via POST; dismiss hides without persisting. Use TanStack Query mutations.
+    acceptance_criteria:
+      - User can add, edit, and delete a savings goal; changes persist and refetch
+      - Suggested goals render with rationale and can be accepted, edited, or dismissed
+      - Accepted goals become normal editable goals; dismissed ones do not reappear

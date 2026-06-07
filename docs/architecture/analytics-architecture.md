@@ -459,3 +459,57 @@ period/representation; **P3** = limitation/inconsistency.
 **Cross-cutting recommendation:** the durable fix for C2, C5, C6, C8 is the single metric layer
 (`TASK-ANALYTICS-002`): each KPI defined once, with a unit, and unit-tested against hand-computed
 fixtures so a small model can verify correctness without guessing.
+
+---
+
+## 12. Intelligent budgets & savings goals
+
+### 12.1 Current state (gaps)
+- **Budgets** (`planning-store.ts:getBudgets`): auto-suggests limits from the **mean** of the prior
+  3 months **+10%**, but only when the user has **zero** configured budgets for the period, and it
+  caps at the **top 10** categories. Once any budget is saved, suggestions disappear (no merge).
+- **Savings goals**: returned verbatim from the `savings_goals` table — **never auto-created**.
+- **No CRUD**: `/planning/*` is read-only (`routes/planning.ts`). The UI's "+ Add category budget"
+  and "+ Add savings goal" buttons (`budgets-panel.tsx`) have no handlers — they do nothing.
+
+### 12.2 Smarter budget suggestions
+Make budgets data-driven and additive instead of all-or-nothing:
+- Suggest a limit for **every category** the user actually spends in (appears in ≥2 of the last 6
+  months **or** exceeds a small monthly threshold), not just the top 10. The UI decides how many to
+  show / paginates (`DataTable`, §10).
+- Use a **robust** baseline: median (or trimmed mean) of the last 6 months rather than a 3-month mean
+  skewed by one-off spikes. Round to a sensible increment.
+- **Merge** suggested + user-configured: when the user has saved some budgets, still return
+  suggestions for the **un-budgeted** categories so they discover more. Tag every item with
+  `source: "user" | "suggested"` and a short `rationale` ("avg $X over 6 mo, +10% buffer").
+- Tag each budget `class: essential | discretionary` (from `dim_category`, `TASK-ANALYTICS-005`) so
+  the UI can group "needs vs wants" and the user budgets the controllable ones.
+- Attach `confidence` from month-coverage (few months → low confidence + caveat).
+
+### 12.3 Auto-generated savings goals
+Generate **suggested** goals from data; the user accepts, edits, dismisses, or adds their own. Each
+suggestion is `source:"suggested"` and is **not** persisted until accepted. Generators:
+- **Emergency fund** — target = 3–6 × monthly **essential** burn (from the resilience profile,
+  `protect-analytics.ts`); `current` = liquid depository cash (or a tracked sub-amount).
+- **Debt payoff** — one per credit card / loan with a balance > 0; target = balance. (Progress needs
+  balance snapshots, `TASK-ANALYTICS-004`; until then `current` = 0 with a caveat.)
+- **Sinking funds** — for large annual/irregular bills detected in recurring (`recurring_series`,
+  cadence annual): target = bill amount, suggested monthly set-aside = amount / months-until-due.
+- **Surplus saver** — if monthly surplus (income − expense − invest) is positive, suggest a
+  round-number monthly savings goal sized to the surplus.
+Show "why" text on every suggestion so it's meaningful (§ "everything on the UI must be meaningful").
+
+### 12.4 Schema + API additions
+- `budgets`: add `source text default 'user'` (`user|suggested`), optional `class text`
+  (`essential|discretionary`). Suggestions can be returned without rows; persisted on accept.
+- `savings_goals`: add `kind text default 'custom'` (`emergency|debt|sinking|surplus|custom`),
+  `status text default 'active'` (`active|achieved|dismissed`), `source text default 'user'`.
+- Endpoints (writes, validate with Zod, scope to user/household):
+  - `POST /planning/budgets` `{ category, periodMonth, limit, emoji?, color? }` (upsert on the
+    existing unique index) · `PATCH /planning/budgets/:id` · `DELETE /planning/budgets/:id`
+  - `POST /planning/goals` `{ name, target, current?, deadline?, emoji?, color?, kind? }` ·
+    `PATCH /planning/goals/:id` · `DELETE /planning/goals/:id`
+- `getBudgets` response gains `suggestedBudgets[]` and `suggestedGoals[]` (each with `source`,
+  `rationale`, `confidence`), leaving the existing `budgets[]`/`goals[]` as the persisted set.
+
+All math stays server-side (thin-client rule, §10.1) so web and iOS share identical suggestions.
