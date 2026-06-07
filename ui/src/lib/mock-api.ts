@@ -46,7 +46,10 @@ import type {
   InvestmentsResponse,
   InvestmentPosition,
   StockAggregate,
+  ListQuery,
+  MerchantRow,
   MerchantsResponse,
+  MerchantsTableResponse,
   MoneyFlowResponse,
   NetWorthResponse,
   PaginatedTransactions,
@@ -1133,6 +1136,73 @@ export async function getWrapped(): Promise<WrappedResponse> {
 export async function getMerchants(): Promise<MerchantsResponse> {
   await delay();
   return { ...(merchantsData as MerchantsResponse), isLive: false };
+}
+
+export async function getMerchantsTable(
+  params: ListQuery = {},
+): Promise<MerchantsTableResponse> {
+  await delay();
+  const source = (merchantsData as MerchantsResponse).merchants;
+  const grandTotal = source.reduce((s, m) => s + Number.parseFloat(m.total), 0);
+
+  const needle = params.q?.toLowerCase();
+  const all: MerchantRow[] = source
+    .filter((m) => !needle || m.name.toLowerCase().includes(needle))
+    .map((m) => ({
+      name: m.name,
+      emoji: m.emoji,
+      visits: m.visits,
+      total: m.total,
+      avgTransaction: (Number.parseFloat(m.total) / Math.max(m.visits, 1)).toFixed(2),
+      share: grandTotal > 0 ? Math.round((Number.parseFloat(m.total) / grandTotal) * 1000) / 10 : 0,
+      trend: m.trend,
+      lastSeen: "",
+      trail: m.trail,
+    }));
+
+  const sort = params.sort ?? "total";
+  const dir = params.dir ?? "desc";
+  const factor = dir === "asc" ? 1 : -1;
+  const key = (r: MerchantRow): number | string => {
+    if (sort === "name") return r.name.toLowerCase();
+    if (sort === "visits") return r.visits;
+    if (sort === "trend") return r.trend;
+    if (sort === "avgTransaction") return Number.parseFloat(r.avgTransaction);
+    return Number.parseFloat(r.total);
+  };
+  all.sort((a, b) => {
+    const av = key(a);
+    const bv = key(b);
+    if (typeof av === "number" && typeof bv === "number") return (av - bv) * factor;
+    return String(av).localeCompare(String(bv)) * factor;
+  });
+
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? 25;
+  const total = all.length;
+  const rows = all.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize);
+  const byTotal = [...all].sort((a, b) => Number.parseFloat(b.total) - Number.parseFloat(a.total));
+  const byVisits = [...all].sort((a, b) => b.visits - a.visits);
+  const byTrend = [...all].sort((a, b) => b.trend - a.trend);
+
+  return {
+    rows,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    sort,
+    dir,
+    appliedFilters: needle ? { q: needle } : {},
+    summary: {
+      merchantCount: all.length,
+      totalSpend: grandTotal.toFixed(2),
+      topMerchant: byTotal[0] ? { name: byTotal[0].name, total: byTotal[0].total } : null,
+      mostVisited: byVisits[0] ? { name: byVisits[0].name, visits: byVisits[0].visits } : null,
+      fastestGrowing: byTrend[0] ? { name: byTrend[0].name, trend: byTrend[0].trend } : null,
+    },
+    isLive: false,
+  };
 }
 
 export async function getCalendar(): Promise<CalendarResponse> {

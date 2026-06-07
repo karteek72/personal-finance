@@ -74,7 +74,24 @@ metrics must ship with a confidence + caveat — never present an inference as f
 | TASK-ANALYTICS-019 | backend | Behavior heuristics w/ evidence + confidence | 014,018 |
 | TASK-ANALYTICS-020 | backend | Planning engine (runway/payoff/scenarios) | 002,011 |
 
-**Parallelizable now (no deps):** 001, 003, 004, 008, 013, all UI tasks, and the docs task.
+### Pagination, tabular reports & thin-client
+
+Many analytics surfaces serve a fixed top-N (e.g. merchants `.slice(0,6)`) with no pagination,
+and clients recompute totals/ranks. Standardize server-side pagination/sort/filter and move all
+calculation to the backend so iOS reuses it. See `analytics-architecture.md` §10.
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-PAGINATE-001 | docs | Standard list/pagination contract | — |
+| TASK-PAGINATE-002 | backend | Merchants endpoint paginated/sortable (reference) | 001 |
+| TASK-PAGINATE-003 | ui | Reusable `DataTable` (sort/filter/page + URL state) | — |
+| TASK-PAGINATE-004 | ui | Merchants page on `DataTable` (reference) | 002,003 |
+| TASK-PAGINATE-005 | backend | Remove remaining caps; paginate list endpoints | 001 |
+| TASK-PAGINATE-006 | ui | Apply `DataTable` to txns/holdings/subs/categories | 003,005 |
+| TASK-THINCLIENT-001 | backend | Move residual UI calculations to backend | A-002 |
+
+**Parallelizable now (no deps):** A-001, A-003, A-004, A-008, A-013, all UI-ANALYTICS tasks,
+PAGINATE-001, PAGINATE-003, and the docs tasks.
 
 ---
 

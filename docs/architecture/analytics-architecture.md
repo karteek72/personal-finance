@@ -349,3 +349,75 @@ by `TASK-DOCS-ANALYTICS-001`.
 - Transfer pairing is probabilistic; keep `match_confidence` and let unmatched transfers degrade
   confidence rather than guessing.
 - Single-currency assumption today; add `fx_rates` before mixing currencies.
+
+---
+
+## 10. Pagination, tabular reports & the thin-client rule
+
+### 10.1 Thin-client rule (iOS readiness)
+**All calculation, ranking, truncation, sorting, and aggregation happen in the backend.**
+Clients (web + iOS) render rows as received and never recompute totals, percentages, P/L,
+ranks, or trends. This is already mandated by `.cursor/rules/ui-typescript.mdc` and `AGENTS.md`
+("all clients are thin") but is violated in many analytics surfaces. Moving the math server-side
+is what prevents the iOS app from re-deriving (and re-bugging) the same numbers.
+
+Client recomputation to remove (web), so iOS inherits correct values:
+net-worth hero sum, holdings P/L on account filter, income variance/stability, FIRE projection
+math, time-machine multiple, merchant KPI ranks (top/most-visited/fastest-growing).
+
+### 10.2 Truncation audit — fixed top-N served as if complete
+| Location | Cap | Fix |
+|----------|-----|-----|
+| `coach-store.ts` getMerchants | `.slice(0, 6)` | paginate + sort/filter (`TASK-PAGINATE-002`) |
+| `compute-patterns.ts` | `.limit(5)` categories | full list, client shows top-N |
+| `transaction-store.ts` getMoneyFlow | `LIMIT 10` sources | paginate |
+| `protect-analytics.ts` | `.slice(0, 9)` inflation cats | full list |
+| `coach-ask.ts` | top 5 subscriptions | n/a (narrative text) |
+
+These are deliberate caps, **not** pagination. Replace with the list contract below; the UI
+decides how many to display, but the API must be able to return all rows on request.
+
+### 10.3 Standard list contract
+Tabular/list endpoints accept a uniform query and return a uniform page envelope. Use
+**offset pagination with a total count** for tabular reports (page numbers + sort + filter);
+reserve **cursor pagination** for high-volume append-only feeds (the transactions list already
+uses cursor/infinite-scroll — keep it).
+
+Request query params:
+```
+?page=1&pageSize=25          # 1-based page, pageSize ∈ [1,200] (default 25)
+&sort=total&dir=desc         # sort = a server-whitelisted column; dir = asc|desc
+&q=starbucks                 # optional free-text filter (server-defined fields)
+&from=2026-01-01&to=2026-06-30   # optional date window
+&...facets                   # endpoint-specific filters (category, accountId, etc.)
+```
+
+Response envelope:
+```jsonc
+{
+  "rows": [ /* fully-computed row objects, money as 2-dp strings */ ],
+  "page": 1,
+  "pageSize": 25,
+  "total": 184,
+  "totalPages": 8,
+  "sort": "total",
+  "dir": "desc",
+  "appliedFilters": { "q": "starbucks", "from": "2026-01-01" }
+}
+```
+
+Rules:
+- **Sort/filter are server-side.** Whitelist sortable columns (reject others with 400) — never
+  trust an arbitrary column name in SQL. Validate query with Zod.
+- Each row is fully computed server-side (totals, %, trend, rank metadata). No client math.
+- `total` is the unfiltered-by-page count **after** facet/`q` filters, so the client can render
+  page controls.
+- Scope every query by authenticated `userId` / household, as today.
+
+### 10.4 Reusable web `DataTable`
+A single client component (`ui/src/components/ui/data-table.tsx`) renders any list endpoint:
+sortable column headers, a filter/search box, and pagination controls, with sort/filter/page
+state mirrored to the URL (`useSearchParams`) and fetched via TanStack Query. It performs **no**
+aggregation — it only passes query params and renders `rows`. The merchants page is the
+reference implementation (`TASK-PAGINATE-002` + `TASK-PAGINATE-004`); transactions, holdings,
+subscriptions, categories, and money-flow follow the same pattern (`TASK-PAGINATE-005/006`).

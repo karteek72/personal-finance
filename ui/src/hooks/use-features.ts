@@ -1,10 +1,16 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import { api } from "@/lib/api-client";
 import { readAuthSession } from "@/lib/auth-session";
 import { useAuthStore } from "@/stores/auth-store";
+import type { ListQuery } from "@/types/api";
 
 /**
  * Hooks for the demo-dataset feature endpoints (wealth, planning, insights,
@@ -125,6 +131,15 @@ export function useMerchants() {
   return useQuery({
     queryKey: ["merchants"],
     queryFn: () => api.getMerchants(),
+  });
+}
+
+/** Paginated/sortable/filterable merchant report (server-computed). */
+export function useMerchantsTable(params: ListQuery) {
+  return useQuery({
+    queryKey: ["merchants-table", params],
+    queryFn: () => api.getMerchantsTable(params),
+    placeholderData: keepPreviousData,
   });
 }
 

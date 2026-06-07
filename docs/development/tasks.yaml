@@ -1080,3 +1080,169 @@ tasks:
       - api-contract.md documents the metric envelope + /analytics/* request/response shapes
       - system-overview.md describes new tables + mart refresh on sync
       - product-requirements.md lists the analytics KPIs and phases 3.7-3.9
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Pagination, tabular reports & thin-client — analytics-architecture.md section 10
+  # Many analytics surfaces serve a fixed top-N (e.g. merchants .slice(0,6)) with no
+  # pagination, and clients recompute totals/ranks. Standardize server-side
+  # pagination/sort/filter and move all calculation to the backend so iOS reuses it.
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: TASK-PAGINATE-001
+    title: Standard list/pagination contract in api-contract.md
+    status: ready
+    priority: P1
+    area: docs
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - docs/design/api-contract.md
+    description: |
+      Document the uniform list contract (section 10.3): ListQuery params
+      (page,pageSize,sort,dir,q,from,to,facets) and the Page<T> response envelope
+      (rows,page,pageSize,total,totalPages,sort,dir,appliedFilters). Offset pagination with
+      total count for tabular reports; cursor reserved for the transactions feed. Define the
+      shared Zod ListQuery schema and Page<T> TS type location for backend + UI.
+    acceptance_criteria:
+      - api-contract.md has a "List & pagination" section with ListQuery + Page<T>
+      - Sortable-column whitelisting and 400-on-invalid-sort documented
+      - Shared types referenced by backend services and ui/src/types/api.ts
+
+  - id: TASK-PAGINATE-002
+    title: Merchants endpoint — paginated, sortable, filterable (reference)
+    status: backlog
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PAGINATE-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/coach-store.ts
+    description: |
+      getMerchants is hardcoded to top 6 (.slice(0,6)) and the KPI ranks (top/most-visited/
+      fastest-growing) are recomputed on the client. Replace with GET /analytics/merchants
+      implementing the list contract: server-side sort (total|visits|trend|name), q filter,
+      date window, full pagination, and server-computed KPI/rank summary in the response.
+      This is the REFERENCE implementation other list endpoints follow.
+    acceptance_criteria:
+      - GET /analytics/merchants returns Page<MerchantRow> per the contract
+      - No .slice cap; all merchants reachable via pagination
+      - Sort whitelist enforced (400 on invalid); query Zod-validated
+      - Top/most-visited/fastest-growing computed server-side in a summary block
+
+  - id: TASK-PAGINATE-003
+    title: Reusable DataTable component (sort / filter / pagination + URL state)
+    status: ready
+    priority: P1
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Build ui/src/components/ui/data-table.tsx: sortable headers, search/filter box,
+      pagination controls, loading + explicit empty states, sort/filter/page mirrored to the URL
+      (useSearchParams), fetched via TanStack Query. Performs NO aggregation — passes query
+      params and renders rows. Generic over column defs.
+    acceptance_criteria:
+      - Generic DataTable<TRow> with column defs (header,align,render,sortable)
+      - Sort/filter/page state in URL; TanStack Query keyed by params
+      - Loading and empty states; no client-side totals/ranks
+      - Money rendered via the shared formatter (2 decimals)
+
+  - id: TASK-PAGINATE-004
+    title: Merchants page on DataTable + backend pagination (reference)
+    status: backlog
+    priority: P1
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PAGINATE-002
+      - TASK-PAGINATE-003
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/merchants-panel.tsx
+    description: |
+      Convert the merchants panel to the DataTable backed by GET /analytics/merchants. Remove
+      client-side rank computation and the single-point sparkline divide-by-zero; show KPI cards
+      from the server summary block. Reference pattern for the remaining list pages.
+    acceptance_criteria:
+      - Merchants table paginates/sorts/filters via the backend (not top-6)
+      - KPI cards use server summary; no client recomputation
+      - Sparkline guards len<=1; no NaN
+
+  - id: TASK-PAGINATE-005
+    title: Remove remaining analytics caps; paginate list endpoints
+    status: backlog
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PAGINATE-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Apply the list contract to the other capped/list surfaces (section 10.2): money-flow
+      sources (LIMIT 10), inflation categories (.slice(0,9)), patterns categories (.limit(5)),
+      subscriptions/recurring, and holdings. Return full computed rows with pagination; the UI
+      chooses how many to display.
+    acceptance_criteria:
+      - money-flow, inflation, patterns, recurring, holdings endpoints accept ListQuery
+      - No fixed top-N truncation remains in analytics services
+      - Each row fully computed server-side
+
+  - id: TASK-PAGINATE-006
+    title: Apply DataTable to transactions, holdings, subscriptions, categories
+    status: backlog
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PAGINATE-003
+      - TASK-PAGINATE-005
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Roll out the DataTable pattern to the remaining tabular pages. Keep the transactions feed
+      on cursor/infinite-scroll but standardize its sort/filter controls; convert holdings,
+      subscriptions, and category breakdowns to paginated tables.
+    acceptance_criteria:
+      - Holdings, subscriptions, categories use DataTable + backend pagination/sort/filter
+      - Transactions sort/filter controls standardized
+      - No client-side recomputation of totals/ranks on these pages
+
+  - id: TASK-THINCLIENT-001
+    title: Move residual UI calculations to backend computed fields
+    status: backlog
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Audit and relocate client-side math (section 10.1) into backend computed fields so iOS
+      reuses them: net-worth hero sum, holdings gain/loss on account filter, income
+      variance/stability, FIRE projection math, time-machine multiple. Expose via the metric
+      layer / existing endpoints; UI renders only.
+    acceptance_criteria:
+      - Each listed value returned pre-computed by the backend
+      - UI components drop the corresponding client calculations
+      - Values identical across web and (future) iOS because the source is shared

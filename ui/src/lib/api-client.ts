@@ -30,7 +30,9 @@ import type {
   HouseholdResponse,
   InflationResponse,
   InvestmentsResponse,
+  ListQuery,
   MerchantsResponse,
+  MerchantsTableResponse,
   MoneyFlowResponse,
   NetWorthResponse,
   PaginatedTransactions,
@@ -976,6 +978,13 @@ export const api = {
   getMerchants(): Promise<MerchantsResponse> {
     if (USE_MOCKS) return mockApi.getMerchants();
     return fetchJson<MerchantsResponse>("/insights/merchants");
+  },
+
+  getMerchantsTable(params: ListQuery = {}): Promise<MerchantsTableResponse> {
+    if (USE_MOCKS) return mockApi.getMerchantsTable(params);
+    return fetchJson<MerchantsTableResponse>(
+      `/analytics/merchants${buildQuery({ ...params })}`,
+    );
   },
 
   getInflation(): Promise<InflationResponse> {
