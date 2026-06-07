@@ -2456,3 +2456,321 @@ tasks:
       - Persisted analytics reflect the new member without waiting for the next sync
       - Recompute is idempotent and does not block the mutation response unduly
       - typecheck passes
+
+  # ------------------------------------------------------------------ #
+  # iOS feature parity (Phase 4, P4)
+  #
+  # Bring the SwiftUI app to parity with the web UI. The backend already
+  # owns all calculations (thin-client rule), so iOS work is mostly:
+  # Codable models + APIClient methods + SwiftUI views reusing the
+  # DesignSystem. iOS currently has: Auth (Google + AppLock), push,
+  # Dashboard, MoneyFlow, Categories, Transactions, Accounts, Settings,
+  # Plaid Link. Endpoints/types live in docs/design/api-contract.md and
+  # ui/src/types/api.ts; mirror the matching web panel for each view.
+  #
+  # NOTE (AGENTS.md): iOS is deferred (P4) "until import path ships on
+  # web." These are queued at the user's direction; confirm the phase
+  # gate before starting implementation.
+  # ------------------------------------------------------------------ #
+  - id: TASK-IOS-001
+    title: Expand iOS APIClient + Codable models to cover all read endpoints
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/design/api-contract.md
+      - ui/src/types/api.ts
+      - ios/SpendFlow/Services/APIClient.swift
+      - ios/SpendFlow/Models/API
+    description: |
+      iOS APIClient only covers auth, summary, transactions, by-category, flow, alerts, trends,
+      accounts, and Plaid. Add Codable models and APIClient methods for the remaining endpoints the
+      web uses: net-worth, investments (positions/holdings), fire, wellness, dna, patterns,
+      behavioral, merchants (paginated), inflation, resilience, recurring, calendar, forecast,
+      budgets + goals (CRUD), household, user/profile, credit-debt, coach, wrapped, and
+      analytics/recompute. Add shared decoding for the standard list contract (Page<T>) and the
+      metric envelope (value/unit/asOf/class/basis/confidence/trend/caveats) so views can render
+      confidence + caveats like the web. Match field names to ui/src/types/api.ts exactly.
+    acceptance_criteria:
+      - APIClient exposes typed methods for all read endpoints listed above
+      - Codable models match api-contract.md / ui/src/types/api.ts field-for-field
+      - Shared Page<T> and MetricEnvelope decoding helpers exist and are unit-tested
+      - Decoding round-trips against sample payloads from the live API
+  - id: TASK-IOS-002
+    title: iOS navigation/IA mirroring web (Understand / Wealth / Plan / Protect)
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - docs/design/ui-ux-specification.md
+      - docs/design/mobile-patterns.md
+      - ios/SpendFlow/Features/Root/MainTabView.swift
+    description: |
+      Today there are 5 tabs (Home, Flow, Spend, Activity, Wallet). Web groups many more features
+      under Understand, Wealth, Plan, Protect, Debt, Family, Profile. Define an iOS IA that exposes
+      these without overcrowding the tab bar — e.g. keep core tabs and add a "More"/hub tab (or
+      section landing screens) that route to the new feature views. Follow mobile-patterns.md.
+      This task wires navigation + placeholder destinations; individual views land in IOS-003+.
+    acceptance_criteria:
+      - All web feature areas are reachable in the iOS app via a coherent IA
+      - Navigation matches mobile-patterns.md and does not overcrowd the tab bar
+      - Placeholder destinations exist for each not-yet-built view
+  - id: TASK-IOS-003
+    title: iOS Understand — Wellness, DNA, Patterns, Behavioral, Merchants
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+      - TASK-IOS-CHARTS-001
+    source_docs:
+      - ui/src/components/preview/panels/wellness-panel.tsx
+      - ui/src/components/preview/panels/dna-panel.tsx
+      - ui/src/components/preview/panels/patterns-panel.tsx
+      - ui/src/components/preview/panels/behavioral-panel.tsx
+      - ui/src/components/preview/panels/merchants-panel.tsx
+    description: |
+      Build the Understand views to mirror the web panels: Wellness (score ring + history chart with
+      0-100 axis and per-bar values + dimension breakdown), Spending DNA, Patterns (day-of-week etc.),
+      Behavioral (streaks, challenges, spend-by-reason with reason tagging + empty states), and the
+      paginated Merchants report. Render confidence + caveats from the metric envelope. Reuse the
+      shared chart + paginated-list components (IOS-CHARTS-001). Behavioral tagging depends on the
+      backend reason endpoint (TASK-BEHAVIORAL-003).
+    acceptance_criteria:
+      - Wellness/DNA/Patterns/Behavioral/Merchants views match their web counterparts
+      - Charts show axes/labels/values; lists paginate, sort, and filter server-side
+      - Confidence/caveats are surfaced; empty states match web behavior
+  - id: TASK-IOS-004
+    title: iOS Wealth — Net worth, Investments/Holdings, FIRE
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+      - TASK-IOS-CHARTS-001
+    source_docs:
+      - ui/src/components/preview/panels/net-worth-panel.tsx
+      - ui/src/components/preview/panels/investments-panel.tsx
+      - ui/src/components/preview/panels/holdings-portfolio-section.tsx
+      - ui/src/components/preview/panels/fire-panel.tsx
+    description: |
+      Build Net worth (assets/liabilities incl. loans, trend), Investments (positions/holdings,
+      allocation, performance), and FIRE (projection from investable assets, age prompt when
+      isDefaultAge, surfaced assumptions + sliders) views, mirroring the web. All math is server-side;
+      iOS just renders. FIRE must reflect the F-series fixes (investable assets, real age, assumptions).
+    acceptance_criteria:
+      - Net worth / Investments / FIRE views match their web counterparts
+      - FIRE prompts for age when unset and shows assumptions; no client-side projection math
+      - Charts use the shared chart component with axes/values
+  - id: TASK-IOS-005
+    title: iOS Plan — Budgets, Savings goals, Recurring/Subscriptions, Calendar, Forecast, Cost audits
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+    source_docs:
+      - ui/src/components/preview/panels/budgets-panel.tsx
+      - ui/src/components/preview/panels/recurring-panel.tsx
+      - ui/src/components/preview/panels/subscriptions-panel.tsx
+      - ui/src/components/preview/panels/calendar-panel.tsx
+      - ui/src/components/preview/panels/forecast-panel.tsx
+      - ui/src/components/preview/panels/leaks-panel.tsx
+    description: |
+      Build the Plan views: Budgets (list + CRUD + accept suggestions + add category), Savings goals
+      (CRUD + accept/edit/delete suggested goals), Recurring + Subscriptions (with lapsed/cancelled
+      lifecycle), Calendar, Forecast, and Cost audits / hidden fees (leaks). Use the budgets/goals
+      CRUD endpoints and audit engine output; no client-side opportunity-cost math.
+    acceptance_criteria:
+      - Budgets and goals support full CRUD + accepting suggestions on device
+      - Recurring/subscriptions show lifecycle; calendar/forecast/audits match web
+      - All amounts/opportunity-cost come from the API, not computed on device
+  - id: TASK-IOS-006
+    title: iOS Protect — Resilience & Inflation (personal CPI)
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+      - TASK-IOS-CHARTS-001
+    source_docs:
+      - ui/src/components/preview/panels/resilience-panel.tsx
+      - ui/src/components/preview/panels/inflation-panel.tsx
+    description: |
+      Build Resilience (emergency-fund months, shock scenarios, sub-scores with actions) and Inflation
+      (personal CPI, nominal vs real spending) views mirroring the web panels, rendering confidence +
+      caveats from the metric envelope.
+    acceptance_criteria:
+      - Resilience and Inflation views match their web counterparts
+      - Sub-scores, scenarios, and real-vs-nominal series render with caveats
+  - id: TASK-IOS-007
+    title: iOS Debt — credit/debt summary
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+    source_docs:
+      - ui/src/app/(dashboard)/debt/page.tsx
+    description: |
+      Build the Debt view: balances, utilization, APRs, minimum payments, and payoff guidance,
+      mirroring the web debt page using the credit-debt endpoint.
+    acceptance_criteria:
+      - Debt view shows balances, utilization, APR, and minimums from the API
+      - Matches the web debt page content and states
+  - id: TASK-IOS-008
+    title: iOS Family — household members, account assignment, invites
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+    source_docs:
+      - ui/src/app/(dashboard)/family/page.tsx
+      - ui/src/hooks/use-household.ts
+    description: |
+      Build the Family/household view: list members, create/edit/delete members, assign accounts to
+      members, and send/revoke invites. After mutations, invalidate/refresh the full feature set
+      (mirror the H1 fix) so all views reflect membership changes.
+    acceptance_criteria:
+      - Members can be created/edited/deleted and accounts assigned on device
+      - Invite/revoke flows work; membership changes refresh all dependent views
+  - id: TASK-IOS-009
+    title: iOS Profile — user profile wired into analytics
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+    source_docs:
+      - ui/src/app/(dashboard)/profile/page.tsx
+      - backend/src/routes/user.ts
+    description: |
+      Build the Profile view: edit display name, age, household size, target retirement age, annual
+      gross income, employment status, risk tolerance, withdrawal rate, and real return — persisted via
+      /user/profile. Ensure saving age flows into FIRE (isDefaultAge=false) like the web.
+    acceptance_criteria:
+      - All profile fields are editable and persist via /user/profile
+      - Saving age updates FIRE (no default-age fallback after save)
+  - id: TASK-IOS-010
+    title: iOS SnapTrade brokerage connection flow
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/app/(dashboard)/accounts/snaptrade/callback/page.tsx
+      - backend/src/routes/snaptrade.ts
+    description: |
+      iOS only supports Plaid today. Add the SnapTrade connection flow (register/connect portal +
+      callback handling + sync) so users can link brokerage/retirement accounts, mirroring the web
+      SnapTrade flow. Reuse the backend snaptrade endpoints.
+    acceptance_criteria:
+      - Users can connect a SnapTrade brokerage account from iOS and see holdings sync
+      - Connection + callback + sync mirror the web flow and handle errors
+  - id: TASK-IOS-011
+    title: iOS recalculate-all + pull-to-refresh + full state invalidation
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-RECOMPUTE-001
+    source_docs:
+      - ui/src/components/layout/recalculate-analytics-button.tsx
+      - ui/src/lib/invalidate-financial-queries.ts
+    description: |
+      Add a recalculate-all control (parity with web RC2) that calls POST /analytics/recompute and
+      then refreshes all feature view-models, plus pull-to-refresh on list/detail screens. Ensure a
+      sync or recompute refreshes every dependent view (parity with the web full-invalidation set).
+    acceptance_criteria:
+      - A recalculate control triggers /analytics/recompute and refreshes all views
+      - Pull-to-refresh is available on primary screens
+      - After sync/recompute, no stale view remains
+  - id: TASK-IOS-CHARTS-001
+    title: iOS shared chart + paginated-list components (DesignSystem)
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - ui/src/components/ui/data-table.tsx
+      - docs/architecture/analytics-architecture.md
+      - ios/SpendFlow/DesignSystem
+    description: |
+      Add reusable SwiftUI components to the DesignSystem: (1) a chart component with labeled x/y
+      axes, value labels, and tap-to-inspect (mirroring the self-explanatory-chart rule from U1/W1),
+      and (2) a paginated list component that consumes the standard Page<T> contract with server-side
+      sort/filter/search (the DataTable equivalent). Feature views (IOS-003/004/006) build on these.
+    acceptance_criteria:
+      - A shared chart view renders axes, labels, and values and supports tap-to-inspect
+      - A shared paginated list consumes Page<T> with server sort/filter/search
+      - Components use design tokens and are reused by the feature views
+  - id: TASK-IOS-IMPORT-001
+    title: iOS statement import (deferred until web import ships)
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/app/(dashboard)/accounts/import/page.tsx
+      - backend/src/routes/imports.ts
+    description: |
+      Parity with the web statement-import path (upload QFX/OFX/CSV/PDF, consent, batch status,
+      review). Per AGENTS.md the import path must ship on web first; this is queued but should remain
+      blocked until that gate lifts. Reuse the imports endpoints; do not parse files on device.
+    acceptance_criteria:
+      - Users can upload and import statements from iOS once the web gate lifts
+      - Consent + batch status + review mirror the web flow
+      - No on-device parsing; all handled by the backend

@@ -290,6 +290,36 @@ numbers until the next sync. Design: `analytics-architecture.md` §19.
 
 ---
 
+### iOS feature parity (Phase 4, P4)
+
+The SwiftUI app has the core (Auth + AppLock, push, Dashboard, MoneyFlow, Categories, Transactions,
+Accounts, Settings, Plaid Link) but lacks all of Understand, Wealth, Plan, Protect, Debt, Family,
+Profile, SnapTrade, import, and recalculate. Backend already owns all calculations (thin-client), so
+iOS work is models + APIClient + SwiftUI views mirroring each web panel. **Note (AGENTS.md):** iOS is
+deferred until the web import path ships — these are queued at the user's direction; confirm the gate
+before implementing.
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-IOS-001 | ios | APIClient + Codable models for all read endpoints | — |
+| TASK-IOS-002 | ios | Navigation/IA mirroring web (Understand/Wealth/Plan/Protect) | IOS-001 |
+| TASK-IOS-CHARTS-001 | ios | Shared chart + paginated-list components | — |
+| TASK-IOS-003 | ios | Understand — Wellness/DNA/Patterns/Behavioral/Merchants | IOS-001/002/CHARTS-001 |
+| TASK-IOS-004 | ios | Wealth — Net worth/Investments/FIRE | IOS-001/002/CHARTS-001 |
+| TASK-IOS-005 | ios | Plan — Budgets/Goals/Recurring/Calendar/Forecast/Audits | IOS-001/002 |
+| TASK-IOS-006 | ios | Protect — Resilience & Inflation | IOS-001/002/CHARTS-001 |
+| TASK-IOS-007 | ios | Debt — credit/debt summary | IOS-001/002 |
+| TASK-IOS-008 | ios | Family — members/assignment/invites | IOS-001/002 |
+| TASK-IOS-009 | ios | Profile — wired into analytics (age → FIRE) | IOS-001/002 |
+| TASK-IOS-010 | ios | SnapTrade brokerage connection | IOS-001 |
+| TASK-IOS-011 | ios | Recalculate-all + pull-to-refresh + full invalidation | IOS-001, RECOMPUTE-001 |
+| TASK-IOS-IMPORT-001 | ios | Statement import (blocked until web import ships) | IOS-001 |
+
+**Start with `TASK-IOS-001` + `TASK-IOS-CHARTS-001`** (foundation), then `TASK-IOS-002`, then the
+feature views in parallel.
+
+---
+
 ## Recently completed
 
 | ID | Title |
