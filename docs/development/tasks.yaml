@@ -1,16 +1,6 @@
-# SpendFlow development task board — machine-readable source of truth.
-# Human dashboard: TASK_BOARD.md
-# CLI: npm run task -- <list|next|claim|release|complete|status> [args]
-#
-# Status: backlog | ready | in_progress | blocked | done | cancelled
-# Priority: P0 (critical) | P1 (high) | P2 (medium) | P3 (low) | P4 (deferred)
-
 version: 1
-updated_at: "2026-06-03"
-
+updated_at: 2026-06-07
 tasks:
-  # ── P0 — Critical gaps (docs claim done but code missing) ─────────────────
-
   - id: TASK-INFRA-001
     title: BullMQ worker + Redis + async Plaid webhook sync
     status: done
@@ -36,7 +26,6 @@ tasks:
       - GET /health reports real Redis connectivity
       - containers/compose.yaml includes redis service
       - backend/.env.example documents REDIS_URL
-
   - id: TASK-API-001
     title: Transaction CSV export endpoint + UI download
     status: done
@@ -57,7 +46,6 @@ tasks:
       - Filters match list endpoint (month, category, account, scope, q, type)
       - UI exposes download on transactions page
       - api-contract.md unchanged (already specified)
-
   - id: TASK-DOCS-001
     title: Sync product-requirements.md with implemented reality
     status: done
@@ -77,9 +65,6 @@ tasks:
       - Completed MVP items marked [x] with accurate status
       - Open items reflect real gaps (BullMQ, CSV, rate limit, etc.)
       - Development Phases section matches README status section
-
-  # ── P1 — High priority (Phase 3 completion) ─────────────────────────────
-
   - id: TASK-SEC-001
     title: Per-user rate limiting (100 req/min)
     status: done
@@ -100,7 +85,6 @@ tasks:
       - Authenticated routes rate-limited per userId
       - Returns HTTP 429 when exceeded
       - Uses Redis when REDIS_URL set; graceful skip in dev without Redis
-
   - id: TASK-INFRA-002
     title: Worker container in Podman compose
     status: done
@@ -119,7 +103,6 @@ tasks:
       - worker service in compose.yaml
       - containers/README.md updated
       - depends_on redis + api
-
   - id: TASK-UI-001
     title: Mobile responsive polish (375px breakpoints)
     status: done
@@ -137,7 +120,6 @@ tasks:
       - Sidebar collapses to mobile-nav without horizontal scroll
       - KPI cards stack cleanly at 375px
       - Transaction table readable (horizontal scroll OK if intentional)
-
   - id: TASK-PLAID-001
     title: Plaid ITEM_ERROR reconnect flow (UI + backend status)
     status: done
@@ -154,9 +136,6 @@ tasks:
       - Webhook sets plaid_items.status = reauth_required
       - Accounts API exposes status
       - UI shows reconnect Plaid Link for affected items
-
-  # ── P2 — Preview → live backend (Phase 3.5) ─────────────────────────────
-
   - id: TASK-PREVIEW-001
     title: Budgets API — real data from transaction aggregates
     status: done
@@ -173,7 +152,6 @@ tasks:
     acceptance_criteria:
       - GET /planning/budgets returns live data when user has transactions
       - UI preview banner removed on Budgets tab when live
-
   - id: TASK-PREVIEW-002
     title: Recurring charges detector (subscription list)
     status: done
@@ -189,7 +167,6 @@ tasks:
     acceptance_criteria:
       - Identifies charges with ≥3 occurrences at ~monthly interval
       - Returns amount, merchant, next expected date
-
   - id: TASK-PREVIEW-003
     title: Financial wellness score endpoint
     status: done
@@ -206,7 +183,6 @@ tasks:
     acceptance_criteria:
       - GET /insights/wellness returns score + dimension breakdown
       - Computed from real user data
-
   - id: TASK-PREVIEW-004
     title: Coach Q&A — RAG over transaction summaries (V2 stub)
     status: done
@@ -222,9 +198,6 @@ tasks:
     acceptance_criteria:
       - POST /coach/ask returns answers from precomputed monthly summaries
       - No API keys required for MVP stub
-
-  # ── P0 — Statement import (current focus) ───────────────────────────────
-
   - id: TASK-IMPORT-001
     title: Import UI + encrypted multipart upload API (Phase A)
     status: done
@@ -246,7 +219,6 @@ tasks:
       - POST /imports/batches stores encrypted files in import_files
       - GET /imports/formats returns limits for client validation
       - No file contents in logs
-
   - id: TASK-IMPORT-002
     title: Day-trade CSV parsers — E*TRADE, Fidelity, Webull + worker parse job
     status: done
@@ -269,7 +241,6 @@ tasks:
       - Worker job processes import_batches; updates status + txn counts
       - Webull filters non-Filled orders
       - Unit tests with sanitized fixture headers
-
   - id: TASK-IMPORT-003
     title: OFX/QFX parser — bank, credit, and investment blocks
     status: done
@@ -290,7 +261,6 @@ tasks:
       - Fidelity QFX invest block maps buy/sell with FITID external_id
     notes: |
       parse-ofx.ts + persist-banking.ts; migration 0010; 8 import tests pass.
-
   - id: TASK-IMPORT-004
     title: Import review UI — detected accounts + confirm before persist
     status: done
@@ -312,7 +282,6 @@ tasks:
       - Confirm triggers final persist (or re-queue job)
     notes: |
       previewImportBatch + confirmImportBatch; ImportReview component; POST /imports/batches/:id/confirm.
-
   - id: TASK-IMPORT-005
     title: Plaid ↔ import account merge + cross-source dedup fingerprint
     status: done
@@ -334,7 +303,6 @@ tasks:
       - Same purchase from import + Plaid not inserted twice
     notes: |
       dedup_fingerprint columns; fingerprint.ts; GET /imports/link-suggestions; POST /imports/accounts/merge; Plaid upsert skips fingerprint dupes.
-
   - id: TASK-IMPORT-006
     title: Import compliance — blob retention, consent_records, audit_events
     status: done
@@ -357,7 +325,6 @@ tasks:
       - audit_events logged without PII or file content
     notes: |
       Migration 0011; import-audit.ts; purge-import-blobs.ts; consent on every upload batch.
-
   - id: TASK-IMPORT-007
     title: Secondary CSV templates — Schwab, Robinhood, Coinbase + SoFi checking
     status: done
@@ -376,7 +343,6 @@ tasks:
       - coinbase-tx-history maps to investment_transactions with assetType crypto
     notes: |
       schwab-transactions, robinhood-activity, coinbase-tx-history, sofi-checking templates + fixtures.
-
   - id: TASK-IMPORT-008
     title: PDF statement plugins — SoFi Invest, brokerage fallbacks
     status: done
@@ -395,7 +361,6 @@ tasks:
       - Generic detection fails gracefully with user-visible warning
     notes: |
       pdf/detect-institution.ts, sofi-invest.ts, parseImportFileAsync; graceful errors for unknown PDFs.
-
   - id: TASK-SEC-002
     title: GDPR JSON data export endpoint
     status: done
@@ -413,12 +378,9 @@ tasks:
       - No secrets in export
     notes: |
       export-user-data.ts; GET /auth/export with attachment; assertExportHasNoSecrets; data_export audit event.
-
-  # ── P4 — iPhone app (deferred — lowest priority) ────────────────────────
-
-  - id: TASK-IOS-001
+  - id: TASK-IOS-FACEID-001
     title: iOS Face ID app unlock
-    status: backlog
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -434,10 +396,9 @@ tasks:
     acceptance_criteria:
       - Optional toggle in settings
       - Keychain tokens remain; only UI gated
-
-  - id: TASK-IOS-002
+  - id: TASK-IOS-PUSH-002
     title: iOS push notifications (APNs) for alerts
-    status: backlog
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -453,3 +414,2358 @@ tasks:
     acceptance_criteria:
       - Device token stored per user
       - Test push from dev script
+  - id: TASK-ANALYTICS-001
+    title: Canonical signed_amount column + cashflow indexes
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Sign convention is implicit (expenses positive, depository income negative) and abs()
+      is sprinkled per-query (defect B14). Add a STORED generated column signed_amount
+      (expense -> -abs(amount), income -> +abs(amount), transfer -> 0) and indexes so all
+      cashflow SQL can use SUM(signed_amount) with no per-query sign branching.
+    acceptance_criteria:
+      - Drizzle migration adds transactions.signed_amount GENERATED ALWAYS AS STORED
+      - Indexes tx_user_date_idx (user_id,date) and tx_user_cat_date_idx (user_id,category,date)
+      - schema.ts reflects the generated column
+      - Existing aggregation queries unaffected (column is additive)
+  - id: TASK-ANALYTICS-002
+    title: Metric layer module (services/metrics) + metric envelope type
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - docs/design/api-contract.md
+    description: |
+      "Savings rate" is defined 4 different ways across services (defect B13). Create
+      services/metrics/ with one exported function per metric (single definition), each
+      returning the metric envelope {value, unit, grain, asOf, class, basis, confidence,
+      trend, caveats}. Other services must consume the metric layer, never re-query raw tables.
+    acceptance_criteria:
+      - services/metrics/ with typed MetricEnvelope (no any)
+      - Single savingsRate, freeCashFlow, burnRate, emergencyMonths implementations
+      - Savings/return rates emitted as 0-1 fraction with unit:"percent"
+      - compute-wellness / compute-wrapped / transaction-store reuse the metric layer
+      - Unit tests with a golden transaction dataset -> expected values
+  - id: TASK-ANALYTICS-003
+    title: Capture real credit limit from Plaid; real utilization
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Credit utilization is fabricated as balance*2.5 (defect B1). Persist the real limit
+      from Plaid (accounts.balances.limit / liabilities) on accounts or credit_card_liabilities,
+      and compute utilization = sum(balance)/sum(limit). When limit unknown, return
+      confidence 0 instead of fabricating.
+    acceptance_criteria:
+      - credit_limit captured on sync (Plaid) and stored
+      - Utilization metric uses real limit; confidence 0 when missing
+      - Remove the balance*2.5 estimate from compute-wellness.ts
+  - id: TASK-ANALYTICS-004
+    title: balance_snapshots table + net-worth-month pipeline
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      getNetWorth reads net_worth_snapshots which nothing writes in production -> empty trend
+      (defect B10). Add balance_snapshots (account_id, as_of_date, balances, credit_limit) and
+      write idempotently on every sync (plaid/teller/snaptrade). Build mart_net_worth_month and
+      back getNetWorth trend from it.
+    acceptance_criteria:
+      - balance_snapshots migration + write on each sync job (upsert by date)
+      - Net-worth monthly trend derived from snapshots, not seed-only table
+      - getNetWorth.trend returns real history when snapshots exist
+  - id: TASK-ANALYTICS-005
+    title: dim_category spend-class + fixed/variable/discretionary metrics
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/config/categories.ts
+    description: |
+      No fixed/variable/discretionary or essential split exists. Add dim_category
+      (spend_class, is_essential, cpi_weight_eligible) seeded from the existing taxonomy,
+      with user override via rules. Expose spend-class and essential/non-essential breakdowns
+      through the metric layer.
+    acceptance_criteria:
+      - dim_category table + seed for all SPEND_CATEGORIES
+      - Metrics for fixed/variable/discretionary and essential vs non-essential
+      - Essential burn used as emergency-fund denominator
+  - id: TASK-ANALYTICS-006
+    title: Remove fabricated wellness metrics; rebuild Financial Health score
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+      - TASK-ANALYTICS-003
+      - TASK-ANALYTICS-004
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Remove fabricated dims/values (B2 "Inflation Beat"=savings*0.85, B3 fake history reusing
+      current balances, B4 single-month emergency denominator, B5 goal on-track at >=50%,
+      B7 fabricated salary) and rebuild Health per analytics-architecture.md section 6
+      (7 weighted sub-scores) with composite confidence.
+    acceptance_criteria:
+      - Health = weighted sub-scores; no fabricated dimensions remain
+      - Emergency fund uses trailing essential burn; goal pace is deadline-aware
+      - History trend recomputed per-month (no reuse of current balances)
+      - Composite confidence surfaced in response
+  - id: TASK-ANALYTICS-007
+    title: Data-quality / confidence / reconciliation endpoint
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      No data-quality layer exists beyond an isLive boolean (defect B16). Add
+      GET /analytics/data-quality: categorization coverage, sync freshness, transfer-pair
+      coverage, reconciliation gap (SUM(signed_amount) vs balance delta), pending ratio,
+      cost-basis completeness. Feed a 0-1 confidence into metric envelopes.
+    acceptance_criteria:
+      - GET /analytics/data-quality returns the coverage/freshness/reconciliation metrics
+      - Metric envelopes derive confidence from data-quality signals
+  - id: TASK-ANALYTICS-008
+    title: Merchant normalization + dim_merchant
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Recurring/concentration logic keys on raw merchant strings, fragmenting series
+      (defect B12). Add dim_merchant (canonical_key, display_name) with a normalizer
+      (strip store numbers, *, SQ */TST* prefixes, trailing digits, city/state) and
+      transactions.merchant_id. Powers HHI and recurring v2.
+    acceptance_criteria:
+      - dim_merchant table + normalizer with unit tests on real-world merchant strings
+      - transactions.merchant_id backfilled and set on ingest
+      - Merchant concentration (HHI, top-5 share) metric available
+  - id: TASK-ANALYTICS-009
+    title: Recurring engine v2 (creep / zombie / duplicate, all cadences)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-008
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Extend detect-recurring to weekly/monthly/quarterly/annual; detect price creep
+      (regression over charge series), zombie (cadence broken/cancelled), duplicate
+      (two series same category and similar amount), free-trial->paid jump. Use dim_merchant keys.
+    acceptance_criteria:
+      - All four cadences detected; series keyed by canonical merchant
+      - priceCreep, zombie, duplicate flags with confidence
+      - Powers /analytics/recurring with flags
+  - id: TASK-ANALYTICS-010
+    title: Transfer pairing (transfer_links) + refund/reversal netting
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transfer-classification.ts
+    description: |
+      Bank<->bank and bank<->brokerage ACH are not paired, so net-investment and true savings
+      leak/double-count (defect B15). Add transfer_links and a pairing pass (opposite sign,
+      |Δamount| <= $1 or 1%, |Δdate| <= 4d, different account, household-wide). Net refunds
+      against the matching debit within 45 days.
+    acceptance_criteria:
+      - transfer_links populated post-sync with match_confidence
+      - Brokerage contributions paired to originating bank ACH
+      - Refunds netted from category spend; unmatched credits treated as income/rebate
+      - net-investment-rate and true-savings-rate use links
+  - id: TASK-ANALYTICS-011
+    title: Resilience composite score + sub-scores
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+      - TASK-ANALYTICS-004
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      No composite resilience score exists today (defect B8). Implement the weighted model in
+      analytics-architecture.md section 6 (Liquidity 0.30, IncomeStability 0.20,
+      ExpenseFlexibility 0.20, DebtBurden 0.20, InvestmentLiquidity 0.10) with interpretation
+      bands and a top improvement action per sub-score. Replace template-only resilience output.
+    acceptance_criteria:
+      - GET /analytics/resilience returns composite + 5 sub-scores + bands + actions
+      - Single-income-source penalty caps IncomeStability at 70
+      - No hardcoded shock amounts presented as computed
+  - id: TASK-ANALYTICS-012
+    title: Alert rule engine (table-driven)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+      - TASK-ANALYTICS-009
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Add alert_rules (config-driven thresholds) evaluated post-sync: price creep, zombie/
+      duplicate subscription, overdraft/ATM fee, utilization spike, EF breach, runway < 3mo,
+      lifestyle inflation (heuristic), bill-cluster cash dip, wash-sale risk (heuristic),
+      idle-cash drag, stale sync, reconciliation gap. Heuristic alerts carry confidence.
+    acceptance_criteria:
+      - alert_rules table + evaluator run in worker after sync
+      - Alerts persisted and exposed to the existing notifications surface
+      - Heuristic alerts labeled basis:"heuristic" with confidence
+  - id: TASK-ANALYTICS-013
+    title: Investment snapshots — security_prices + holdings_snapshots on sync
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Holdings are a single upserted snapshot with no price history, so TWR/drawdown/portfolio
+      time series are impossible (defect B9). Add security_prices and holdings_snapshots and
+      write them idempotently on each investment sync.
+    acceptance_criteria:
+      - security_prices + holdings_snapshots migrations
+      - Both written per-date on snaptrade/import investment sync
+      - mart_portfolio_daily (value, cost) view
+  - id: TASK-ANALYTICS-014
+    title: Tax lots (FIFO) — realized & unrealized P/L
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-013
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Build a FIFO lot engine (tax_lots) from investment_transactions to compute realized P/L
+      (proceeds - matched cost), unrealized P/L (qty*price - qty*cost), and holding-period
+      (short/long term) with wash-sale flags.
+    acceptance_criteria:
+      - tax_lots populated; sells consume lots FIFO
+      - Realized/unrealized P/L + short/long-term split exposed via metric layer
+      - Wash-sale repurchase (<=30d of a realized loss) flagged
+  - id: TASK-ANALYTICS-015
+    title: XIRR + dividend trend + fee/cash drag
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-013
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Replace estimatedValueToday hand-wave (defect B9) with money-weighted return (XIRR) over
+      dated cashflows incl. terminal value. Add dividend income trend + TTM yield, fee drag
+      (fees/avg value annualized), cash drag (idle cash share).
+    acceptance_criteria:
+      - XIRR implementation with tests (known cashflow series)
+      - Dividend trend + TTM yield from investment_transactions type=dividend
+      - Fee drag and cash drag metrics in /analytics/investments/performance
+  - id: TASK-ANALYTICS-016
+    title: Materialized marts + seasonally-adjusted category deltas
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-001
+      - TASK-ANALYTICS-005
+      - TASK-ANALYTICS-008
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Add mart_cashflow_month, mart_category_month, mart_recurring (+ existing net-worth/portfolio
+      marts) refreshed CONCURRENTLY at end of sync. Compute real deltaVsPriorMonth using
+      trailing-6mo median (seasonally adjusted), replacing the hardcoded 0 (defect B11).
+      Keep the in-progress month live.
+    acceptance_criteria:
+      - Materialized views + refresh-marts worker step
+      - getCategories returns real seasonally-adjusted deltaVsPriorMonth
+      - Current month served live; closed months from marts
+  - id: TASK-ANALYTICS-017
+    title: Personal CPI + nominal vs real spending
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-009
+      - TASK-ANALYTICS-010
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/protect-analytics.ts
+    description: |
+      Replace the static CATEGORY_INFLATION table (defect B6) with a measured personal CPI
+      (Laspeyres) over the user's repeat-purchase / fixed-bill basket. Add nominal vs real
+      spend and real savings rate. National/BLS comparison is external and must be marked.
+    acceptance_criteria:
+      - Personal CPI computed from recurring merchants + fixed bills (basis:factual)
+      - Nominal vs real spend series + real savings rate
+      - National CPI sourced/marked external (no hardcoded 3.1 presented as fact)
+  - id: TASK-ANALYTICS-018
+    title: TWR + benchmark comparison + max drawdown
+    status: done
+    priority: P3
+    area: backend
+    phase: 3.9
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-013
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Using daily holdings_snapshots, compute time-weighted return, max drawdown
+      (min(value/running_peak - 1)), and benchmark delta vs an external index series (SPY/VT).
+      Mark benchmark data external.
+    acceptance_criteria:
+      - TWR (geometric link) + max drawdown from daily portfolio values
+      - Benchmark delta with basis:"external" and source noted
+      - Exposed in /analytics/investments/performance
+  - id: TASK-ANALYTICS-019
+    title: Investment behavior heuristics with evidence + confidence
+    status: done
+    priority: P3
+    area: backend
+    phase: 3.9
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-014
+      - TASK-ANALYTICS-018
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Extend behavioral analysis: overtrading (turnover), performance chasing, panic selling,
+      buy-high/sell-low, tax-inefficiency. Every signal is basis:"heuristic", returns a
+      confidence and the specific trades that triggered it. Never present as fact.
+    acceptance_criteria:
+      - Each heuristic returns confidence + evidence trade ids
+      - GET /analytics/investments/behavior labels all as heuristic
+      - Caveats explain confidence limits
+  - id: TASK-ANALYTICS-020
+    title: Planning engine — runway, payoff, goals, scenarios, surplus
+    status: done
+    priority: P3
+    area: backend
+    phase: 3.9
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+      - TASK-ANALYTICS-011
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Build /analytics/planning: runway forecast (optional Monte Carlo), debt payoff simulator
+      (avalanche/snowball), deadline-aware goal pacing, sinking funds for detected annual bills,
+      scenario engine (income -X%, market -Y%), upcoming-obligations calendar, and the
+      surplus-allocation rule (cash EF -> high-interest debt -> invest).
+    acceptance_criteria:
+      - /analytics/planning/{runway,payoff,goals,scenarios,calendar}
+      - Payoff sim returns ETA + interest saved for avalanche vs snowball
+      - Surplus allocation suggestion per the section-3 rule
+  - id: TASK-UI-ANALYTICS-001
+    title: Normalize savingsRate scale across views + document contract
+    status: done
+    priority: P1
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      savingsRate is treated as 0-1 on the dashboard but 0-100 in Wrapped/mocks (defect F1) ->
+      mock mode shows ~2585%. Normalize at the API-client boundary to a single 0-1 fraction
+      and multiply by 100 exactly once at display. Fix mock fixtures + computeMockSummary.
+    acceptance_criteria:
+      - Dashboard, wrapped-banner, and mocks agree on a single savingsRate scale
+      - Mock mode shows correct ~26% not ~2585%
+      - No remaining double *100 or missing *100
+  - id: TASK-UI-ANALYTICS-002
+    title: Fix UTC off-by-one in analytics date range + date labels
+    status: done
+    priority: P1
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      lib/date-ranges.ts serializes local dates with toISOString() (UTC) and transaction-row /
+      subscriptions parse YYYY-MM-DD as UTC midnight (defect F2), shifting filters and labels by
+      a day / month edge. Format from local Y/M/D; parse date-only strings as local.
+    acceptance_criteria:
+      - analyticsDateRange() emits local calendar from/to (no toISOString slice)
+      - transaction-row and subscription dates render the same calendar day as stored
+      - Unit test around a UTC-negative timezone month boundary
+  - id: TASK-UI-ANALYTICS-003
+    title: Loading/empty guards + divide-by-zero/NaN fixes
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Leaks/Subscriptions/cash-flow strips render $0 while loading as if real (F3); resilience
+      runway can show Infinity when burn is 0 and merchants sparkline divides by zero on a single
+      point (F4). Add loading + explicit empty states; guard zero denominators.
+    acceptance_criteria:
+      - Leaks, subscriptions, cash-flow strips show loader then explicit empty state
+      - Runway never renders Infinity/NaN; sparkline handles len<=1
+      - No $0/0.00 presented as measured during fetch
+  - id: TASK-UI-ANALYTICS-004
+    title: Surface isLive (computed vs placeholder) on preview panels
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      isLive exists in types/api.ts but no panel reads it (defect F5). Add a small badge/banner
+      so users can tell computed metrics from placeholder/demo (budgets, recurring, wellness,
+      merchants, coach, DNA). Later extend to render envelope confidence.
+    acceptance_criteria:
+      - Panels with isLive show a Live vs Preview indicator
+      - Indicator consistent and accessible
+      - Hook ready to display metric-envelope confidence when available
+  - id: TASK-UI-ANALYTICS-005
+    title: Fix FIRE accelerator math + inflation/time-machine copy
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      fire-panel "cut $400/mo spending" accelerator adds $400 to investing instead of reducing
+      the FIRE number, and labels monthlyInvest/(invest+spend) as a savings rate (F6).
+      inflation-panel hardcodes "faster than average"; time-machine shows a 1.45x constant as a
+      factual backtest. Fix math and make copy conditional/clearly illustrative.
+    acceptance_criteria:
+      - Cut-spending accelerator lowers monthlySpend, keeps monthlyInvest
+      - FIRE "savings rate" relabeled or computed from income
+      - Inflation copy conditional on personal vs national rate
+      - Time-machine constant labeled as illustrative, not a backtest
+  - id: TASK-UI-ANALYTICS-006
+    title: Preserve category deltas + chart correctness fixes
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      category-analytics-panel overwrites real deltaVsPriorMonth with 0 (F7); interactive-area-chart
+      header always says "spent" even on Income/Net; cash-flow strip expense bar widths can exceed
+      100%. Preserve backend deltas, make the header track the active metric, scale bars to a shared max.
+    acceptance_criteria:
+      - deltaVsPriorMonth from backend preserved (no zeroing)
+      - Area-chart header reflects the active metric (spent/income/net)
+      - Bar widths clamp to 100% against a shared max
+  - id: TASK-UI-ANALYTICS-007
+    title: Consolidate money formatters + chart tooltip currency
+    status: done
+    priority: P3
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Two money formatters (lib/format-money.ts vs lib/chart-utils.ts) with different locale rules;
+      chart/trend/donut tooltips use raw toLocaleString without currency/2-dp (defect F8).
+      Consolidate to one formatter honoring the project money standard.
+    acceptance_criteria:
+      - Single shared money formatter used by dashboard and charts
+      - Tooltips show currency symbol + 2 decimals consistently
+      - Compact formatter respects currency code
+  - id: TASK-DOCS-ANALYTICS-001
+    title: Sync api-contract, system-overview, and PRD with analytics redesign
+    status: done
+    priority: P1
+    area: docs
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - docs/design/api-contract.md
+      - docs/architecture/system-overview.md
+      - docs/design/product-requirements.md
+    description: |
+      Land the analytics design into the shared contract docs so all clients align: add the
+      metric envelope and the /analytics/* endpoints to api-contract.md; document the snapshot
+      tables, dimensions, transfer_links, tax_lots, and materialized marts in system-overview.md;
+      add the analytics KPI section to product-requirements.md.
+    acceptance_criteria:
+      - api-contract.md documents the metric envelope + /analytics/* request/response shapes
+      - system-overview.md describes new tables + mart refresh on sync
+      - product-requirements.md lists the analytics KPIs and phases 3.7-3.9
+  - id: TASK-PAGINATE-001
+    title: Standard list/pagination contract in api-contract.md
+    status: done
+    priority: P1
+    area: docs
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - docs/design/api-contract.md
+    description: |
+      Document the uniform list contract (section 10.3): ListQuery params
+      (page,pageSize,sort,dir,q,from,to,facets) and the Page<T> response envelope
+      (rows,page,pageSize,total,totalPages,sort,dir,appliedFilters). Offset pagination with
+      total count for tabular reports; cursor reserved for the transactions feed. Define the
+      shared Zod ListQuery schema and Page<T> TS type location for backend + UI.
+    acceptance_criteria:
+      - api-contract.md has a "List & pagination" section with ListQuery + Page<T>
+      - Sortable-column whitelisting and 400-on-invalid-sort documented
+      - Shared types referenced by backend services and ui/src/types/api.ts
+  - id: TASK-PAGINATE-002
+    title: Merchants endpoint — paginated, sortable, filterable (reference)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PAGINATE-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/coach-store.ts
+    description: |
+      getMerchants is hardcoded to top 6 (.slice(0,6)) and the KPI ranks (top/most-visited/
+      fastest-growing) are recomputed on the client. Replace with GET /analytics/merchants
+      implementing the list contract: server-side sort (total|visits|trend|name), q filter,
+      date window, full pagination, and server-computed KPI/rank summary in the response.
+      This is the REFERENCE implementation other list endpoints follow.
+    acceptance_criteria:
+      - GET /analytics/merchants returns Page<MerchantRow> per the contract
+      - No .slice cap; all merchants reachable via pagination
+      - Sort whitelist enforced (400 on invalid); query Zod-validated
+      - Top/most-visited/fastest-growing computed server-side in a summary block
+  - id: TASK-PAGINATE-003
+    title: Reusable DataTable component (sort / filter / pagination + URL state)
+    status: done
+    priority: P1
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Build ui/src/components/ui/data-table.tsx: sortable headers, search/filter box,
+      pagination controls, loading + explicit empty states, sort/filter/page mirrored to the URL
+      (useSearchParams), fetched via TanStack Query. Performs NO aggregation — passes query
+      params and renders rows. Generic over column defs.
+    acceptance_criteria:
+      - Generic DataTable<TRow> with column defs (header,align,render,sortable)
+      - Sort/filter/page state in URL; TanStack Query keyed by params
+      - Loading and empty states; no client-side totals/ranks
+      - Money rendered via the shared formatter (2 decimals)
+  - id: TASK-PAGINATE-004
+    title: Merchants page on DataTable + backend pagination (reference)
+    status: done
+    priority: P1
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PAGINATE-002
+      - TASK-PAGINATE-003
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/merchants-panel.tsx
+    description: |
+      Convert the merchants panel to the DataTable backed by GET /analytics/merchants. Remove
+      client-side rank computation and the single-point sparkline divide-by-zero; show KPI cards
+      from the server summary block. Reference pattern for the remaining list pages.
+    acceptance_criteria:
+      - Merchants table paginates/sorts/filters via the backend (not top-6)
+      - KPI cards use server summary; no client recomputation
+      - Sparkline guards len<=1; no NaN
+  - id: TASK-PAGINATE-005
+    title: Remove remaining analytics caps; paginate list endpoints
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PAGINATE-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Apply the list contract to the other capped/list surfaces (section 10.2): money-flow
+      sources (LIMIT 10), inflation categories (.slice(0,9)), patterns categories (.limit(5)),
+      subscriptions/recurring, and holdings. Return full computed rows with pagination; the UI
+      chooses how many to display.
+    acceptance_criteria:
+      - money-flow, inflation, patterns, recurring, holdings endpoints accept ListQuery
+      - No fixed top-N truncation remains in analytics services
+      - Each row fully computed server-side
+  - id: TASK-PAGINATE-006
+    title: Apply DataTable to transactions, holdings, subscriptions, categories
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PAGINATE-003
+      - TASK-PAGINATE-005
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Roll out the DataTable pattern to the remaining tabular pages. Keep the transactions feed
+      on cursor/infinite-scroll but standardize its sort/filter controls; convert holdings,
+      subscriptions, and category breakdowns to paginated tables.
+    acceptance_criteria:
+      - Holdings, subscriptions, categories use DataTable + backend pagination/sort/filter
+      - Transactions sort/filter controls standardized
+      - No client-side recomputation of totals/ranks on these pages
+  - id: TASK-THINCLIENT-001
+    title: Move residual UI calculations to backend computed fields
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+    description: |
+      Audit and relocate client-side math (section 10.1) into backend computed fields so iOS
+      reuses them: net-worth hero sum, holdings gain/loss on account filter, income
+      variance/stability, FIRE projection math, time-machine multiple. Expose via the metric
+      layer / existing endpoints; UI renders only.
+    acceptance_criteria:
+      - Each listed value returned pre-computed by the backend
+      - UI components drop the corresponding client calculations
+      - Values identical across web and (future) iOS because the source is shared
+  - id: TASK-CALC-001
+    title: Fix C1 — day-of-week 'average' is a lifetime sum
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/compute-patterns.ts
+      - ui/src/components/preview/panels/patterns-panel.tsx
+    description: |
+      The Patterns panel labels a chart "Average spend by day of week" but
+      compute-patterns.ts (lines ~27-52) runs SUM(amount) grouped by extract(dow from date)
+      over ALL history with no division. So each weekday shows the lifetime total of every
+      occurrence of that weekday — the numbers are far too large.
+
+      Fix: return the AVERAGE spend per occurrence of that weekday over the data window:
+        value = SUM(amount) / COUNT(DISTINCT date)   -- per dow group
+      (i.e. on a typical Monday, how much is spent). Keep the same filters already present
+      (expense, not transfer, not internal-transfer category, not pending). Do NOT change the
+      UI label unless you switch the metric; data and label must agree. The weekday/weekend
+      comparison in patterns-panel.tsx (lines ~41-46) is derived from these values and will
+      become correct once the per-day numbers are averages.
+    acceptance_criteria:
+      - dayOfWeek values are average-per-weekday-occurrence, not lifetime sums
+      - Division guards against zero occurrences (no NaN/Infinity)
+      - Existing filters preserved; UI label matches the metric
+      - A unit/integration check with a small fixture confirms the average math
+  - id: TASK-CALC-002
+    title: Fix C2 — inverted wellness scores for lower-is-better dimensions
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/compute-wellness.ts
+    description: |
+      scoreFromRatio (compute-wellness.ts:17-22) for the "lower is better" branch returns
+      (target/value)*100, and the call sites pass the IDEAL as `value` and the ACTUAL as
+      `target`:
+        debtScore         = scoreFromRatio(30, utilization, false)   // line ~100
+        incomeExpenseScore= scoreFromRatio(72, expenseRatio, false)  // line ~102
+      Result: HIGHER credit utilization scores BETTER, and LOWER expense ratio scores WORSE —
+      both inverted.
+
+      Fix: for lower-is-better metrics the score must DECREASE as the actual value rises, e.g.
+      clamp((ideal / max(actual, epsilon)) * 100). Decide a clear (value=actual, target=ideal)
+      convention and apply it consistently. Add unit tests: e.g. utilization 10% → high score,
+      90% → low score; expenseRatio 50% → high score, 110% → low score.
+    acceptance_criteria:
+      - Debt-Health score decreases as credit utilization rises
+      - Income-to-Expense score decreases as expense ratio rises
+      - scoreFromRatio has explicit, documented value/target semantics
+      - Unit tests cover both directions with known inputs
+  - id: TASK-CALC-003
+    title: Fix C3/C5/C6 — remove fabricated wellness dimensions
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/compute-wellness.ts
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Three wellness dimensions are fabricated and must not be shown as fact:
+        - C3 Debt-Health uses creditLimit = balance * 2.5 (compute-wellness.ts:84). Utilization
+          is fiction. Use the real limit when available (TASK-ANALYTICS-003); when unknown,
+          OMIT the dimension and add a caveat — never estimate the limit.
+        - C5 "Inflation Beat" = savingsScore * 0.85 (line ~139). Remove from the composite (or
+          base it on personal CPI from TASK-ANALYTICS-017).
+        - C6 "Investment Growth" = arbitrary point formula in
+          investment-analytics.ts:765-829 (computeInvestmentGrowthScore). Remove from the
+          composite or replace with a real contribution/return metric.
+      Re-normalize the composite weights after removing/omitting dimensions so they still sum
+      correctly. This overlaps TASK-ANALYTICS-006 (rebuild Health) — coordinate, do not duplicate.
+    acceptance_criteria:
+      - No dimension uses a fabricated credit limit, savingsScore*0.85, or the point-formula growth score
+      - Omitted dimensions are excluded from the weighted composite (weights re-normalized)
+      - Any data-gap dimension carries a caveat instead of a fake number
+  - id: TASK-CALC-004
+    title: Fix C7 — fabricated investment 'estimated value today'
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/investment-analytics.ts
+    description: |
+      buildInvestmentHistorySummary (investment-analytics.ts:652-657) computes
+      estimatedValueToday = totalContributed * (portfolioValue / totalCost) clamped ≥1. This
+      invents a return by applying current holdings' gain ratio to lifetime contributions.
+      Fix: report real figures only — current market value and cost basis (unrealized gain),
+      and total contributed separately. Do not synthesize an "estimated value". If a true
+      time-weighted return is wanted, that needs snapshots (TASK-ANALYTICS-018) and is out of
+      scope here.
+    acceptance_criteria:
+      - No metric multiplies contributions by a current-holdings ratio
+      - Summary shows market value, cost basis, unrealized gain, and contributions as distinct fields
+      - UI labels match what is actually computed
+  - id: TASK-CALC-005
+    title: Fix C8 — unify savings-rate definition and scale
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transaction-store.ts
+      - backend/src/services/compute-wellness.ts
+      - backend/src/services/compute-wrapped.ts
+      - backend/src/services/protect-analytics.ts
+    description: |
+      Savings rate is inconsistent across services:
+        - transaction-store.ts:562 returns a FRACTION (net/income, ~0.0-1.0)
+        - compute-wellness.ts:55-56 returns a PERCENT (0-100)
+        - compute-wrapped.ts:163-164,214 returns a PERCENT
+        - protect-analytics.ts:287-290 computes income vs cash-burn (different definition)
+      The UI then multiplies inconsistently (see TASK-UI-ANALYTICS-001).
+      Fix: pick ONE definition (recommended: (income - expense) / income, expense excluding
+      transfers/internal) and ONE representation (emit a 0-1 fraction with unit "percent"); the
+      client multiplies by 100 exactly once. Make all four services use a shared helper. This is
+      the concrete first slice of the metric layer (TASK-ANALYTICS-002).
+    acceptance_criteria:
+      - All services return savings rate from one shared definition + representation
+      - Documented unit (fraction, unit=percent) in api-contract.md
+      - UI multiplies once; the same month shows the same rate everywhere
+  - id: TASK-CALC-006
+    title: Fix C9/C10 — money-flow & trends ignore the period; trends mis-ranked
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transaction-store.ts
+    description: |
+      getMoneyFlow (transaction-store.ts:660 `void from; void to;`) and getTrends
+      (line ~756 `void from; void to;`) discard the selected date range and always aggregate
+      ALL history, so the user sees lifetime data under a period filter. Additionally getTrends
+      slices the first 8 categories in ALPHABETICAL order (line ~787 `.slice(0,8)` after
+      `ORDER BY category`), not the top 8 by spend.
+      Fix: apply the from/to date filter to every query in both functions; rank trend categories
+      by total spend (desc) before slicing. (Pagination is handled separately by TASK-PAGINATE-005.)
+    acceptance_criteria:
+      - Money-flow and trends respect from/to (verified: a narrow range returns less than all-time)
+      - Trend categories are the top-N by spend, not alphabetical
+      - No remaining `void from; void to;` discards in these functions
+  - id: TASK-CALC-007
+    title: Fix C11 — category 'vs prior month' delta is hardcoded 0
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transaction-store.ts
+    description: |
+      getCategories (transaction-store.ts:647) returns deltaVsPriorMonth: 0 for every category,
+      so any "vs last month" indicator in the UI is fake.
+      Fix: compute the real delta of each category's spend versus the prior comparable period
+      (same length immediately before from/to), or remove the field and the UI element that
+      renders it. Prefer computing it.
+    acceptance_criteria:
+      - deltaVsPriorMonth reflects the actual change vs the prior period (or the field is removed end-to-end)
+      - New-this-period categories handled (prior = 0) without divide-by-zero
+      - UI no longer displays a constant 0 delta
+  - id: TASK-CALC-008
+    title: Fix C12 — money-flow transfersOut double-counts both legs
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transaction-store.ts
+    description: |
+      getMoneyFlow transfersOut (transaction-store.ts:725-728) sums ABS(amount) over ALL
+      is_transfer rows, counting both the outgoing and incoming leg of each internal transfer,
+      roughly doubling the figure.
+      Fix: count a single direction (outflow only) or net the paired legs. Until transfer_links
+      exist (TASK-ANALYTICS-009), restrict to the outflow side (e.g. negative/expense leg) so
+      the number reflects money that actually left.
+    acceptance_criteria:
+      - transfersOut counts each transfer once (one leg)
+      - A simple two-leg transfer fixture yields the single transfer amount, not 2x
+  - id: TASK-CALC-009
+    title: Fix C13 — Wrapped 'no-spend days' counts future days
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/compute-wrapped.ts
+    description: |
+      computeWrappedFromTransactions (compute-wrapped.ts:180-195) iterates Jan 1 → Dec 31 of the
+      year and counts days with no expense. For the current (in-progress) year this counts every
+      future day as a "no-spend day", inflating the number.
+      Fix: cap the end of the range at min(today, year-end). Only count elapsed days.
+    acceptance_criteria:
+      - No-spend days never includes dates after today
+      - Past complete years are unaffected
+      - Current-year value equals elapsed days minus days with spend
+  - id: TASK-CALC-010
+    title: Fix C14 — recurring items always 'active' with stale next-charge dates
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/detect-recurring.ts
+    description: |
+      detectRecurringFromTransactions (detect-recurring.ts) sets status:"active" for every
+      detected item (line ~144) and nextChargeDate = lastDate + medInterval (line ~140), which
+      can be in the past for subscriptions that stopped.
+      Fix: mark an item inactive (or "lapsed") when the last charge is older than ~1.5x its
+      cadence; set nextChargeDate to null when the predicted date is already in the past.
+      Note (P3): annual cadence is not detected (only 25-35d and 6-8d windows) — track as a
+      follow-up if desired.
+    acceptance_criteria:
+      - Items with a stale last charge are not labeled active
+      - nextChargeDate is null when it would fall in the past
+      - Active monthly/weekly items still compute a correct future date
+  - id: TASK-CALC-011
+    title: Fix C15 — category/subcategory name drift across services
+    status: done
+    priority: P3
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/lifestyle-habits.ts
+      - backend/src/services/detect-recurring.ts
+      - backend/src/config/categories.ts
+    description: |
+      Hardcoded category/subcategory strings drift between services, so matchers silently never
+      fire. Examples: lifestyle-habits.ts uses "Subscriptions & Digital" while detect-recurring.ts
+      uses "Subscriptions & Software"; lifestyle habit subCategories (e.g. "Cafes & Coffee",
+      "Coffee Shops") may not exist in config/categories.ts.
+      Fix: import category/subcategory names from the single source (config/categories.ts) instead
+      of inlining literals, and add a test that asserts every referenced name exists in the
+      taxonomy. Reconcile the mismatched names to the canonical taxonomy.
+    acceptance_criteria:
+      - No analytics service hardcodes a category/subcategory string that isn't in config/categories.ts
+      - A test fails if a referenced category/subcategory name is not in the taxonomy
+      - Subscription habit/recurring matchers fire against real data
+  - id: TASK-CALC-012
+    title: Fix C16 — net worth ignores loan/mortgage liabilities
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/investment-analytics.ts
+      - backend/src/db/schema.ts
+    description: |
+      computeLiveNetWorth (investment-analytics.ts:686-690) treats only `credit` accounts as
+      liabilities; `loan`/mortgage account types fall into the else branch and are ADDED as
+      assets, overstating net worth.
+      Fix: classify all liability account types (credit, loan, mortgage, and any others in the
+      schema enum) as liabilities. Confirm the account `type` values in schema.ts before coding.
+    acceptance_criteria:
+      - Loan/mortgage balances reduce net worth, not increase it
+      - Account-type classification matches the schema enum (no type silently treated as an asset)
+      - A fixture with a mortgage yields assets − all liabilities
+  - id: TASK-CALC-013
+    title: Fix C4 — wellness history reuses current balances for past months
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-ANALYTICS-004
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/compute-wellness.ts
+    description: |
+      The wellness history loop (compute-wellness.ts:197-216) calls accountMetrics() (current
+      balances) for every past month, so emergency-fund, utilization and investment dimensions
+      are identical across all history points — only income/expense vary. The trend line is
+      misleading. Real per-month balances require the snapshot pipeline (TASK-ANALYTICS-004).
+      Until snapshots exist, chart only the truly historical (cash-flow) dimensions or clearly
+      mark the others as point-in-time.
+    acceptance_criteria:
+      - Balance-derived dimensions use historical snapshots once available
+      - Before snapshots, the history view does not imply month-varying balance metrics
+      - No past month silently uses today's balances without a caveat
+  - id: TASK-UI-CALC-001
+    title: Fix U1 — Income-by-month chart has no axes, values, or tooltip
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/merchants-panel.tsx
+    description: |
+      The "Income by month (primary + side)" stacked bar chart (merchants-panel.tsx income tab)
+      renders bars with no y-axis, no value labels, and no tooltip, so the user cannot read any
+      dollar amount — it "doesn't make sense". Also "Income stability = 100 − CV%" can go
+      negative or exceed 100.
+      Fix: add a readable y-axis (or per-bar value labels) and a hover tooltip showing the exact
+      primary/side/total for each month; clarify the x-axis (month) and legend; clamp/relabel the
+      stability metric to a sane 0-100 range. Apply this bar-with-labels pattern as the standard
+      for other unlabeled charts.
+    acceptance_criteria:
+      - Each bar's primary/side/total dollar values are readable (axis, labels, or tooltip)
+      - X-axis (month) and legend are unambiguous
+      - Income stability stays within 0-100 and is explained
+      - No values-less bar charts remain on this panel
+  - id: TASK-PLAN-001
+    title: Budget & savings-goal CRUD endpoints + schema (source/kind/status)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.7
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/routes/planning.ts
+      - backend/src/services/planning-store.ts
+      - backend/src/db/schema.ts
+    description: |
+      /planning/* is read-only today, so the UI cannot create/edit/delete budgets or goals
+      (section 12.1). Add write endpoints and the schema columns the intelligence needs.
+
+      Schema migration (new drizzle migration file):
+        - budgets: add `source text not null default 'user'` (user|suggested),
+          `class text` (essential|discretionary, nullable).
+        - savings_goals: add `kind text not null default 'custom'`
+          (emergency|debt|sinking|surplus|custom), `status text not null default 'active'`
+          (active|achieved|dismissed), `source text not null default 'user'`.
+
+      Endpoints (Zod-validated, scoped to user/household, typed errors):
+        - POST   /planning/budgets        { category, periodMonth, limit, emoji?, color? }
+                  (upsert on the existing user+category+period unique index)
+        - PATCH  /planning/budgets/:id    { limit?, emoji?, color? }
+        - DELETE /planning/budgets/:id
+        - POST   /planning/goals          { name, target, current?, deadline?, emoji?, color?, kind? }
+        - PATCH  /planning/goals/:id      { name?, target?, current?, deadline?, emoji?, color?, status? }
+        - DELETE /planning/goals/:id
+      Ownership must be enforced (a user can only mutate their own/household rows).
+    acceptance_criteria:
+      - Migration adds the new columns with safe defaults; existing rows unaffected
+      - All six endpoints exist, validate input, and enforce ownership (404/403 on others' rows)
+      - Budget POST upserts on the unique (user,category,period) index
+      - Documented in api-contract.md
+  - id: TASK-PLAN-002
+    title: Smarter, additive budget suggestions (more categories, robust baseline)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PLAN-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/planning-store.ts
+    description: |
+      Replace the all-or-nothing top-10 suggestion logic in getBudgets (section 12.2):
+        - Suggest a limit for EVERY category the user spends in (appears in >=2 of the last 6
+          months OR exceeds a small monthly threshold), not just the top 10.
+        - Use the MEDIAN (or trimmed mean) of the last 6 months instead of the 3-month mean,
+          rounded to a sensible increment, with a buffer (e.g. +10%).
+        - MERGE with user budgets: when some budgets are configured, still return suggestions for
+          the UN-budgeted categories. Return them in a separate `suggestedBudgets[]` array; keep
+          persisted ones in `budgets[]`. Tag each with source ("user"|"suggested"), a short
+          `rationale`, and `confidence` from month coverage.
+        - Tag each budget `class` essential|discretionary from dim_category when available
+          (TASK-ANALYTICS-005); omit gracefully until then.
+      Keep all existing filters (expense, not transfer, not internal-transfer, not pending).
+    acceptance_criteria:
+      - getBudgets returns suggestions for all qualifying categories, merged with user budgets
+      - Suggested limits use a robust 6-month baseline (median/trimmed), not a 3-month mean
+      - Each suggestion carries source, rationale, and confidence
+      - Suggestions persist only when the user accepts (via TASK-PLAN-001 POST)
+  - id: TASK-PLAN-003
+    title: Auto-generate suggested savings goals from data
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PLAN-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/planning-store.ts
+      - backend/src/services/protect-analytics.ts
+    description: |
+      Generate SUGGESTED savings goals from the user's data (section 12.3) returned as
+      `suggestedGoals[]` (source:"suggested", not persisted until accepted via TASK-PLAN-001):
+        - Emergency fund: target = 3-6x monthly essential burn (resilience profile monthlyBurn);
+          current = liquid depository cash.
+        - Debt payoff: one per credit card / loan with balance > 0; target = balance
+          (current = 0 with caveat until balance snapshots, TASK-ANALYTICS-004).
+        - Sinking funds: for annual/irregular bills in recurring_series; target = bill amount,
+          suggested monthly set-aside = amount / months-until-due.
+        - Surplus saver: if monthly surplus (income - expense - invest) > 0, suggest a
+          round-number monthly goal sized to the surplus.
+      Each suggestion includes a human "why" string. Do not duplicate a suggestion the user has
+      already accepted/created (dedupe by kind + name/account).
+    acceptance_criteria:
+      - suggestedGoals[] generated from real account/transaction/recurring data with rationale text
+      - Suggestions are not persisted until accepted; dismissed suggestions don't reappear
+      - No suggestion duplicates an existing user goal
+      - All amounts computed server-side (no client math)
+  - id: TASK-UI-PLAN-001
+    title: "Wire budgets panel: CRUD + accept suggestions + add-category"
+    status: done
+    priority: P1
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PLAN-001
+      - TASK-PLAN-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/budgets-panel.tsx
+    description: |
+      The "+ Add category budget" button (budgets-panel.tsx) is a no-op. Wire the budgets tab to
+      the new endpoints: add/edit/delete a category budget (modal or inline), and render
+      `suggestedBudgets[]` as dismissible suggestion cards with an "Add" action that persists via
+      POST. Show source/rationale; group by essential vs discretionary when `class` is present.
+      Use TanStack Query mutations with cache invalidation; no client-side recomputation of limits.
+    acceptance_criteria:
+      - User can add, edit, and delete a category budget; changes persist and refetch
+      - Suggested categories are shown and can be accepted (persisted) or dismissed
+      - No client-side computation of suggested limits (values come from the API)
+  - id: TASK-UI-PLAN-002
+    title: "Wire savings goals: CRUD + suggested-goals accept/edit/delete"
+    status: done
+    priority: P1
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-PLAN-001
+      - TASK-PLAN-003
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/budgets-panel.tsx
+    description: |
+      The "+ Add savings goal" button is a no-op and goals are display-only. Wire the goals tab:
+      add/edit/delete a goal, and render `suggestedGoals[]` (emergency fund, debt payoff, sinking
+      funds, surplus saver) as cards with the "why" text and Accept / Edit / Dismiss actions.
+      Accept persists via POST; dismiss hides without persisting. Use TanStack Query mutations.
+    acceptance_criteria:
+      - User can add, edit, and delete a savings goal; changes persist and refetch
+      - Suggested goals render with rationale and can be accepted, edited, or dismissed
+      - Accepted goals become normal editable goals; dismissed ones do not reappear
+  - id: TASK-AUDIT-001
+    title: Data-driven lifestyle cost-audit engine (10-20+ audits)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/lifestyle-habits.ts
+      - backend/src/services/planning-store.ts
+    description: |
+      The lifestyle cost audit (recurring.leaks.habits) is built from 4 hardcoded HABIT_DEFS in
+      lifestyle-habits.ts, gated by minMonthly, with several never matching due to C15 category
+      drift — so the user sees ~1 (Rideshare). Replace it with an engine that derives many audits
+      from real data (section 13.2), each with the uniform audit shape
+      (id, type, emoji, title, monthly, annual, opportunityCost10y?, rationale, action,
+      savingsEstimate, confidence). Generators: habit/frequency (from actual top discretionary
+      merchants/subcategories, not a fixed list), delivery premium, duplicate/overlapping
+      subscriptions, price-hike, impulse/frequent-small-purchases, category overspend vs the
+      user's own baseline. Sort by savingsEstimate desc; the UI paginates (section 10). Move the
+      future-value (opportunity cost) math out of leaks-panel.tsx into this engine so iOS matches.
+      Fix C15 (TASK-CALC-011) or self-contain category lookups so matchers actually fire.
+    acceptance_criteria:
+      - Engine emits many audits (target 10-20 for a typical dataset), not a fixed 4
+      - Audits are derived from the user's actual merchants/subcategories, not hardcoded names
+      - Each audit has rationale, action, savingsEstimate, and confidence
+      - Opportunity-cost (FV) computed server-side; leaks-panel stops computing it
+      - Audits sorted by impact; no matcher silently fails on a missing category name
+  - id: TASK-AUDIT-002
+    title: "Subscription lifecycle: detect lapsed/cancelled subscriptions"
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/detect-recurring.ts
+      - backend/src/services/planning-store.ts
+    description: |
+      Recurring items are always status:"active" with possibly-past nextChargeDate (defect C14,
+      TASK-CALC-010). Add a lifecycle (section 13.3): active (charged within ~1.0x cadence),
+      lapsed/possibly-cancelled (no charge for > ~1.5x cadence), price-changed (flagged).
+      When lapsed: surface a positive audit ("No charge from <X> in N months — looks cancelled,
+      saving ~$Y/yr; confirm?"), set nextChargeDate null, and exclude it from active
+      monthly/annual subscription totals. This gives the "did you cancel this?" check the user
+      expects when transactions stop. Coordinate with TASK-CALC-010 (same root cause) and
+      TASK-AUDIT-001 (lapsed_subscription audit type).
+    acceptance_criteria:
+      - Subscriptions silent beyond ~1.5x cadence are marked lapsed/possibly-cancelled, not active
+      - Active monthly/annual totals exclude lapsed items
+      - A lapsed subscription produces a "looks cancelled, confirm?" audit with estimated savings
+      - nextChargeDate is null when it would be in the past
+  - id: TASK-AUDIT-003
+    title: Expand hidden-fee detection beyond ATM-only
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/planning-store.ts
+      - ui/src/components/preview/panels/leaks-panel.tsx
+    description: |
+      getRecurring returns only a single ATM/overdraft fee row (leaks.fees) even though the UI
+      already renders advice for overdraft, maintenance, late, and FX fees. Detect each fee type
+      from transactions (by subcategory/merchant patterns), with 12-month count + total and the
+      `fixable` flag. Keep the existing fee item shape so the UI lights up the matching advice.
+    acceptance_criteria:
+      - leaks.fees includes ATM, overdraft, maintenance, late, and FX fee types when present
+      - Each fee has a 12-month count + total and a correct fixable flag
+      - The hidden-fees hero total reflects all detected fee types
+  - id: TASK-UI-AUDIT-001
+    title: Render full audit list + lapsed-subscription cards
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-AUDIT-001
+      - TASK-AUDIT-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/leaks-panel.tsx
+    description: |
+      Update leaks-panel.tsx to render the richer audit list from TASK-AUDIT-001: show title,
+      rationale, action, monthly/annual, server-provided opportunity cost, and confidence;
+      group/sort by impact and paginate when long. Surface lapsed/possibly-cancelled
+      subscriptions (TASK-AUDIT-002) as their own "looks cancelled — confirm?" cards. Remove the
+      client-side future-value math (use API values).
+    acceptance_criteria:
+      - The audit tab shows the full ranked list (not capped at the old 4), with rationale + action
+      - Lapsed subscriptions appear as confirm-cancellation cards
+      - No client-side FV/opportunity-cost computation remains in the panel
+  - id: TASK-RECON-001
+    title: Reconcile paired transfer legs so KPIs stop double-counting (R1)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transfer-pairing.ts
+      - backend/src/services/transfer-classification.ts
+      - backend/src/services/plaid/sync.ts
+      - backend/src/services/teller/sync.ts
+      - backend/src/services/snaptrade/sync.ts
+    description: |
+      Defect R1 (analytics-architecture.md section 14.2). transfer_links is computed by
+      refreshTransferLinks after every sync, but the spend/income KPIs exclude transfers ONLY via
+      the per-transaction is_transfer flag — transfer_links is consumed only for brokerage
+      contributions. So a transfer whose two legs are paired with high confidence but where one leg
+      is still typed income/expense (the credit-card payment CREDIT leg, and bank<->bank transfers
+      from non-Plaid sources) still double-counts spend or inflates income.
+      Fix: after refreshTransferLinks builds the links, run an idempotent reconcile pass that, for
+      every link above a confidence threshold (e.g. >= 0.6), sets BOTH referenced legs
+      (outflowTxnId and inflowTxnId) to is_transfer=true and transactionType="transfer". Use a
+      category of "Transfers (internal)" with subCategory "Credit Card Payments" for cc_payment
+      links and a sensible bank-transfer subcategory for bank_bank. Do NOT touch the brokerage
+      (investment_transactions) leg. Make it run inside/after refreshTransferLinks so all three sync
+      paths get it, and ensure re-running does not flip-flop values. Because every existing
+      analytics query already filters is_transfer=false, this single change removes double-counting
+      across spend, categories, money-flow, wellness, and audits at once — and gives iOS reconciled
+      data with no client logic.
+    acceptance_criteria:
+      - High-confidence transfer_links cause both transaction legs to be marked is_transfer=true and type transfer
+      - Credit-card payment credit legs and bank<->bank self-transfers no longer appear in spend or income totals
+      - The pass is idempotent (running twice changes nothing) and only runs server-side
+      - The brokerage leg of bank_brokerage links is left unchanged
+      - typecheck passes
+  - id: TASK-RECON-002
+    title: Wire data-quality transfer-pair coverage to the real implementation (R2)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECON-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/data-quality.ts
+      - backend/src/services/transfer-pairing.ts
+    description: |
+      Defect R2 (analytics-architecture.md section 14.2). data-quality.ts hardcodes
+      transferPairRatio = 0 with the caveat "Transfer pairing not yet implemented; coverage reported
+      as 0" (lines ~159-163, 242-250), even though transferPairCoverage(userIds) is implemented in
+      transfer-pairing.ts and pairing runs on every sync. This stale stub wrongly drags down
+      compositeConfidence.
+      Fix: call transferPairCoverage(ctx.userIds), use the returned ratio as the transferPairs
+      signal and the transferPairCoverage envelope value/confidence, and remove the
+      "not yet implemented" caveat (replace with a real caveat only when coverage is low or there
+      are no transfer outflows). Confirm compositeConfidence reflects the real value.
+    acceptance_criteria:
+      - data-quality reports the real transfer-pair coverage ratio, not a hardcoded 0
+      - The "not yet implemented" caveat is removed
+      - compositeConfidence incorporates the real transferPairs signal
+      - typecheck passes
+  - id: TASK-RECON-003
+    title: Self-transfer fallback + unpaired-transfer data-quality signal (R3)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECON-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transfer-classification.ts
+      - backend/src/services/data-quality.ts
+    description: |
+      Defect R3 (analytics-architecture.md section 14.2). Bank<->bank savings/checking transfers
+      from Teller / SnapTrade / CSV / manual sources are only treated as internal when the upstream
+      category is already "Transfers (internal)"; otherwise resolveInternalTransfer catches only
+      credit-card payments, so self-transfers from those sources count as income + expense.
+      TASK-RECON-001 already reclassifies any pair that the pairer matches. This task handles the
+      remainder: (a) add a self-transfer heuristic for legs that look like transfers (opposite-sign,
+      matching amount/date, same owner) but were not matched, and (b) surface the count/$ of still
+      -unpaired transfer-looking outflows as a data-quality caveat rather than silently counting
+      them as spend/income. Keep it conservative to avoid hiding real spend.
+    acceptance_criteria:
+      - Unmatched same-owner opposite-sign amount/date matches are treated as internal transfers
+      - Remaining unpaired transfer-looking outflows are reported as a data-quality caveat
+      - No legitimate external spend is reclassified as a transfer (conservative thresholds)
+      - typecheck passes
+  - id: TASK-RECON-004
+    title: Detect cross-provider duplicate accounts and transactions (R4)
+    status: done
+    priority: P3
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/plaid/upsert-transactions.ts
+      - backend/src/services/import/persist-banking.ts
+      - backend/src/services/import/fingerprint.ts
+      - backend/src/services/data-quality.ts
+    description: |
+      Defect R4 (analytics-architecture.md section 14.2). The dedup fingerprint is scoped to a
+      single accountId, so when the SAME real account is linked via two providers (two Plaid items,
+      or Plaid + Teller) the rows land under different accountIds and the same transaction appears
+      twice -> duplicated spend/income. Detect likely-duplicate accounts (institution + mask + type)
+      and duplicate transactions across them (institution, mask, amount, date, name), surface them
+      in data-quality, and provide a way to merge/ignore one side. Do not auto-delete; flag and let
+      the user resolve.
+    acceptance_criteria:
+      - Likely-duplicate accounts across providers are detected and surfaced in data-quality
+      - Cross-account duplicate transactions are flagged (not silently dropped)
+      - A documented path exists to merge/ignore duplicates
+      - typecheck passes
+  - id: TASK-INTEGRITY-001
+    title: Guarantee prod builds never enable UI mocks (M1)
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/lib/api-client.ts
+    description: |
+      M1 (analytics-architecture.md section 15.1). UI mock gating is correct (single
+      USE_MOCKS = NEXT_PUBLIC_USE_MOCKS === "true"; only api-client imports mock-api; everything else
+      goes through fetchJson). BUT NEXT_PUBLIC_* is inlined at BUILD time, so a prod image must be
+      built with the flag false/unset — flipping it at runtime does nothing. Add a build-time/CI
+      guard that fails the production build if NEXT_PUBLIC_USE_MOCKS is "true", and verify (e.g. via
+      a bundle check or by ensuring the import is tree-shaken) that mock fixtures are not shipped in
+      production bundles. Document the deployment requirement in the UI README/STRUCTURE.
+    acceptance_criteria:
+      - Production build fails (or warns loudly in CI) if mocks are enabled
+      - Deployment docs state NEXT_PUBLIC_USE_MOCKS must be set at build time
+      - Confirm mock-api is not executed in a non-mock production bundle
+  - id: TASK-INTEGRITY-002
+    title: Make planning projections reproducible (seeded RNG) (M2)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/planning-engine.ts
+    description: |
+      M2 (analytics-architecture.md section 15.2). planning-engine.ts:124 uses Math.random() for a
+      Monte-Carlo shock, so projection numbers change between requests and read as "inaccurate" to
+      the user. Replace with a seeded/deterministic RNG (seed derived from userId + period) or a
+      closed-form percentile, so repeated loads agree, and ensure the UI labels these as
+      projections/estimates. Keep the distribution behavior; only remove non-determinism.
+    acceptance_criteria:
+      - Two identical projection requests return identical numbers
+      - The RNG is seeded deterministically (no bare Math.random in projection math)
+      - Projection outputs remain labeled as estimates in the metric envelope/UI
+  - id: TASK-INTEGRITY-003
+    title: Multi-user tenant-isolation test for all read endpoints (M3)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/household-access.ts
+      - backend/src/services/active-account-scope.ts
+    description: |
+      M3 (analytics-architecture.md section 15.3). Read-path scoping is currently correct (every
+      analytics service resolves household context and filters by active-account scope; ingestion
+      and backfills are writes, not response leaks). Lock this in with an automated isolation test:
+      seed two households (A and B) with distinct accounts/transactions, authenticate as user A, hit
+      every read endpoint (summary, categories, money-flow, trends, merchants, investments, net
+      worth, wellness, patterns, recurring, audits, data-quality, etc.), and assert that no row,
+      total, or aggregate derived from B appears in A's response. Add a lint/check or PR checklist
+      item so new transaction-querying services must go through resolveHouseholdContext +
+      drizzleActiveTransactionWhere.
+    acceptance_criteria:
+      - A test seeds two households and asserts every read endpoint returns only the caller's data
+      - The test fails if a service queries transactions without household/account scoping
+      - The test runs in CI
+  - id: TASK-FIRE-001
+    title: FIRE projection should start from investable assets, not total net worth (F1)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/computed-fields.ts
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Defect F1 (analytics-architecture.md section 16). computeFireProjection seeds the starting
+      portfolio with currentNetWorth = computeLiveNetWorth (checking + savings + cash + investments
+      - debts) and grows the whole thing at the real return toward the 25x target. The 4% safe-
+      withdrawal target assumes a liquid INVESTED portfolio, so including cash buffers and non-
+      retirement assets makes years-to-FIRE far too short (e.g. "1.9 years" for a 42-year-old).
+      Fix: compute an "investable assets" figure — investment/brokerage/retirement account balances
+      (reuse investmentLiquidityTotals / holdings) plus at most liquid cash ABOVE the emergency-fund
+      target — and pass THAT as the projection start. Keep total net worth as a separate displayed
+      number (do not change net-worth KPIs). Add a caveat describing what counts as investable.
+    acceptance_criteria:
+      - Years-to-FIRE is computed from investable assets, not total net worth
+      - Cash up to the emergency-fund target is excluded from the FIRE start balance
+      - Total net worth remains available as its own field for display
+      - typecheck passes
+  - id: TASK-FIRE-002
+    title: Do not compute FIRE age off the default age; require user age (F2)
+    status: done
+    priority: P1
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/fire-panel.tsx
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Defect F2 (analytics-architecture.md section 16). When the user has not set their age the
+      projection uses DEFAULT_FIRE_AGE = 35, so fireAge is wrong for anyone older (user is 42). The
+      API already returns isDefaultAge. Update fire-panel.tsx so that when isDefaultAge is true it
+      prompts the user to set their age and does NOT present a concrete FIRE age (show years-to-FIRE
+      or a "set your age" prompt instead). Once the user sets their age, show the FIRE age.
+    acceptance_criteria:
+      - When isDefaultAge is true the UI prompts for age and hides/labels the FIRE age as unset
+      - After the user sets their age the FIRE age is shown using the real age
+      - No FIRE age is presented as fact while based on the default 35
+  - id: TASK-FIRE-003
+    title: Longer/annualized spend & contribution basis for FIRE inputs (F3)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Defect F3 (analytics-architecture.md section 16). averageMonthlyCashSpending and
+      averageMonthlyInvestment use a trailing 3-month window, which is volatile and misses lumpy
+      annual costs (insurance, tuition, holidays), usually understating annual spend and thus the
+      FIRE number. Use a 12-month trailing window (fall back gracefully with less history) and/or
+      annualize known-annual categories, and surface the basis + a confidence/caveat in the FIRE
+      response so the user understands the inputs.
+    acceptance_criteria:
+      - FIRE spend/contribution inputs use ~12 months of history (graceful fallback when less)
+      - The FIRE response documents the basis and a confidence/caveat
+      - typecheck passes
+  - id: TASK-FIRE-004
+    title: Surface FIRE assumptions; default to a conservative real return (F4)
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/fire-panel.tsx
+      - backend/src/services/computed-fields.ts
+    description: |
+      Defect F4 (analytics-architecture.md section 16). The 6% real-return default is optimistic and
+      the assumptions (real/inflation-adjusted return, 4% SWR, figures in today's dollars) are not
+      shown, so the user cannot tell inflation is already netted out. Show the assumptions in the
+      FIRE panel, let the user adjust withdrawal rate and real return (overrides already exist on the
+      API), and consider a more conservative default real return (~4-5%). Add a one-line explanation
+      that the FIRE number is in today's dollars and inflation is handled via the real return.
+    acceptance_criteria:
+      - FIRE panel shows the real return, withdrawal rate, and "today's dollars" assumption
+      - User can adjust real return / withdrawal rate and see the projection update
+      - Default real return reviewed (more conservative) with rationale in the doc
+  - id: TASK-PROFILE-001
+    title: Use targetRetirementAge in the FIRE projection (P1)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/computed-fields.ts
+      - backend/src/services/investment-analytics.ts
+      - backend/src/services/planning-store.ts
+    description: |
+      Defect P1 (analytics-architecture.md section 17). targetRetirementAge is stored on
+      fire_profiles but referenced by no analytics. Wire it into the FIRE projection: compare the
+      projected FIRE age against the user's target, return an on-track/behind status and the gap in
+      years, and compute the additional monthly savings required to reach the FIRE number by the
+      target age. Pass targetRetirementAge through computeFireProfileInputs into the projection and
+      include the new fields in the FIRE response.
+    acceptance_criteria:
+      - FIRE response includes target retirement age, on-track/behind status, and year gap
+      - Required monthly savings to hit the target age is computed and returned
+      - When no target is set, behavior is unchanged
+      - typecheck passes
+  - id: TASK-PROFILE-002
+    title: Map riskTolerance to default real-return bands (P2)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/user-profile-store.ts
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Defect P2 (analytics-architecture.md section 17). riskTolerance is stored but unused. Use it to
+      derive the default real return when the user has not explicitly overridden it (e.g.
+      conservative ~3-4%, moderate ~4.5-5%, aggressive ~6%). Keep the user override authoritative.
+      Coordinate with TASK-FIRE-004 (assumptions surfaced in the UI).
+    acceptance_criteria:
+      - Default real return is derived from riskTolerance when not user-overridden
+      - User-set real return still wins over the risk-based default
+      - The derived assumption is documented/caveated in the response
+      - typecheck passes
+  - id: TASK-PROFILE-003
+    title: Use householdSize (dependents) in emergency-fund & spend expectations (P3)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/analytics-resilience.ts
+      - backend/src/services/user-profile-store.ts
+    description: |
+      Defect P3 (analytics-architecture.md section 17). householdSize is stored but unused. Use it to
+      inform the emergency-fund target (more dependents -> lean toward the higher end of 3-6 months)
+      and as a sanity context for FIRE/resilience spend expectations; surface it in the relevant
+      responses. Keep changes conservative and clearly labeled; do not fabricate per-dependent costs.
+    acceptance_criteria:
+      - Emergency-fund target reflects household size within the documented band
+      - Household size is surfaced where it affects a calculation
+      - No fabricated per-dependent dollar amounts; assumptions are caveated
+      - typecheck passes
+  - id: TASK-PROFILE-004
+    title: Use annualGrossIncome as fallback/cross-check for income metrics (P4)
+    status: done
+    assignee: cursor-agent
+    priority: P3
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/user-profile-store.ts
+      - backend/src/services/compute-wellness.ts
+    description: |
+      Defect P4 (analytics-architecture.md section 17). annualGrossIncome is stored but unused. Use it
+      as a fallback or cross-check for income-derived metrics (savings-rate denominator, DTI) when
+      transaction-detected income is incomplete, and flag large discrepancies between stated income
+      and detected income as a data-quality signal. Detected income remains primary when reliable.
+    acceptance_criteria:
+      - Income-derived metrics fall back to stated gross income when detected income is missing/low
+      - A discrepancy between stated and detected income is surfaced as a caveat/signal
+      - typecheck passes
+  - id: TASK-PROFILE-005
+    title: Regression test + audit that profile fields are consumed (P5)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/user-profile-store.ts
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Defect P5 (analytics-architecture.md section 17). Lock the one wired path and prevent future
+      orphan fields. Add a test that saving currentAge via updateUserProfile makes getFire /
+      getUserProfile return isDefaultAge=false and the saved age, and that withdrawalRate/realReturn
+      round-trip into the projection. Add an audit checklist item: every profile field must have at
+      least one consumer or be removed from the form. Once P1-P4 land, remove any field that still
+      has no consumer.
+    acceptance_criteria:
+      - Test proves saved age flows into the FIRE projection (isDefaultAge=false, age used)
+      - Test proves withdrawalRate/realReturn round-trip into the projection
+      - Doc/checklist requires every profile field to have a consumer
+  - id: TASK-WELLNESS-UI-001
+    title: Wellness score-history chart needs axis, values, and 0-100 scaling (W1)
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/wellness-panel.tsx
+    description: |
+      Defect W1 (analytics-architecture.md section 18.1). The Score history chart
+      (wellness-panel.tsx:118-134) shows bars with month labels but no y-axis, no per-bar value, no
+      tooltip, and bars are normalized to Math.max(...history) instead of the 0-100 score domain
+      (so 60 vs 65 look wildly different and the chart is misleading). Add a 0-100 y-axis/reference
+      (band lines at 55/70/85 to match score bands), show each bar's score (label above the bar
+      and/or an accessible tooltip), and scale bar height to the 0-100 domain. Follow the same
+      self-explanatory-chart pattern as TASK-UI-CALC-001 (income chart); reuse its axis/tooltip
+      approach.
+    acceptance_criteria:
+      - The history chart shows a 0-100 y-axis/reference with score bands
+      - Each bar shows its score value (label and/or tooltip)
+      - Bar heights are scaled to 0-100, not the window max
+  - id: TASK-RECOMPUTE-001
+    title: recomputeAllAnalytics orchestrator + POST /analytics/recompute (RC1)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/post-sync-analytics.ts
+      - backend/src/services/refresh-marts.ts
+      - backend/src/services/transfer-pairing.ts
+      - backend/src/services/protect-analytics.ts
+      - backend/src/routes/analytics.ts
+    description: |
+      RC1 (analytics-architecture.md section 18.2). There is no way to force a full recompute;
+      runPostSyncAnalytics only refreshes marts + protect profiles + alerts. Add an idempotent
+      recomputeAllAnalytics(userId) orchestrator that re-runs every persisted refresher: marts
+      (force), protect profiles, alerts, refreshTransferLinks + reconcileLinkedTransferLegs,
+      refreshFireProfile, balance snapshots, and the wellness/DNA/streak/challenge generators once
+      they exist (TASK-BEHAVIORAL-001/002). Expose POST /analytics/recompute (authenticated, scoped
+      to the caller) that runs it and returns a summary of refreshed steps. Re-running must not
+      change any persisted row.
+    acceptance_criteria:
+      - recomputeAllAnalytics re-runs all persisted refreshers for the caller, idempotently
+      - POST /analytics/recompute triggers it and returns a per-step summary
+      - Running it twice produces no change in persisted rows
+      - typecheck passes
+  - id: TASK-RECOMPUTE-UI-001
+    title: Recalculate-all button that triggers recompute + invalidates caches (RC2)
+    status: done
+    priority: P1
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECOMPUTE-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/lib/invalidate-financial-queries.ts
+      - ui/src/lib/api-client.ts
+    description: |
+      RC2 (analytics-architecture.md section 18.2). Add a recalculate button/icon (dashboard header
+      and/or insights panels) that calls POST /analytics/recompute, shows progress/disabled state
+      while running, then invalidates all financial queries (reuse invalidate-financial-queries.ts)
+      so live-computed metrics refetch. Surface success/error toast. Gate to live mode (not mocks).
+    acceptance_criteria:
+      - A visible recalculate control triggers the recompute endpoint
+      - While running it shows progress and prevents duplicate triggers
+      - On success all financial queries are invalidated and metrics refresh
+  - id: TASK-RECOMPUTE-002
+    title: Idempotency/determinism test for recompute (RC3)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECOMPUTE-001
+      - TASK-INTEGRITY-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/planning-engine.ts
+    description: |
+      RC3 (analytics-architecture.md section 18.2). Add a test that runs recomputeAllAnalytics twice
+      on a seeded dataset and asserts identical persisted rows AND identical metric outputs, proving
+      "refresh = same number". Depends on TASK-INTEGRITY-002 (seeded RNG) so Monte-Carlo projections
+      do not drift between runs. Document any intentionally time-dependent metric (e.g. days-since)
+      and freeze the clock in the test.
+    acceptance_criteria:
+      - Test runs recompute twice and asserts persisted rows are byte-identical
+      - Metric endpoint outputs are identical across the two runs (clock frozen)
+      - Test runs in CI
+  - id: TASK-RECOMPUTE-003
+    title: Wire sync to full recompute after reconcile; fix ordering (RC4)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECOMPUTE-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/plaid/sync.ts
+      - backend/src/services/snaptrade/sync.ts
+      - backend/src/services/teller/sync.ts
+      - backend/src/services/post-sync-analytics.ts
+    description: |
+      RC4 (analytics-architecture.md section 18.2.1). Today every sync runs runPostSyncAnalytics
+      (marts + protect + alerts) BEFORE refreshTransferLinks/reconcileLinkedTransferLegs, so the
+      analytics are computed from pre-reconciliation data and only catch up on the next sync. Also,
+      runPostSyncAnalytics is only a subset of all metrics, and the FIRE profile is refreshed on
+      SnapTrade sync only. Fix the order so transfer pairing + reconcile run FIRST, then call
+      recomputeAllAnalytics (TASK-RECOMPUTE-001) as the single post-sync step in all three sync
+      paths (plaid, snaptrade, teller). Ensure recomputeAllAnalytics includes refreshTransferLinks +
+      reconcile internally (or call reconcile then recompute) and refreshFireProfile for all
+      providers. Keep it idempotent.
+    acceptance_criteria:
+      - All three sync paths reconcile transfers before refreshing analytics
+      - Sync calls recomputeAllAnalytics (not the partial runPostSyncAnalytics) as the post-sync step
+      - FIRE profile is refreshed after every provider sync, not just SnapTrade
+      - A sync followed immediately by a read shows fully reconciled, recomputed metrics
+      - typecheck passes
+  - id: TASK-BEHAVIORAL-001
+    title: Habit-streak engine — populate habit_streaks from transactions (B1)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/insights-store.ts
+      - backend/src/db/schema.ts
+    description: |
+      Defect B1 (analytics-architecture.md section 18.3). habit_streaks is read by getBehavioral but
+      NOTHING writes to it, so streaks are always empty. Build a streak engine that derives streaks
+      from transactions and upserts habit_streaks: e.g. current/best no-spend-day streak,
+      consecutive under-budget months, days-since-last [discretionary category], consecutive months
+      with positive savings. Compute deterministically and run inside recomputeAllAnalytics (RC1)
+      and post-sync. Keep label/currentDays/maxDays shape the reader expects.
+    acceptance_criteria:
+      - habit_streaks is populated from real transaction history (idempotent upsert)
+      - getBehavioral returns non-empty streaks when history supports them
+      - Streak math is deterministic (same input -> same output)
+      - typecheck passes
+  - id: TASK-BEHAVIORAL-002
+    title: Challenge engine — auto-generate challenges with progress (B2)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/insights-store.ts
+      - backend/src/db/schema.ts
+    description: |
+      Defect B2 (analytics-architecture.md section 18.3). challenges is read by getBehavioral but
+      NOTHING writes to it, so it is always empty. Auto-generate data-driven challenges into
+      challenges with progress computed from transactions (e.g. "No-spend weekend", "Dining < $X
+      this month" using the user's own baseline, "Save $Y this month"), mark complete when met, and
+      let the user dismiss/accept. Run inside recomputeAllAnalytics (RC1) and post-sync. Keep the
+      title/goal/progressPercent/complete/color shape the reader expects.
+    acceptance_criteria:
+      - challenges is populated with relevant, data-driven challenges and live progress
+      - Completed challenges are marked complete; user can dismiss/accept
+      - getBehavioral returns non-empty challenges when data supports them
+      - typecheck passes
+  - id: TASK-BEHAVIORAL-003
+    title: Transaction reason tagging to populate spend-by-reason (B3a backend)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/insights-store.ts
+      - backend/src/db/schema.ts
+    description: |
+      Defect B3 (analytics-architecture.md section 18.3). "Spend by reason" is always $0 because
+      transaction_reasons is never populated and there is no tagging path. Add authenticated,
+      scoped endpoints to set and clear a transaction's reason (impulse/social/etc. per REASON_META),
+      persisting to transaction_reasons. Validate the reason id and transaction ownership. This is
+      the honest fix (reasons are not inferable from bank data); inference is at most a labeled
+      suggestion (optional follow-up, never presented as fact).
+    acceptance_criteria:
+      - Endpoints set/clear a transaction reason, scoped to the caller's transactions
+      - getBehavioral spend-by-reason reflects tagged transactions (no longer all $0)
+      - Reason id and transaction ownership are validated
+      - typecheck passes
+  - id: TASK-BEHAVIORAL-UI-001
+    title: Reason-tagging UI + behavioral empty states (B3b ui)
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-BEHAVIORAL-003
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/behavioral-panel.tsx
+      - ui/src/components/transactions/transaction-row.tsx
+    description: |
+      B3b (analytics-architecture.md section 18.3). Add a reason picker to the transaction row and/or
+      behavioral panel that calls the tagging endpoint (TASK-BEHAVIORAL-003), and replace the silent
+      $0 spend-by-reason with an explanatory empty state ("Tag purchases with why you bought them to
+      see spend-by-reason"). Show streaks/challenges from B1/B2 with proper empty states when there
+      is not yet enough data. Do not present heuristic guesses as fact.
+    acceptance_criteria:
+      - Users can tag/untag a transaction's reason from the UI
+      - Spend-by-reason renders from tags; an explanatory empty state shows when no tags exist
+      - Streaks/challenges render with clear empty states until populated
+  - id: TASK-HOUSEHOLD-001
+    title: Household mutations should invalidate the full financial query set (H1)
+    status: done
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/hooks/use-household.ts
+      - ui/src/lib/invalidate-financial-queries.ts
+    description: |
+      Defect H1 (analytics-architecture.md section 19). useHouseholdMutations.invalidate() only
+      invalidates household, household-insights, accounts, chart-data, transactions — so after
+      adding/assigning/linking a family member, panels like wellness, dna, patterns, behavioral,
+      merchants, net-worth, investments, fire, recurring, budgets, summary, categories, money-flow
+      keep showing pre-member numbers. Replace the hand-rolled subset with the shared
+      invalidateFinancialQueries helper (plus the household/household-insights keys) so the whole
+      dashboard refreshes when membership or account assignment changes.
+    acceptance_criteria:
+      - Household member add/update/delete/assign invalidates the full financial query set
+      - Wellness/investments/net-worth/fire/etc. refetch after a membership change
+      - Uses the shared invalidateFinancialQueries helper (no divergent hand-rolled list)
+  - id: TASK-HOUSEHOLD-002
+    title: Recompute household analytics when membership changes (H2)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECOMPUTE-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/household-invitations.ts
+      - backend/src/services/household-store.ts
+    description: |
+      Defect H2 (analytics-architecture.md section 19). Adding/linking a household member (invite
+      accepted, member linked to a user, account assigned) does not trigger a recompute, so persisted
+      analytics (marts, protect profiles, wellness) stay stale for the household until the next sync
+      or manual recalculate. Trigger recomputeAllAnalytics (TASK-RECOMPUTE-001) for the affected
+      household when membership/account-assignment changes, so persisted metrics include the member
+      immediately. Keep it idempotent and avoid blocking the request unnecessarily (enqueue if slow).
+    acceptance_criteria:
+      - Member accept/link and account assignment trigger a household recompute
+      - Persisted analytics reflect the new member without waiting for the next sync
+      - Recompute is idempotent and does not block the mutation response unduly
+      - typecheck passes
+  - id: TASK-IOS-001
+    title: Expand iOS APIClient + Codable models to cover all read endpoints
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/design/api-contract.md
+      - ui/src/types/api.ts
+      - ios/SpendFlow/Services/APIClient.swift
+      - ios/SpendFlow/Models/API
+    description: |
+      iOS APIClient only covers auth, summary, transactions, by-category, flow, alerts, trends,
+      accounts, and Plaid. Add Codable models and APIClient methods for the remaining endpoints the
+      web uses: net-worth, investments (positions/holdings), fire, wellness, dna, patterns,
+      behavioral, merchants (paginated), inflation, resilience, recurring, calendar, forecast,
+      budgets + goals (CRUD), household, user/profile, credit-debt, coach, wrapped, and
+      analytics/recompute. Add shared decoding for the standard list contract (Page<T>) and the
+      metric envelope (value/unit/asOf/class/basis/confidence/trend/caveats) so views can render
+      confidence + caveats like the web. Match field names to ui/src/types/api.ts exactly.
+    acceptance_criteria:
+      - APIClient exposes typed methods for all read endpoints listed above
+      - Codable models match api-contract.md / ui/src/types/api.ts field-for-field
+      - Shared Page<T> and MetricEnvelope decoding helpers exist and are unit-tested
+      - Decoding round-trips against sample payloads from the live API
+  - id: TASK-IOS-002
+    title: iOS navigation/IA mirroring web (Understand / Wealth / Plan / Protect)
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - docs/design/ui-ux-specification.md
+      - docs/design/mobile-patterns.md
+      - ios/SpendFlow/Features/Root/MainTabView.swift
+    description: |
+      Today there are 5 tabs (Home, Flow, Spend, Activity, Wallet). Web groups many more features
+      under Understand, Wealth, Plan, Protect, Debt, Family, Profile. Define an iOS IA that exposes
+      these without overcrowding the tab bar — e.g. keep core tabs and add a "More"/hub tab (or
+      section landing screens) that route to the new feature views. Follow mobile-patterns.md.
+      This task wires navigation + placeholder destinations; individual views land in IOS-003+.
+    acceptance_criteria:
+      - All web feature areas are reachable in the iOS app via a coherent IA
+      - Navigation matches mobile-patterns.md and does not overcrowd the tab bar
+      - Placeholder destinations exist for each not-yet-built view
+  - id: TASK-IOS-003
+    title: iOS Understand — Wellness, DNA, Patterns, Behavioral, Merchants
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+      - TASK-IOS-CHARTS-001
+    source_docs:
+      - ui/src/components/preview/panels/wellness-panel.tsx
+      - ui/src/components/preview/panels/dna-panel.tsx
+      - ui/src/components/preview/panels/patterns-panel.tsx
+      - ui/src/components/preview/panels/behavioral-panel.tsx
+      - ui/src/components/preview/panels/merchants-panel.tsx
+    description: |
+      Build the Understand views to mirror the web panels: Wellness (score ring + history chart with
+      0-100 axis and per-bar values + dimension breakdown), Spending DNA, Patterns (day-of-week etc.),
+      Behavioral (streaks, challenges, spend-by-reason with reason tagging + empty states), and the
+      paginated Merchants report. Render confidence + caveats from the metric envelope. Reuse the
+      shared chart + paginated-list components (IOS-CHARTS-001). Behavioral tagging depends on the
+      backend reason endpoint (TASK-BEHAVIORAL-003).
+    acceptance_criteria:
+      - Wellness/DNA/Patterns/Behavioral/Merchants views match their web counterparts
+      - Charts show axes/labels/values; lists paginate, sort, and filter server-side
+      - Confidence/caveats are surfaced; empty states match web behavior
+  - id: TASK-IOS-004
+    title: iOS Wealth — Net worth, Investments/Holdings, FIRE
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+      - TASK-IOS-CHARTS-001
+    source_docs:
+      - ui/src/components/preview/panels/net-worth-panel.tsx
+      - ui/src/components/preview/panels/investments-panel.tsx
+      - ui/src/components/preview/panels/holdings-portfolio-section.tsx
+      - ui/src/components/preview/panels/fire-panel.tsx
+    description: |
+      Build Net worth (assets/liabilities incl. loans, trend), Investments (positions/holdings,
+      allocation, performance), and FIRE (projection from investable assets, age prompt when
+      isDefaultAge, surfaced assumptions + sliders) views, mirroring the web. All math is server-side;
+      iOS just renders. FIRE must reflect the F-series fixes (investable assets, real age, assumptions).
+    acceptance_criteria:
+      - Net worth / Investments / FIRE views match their web counterparts
+      - FIRE prompts for age when unset and shows assumptions; no client-side projection math
+      - Charts use the shared chart component with axes/values
+  - id: TASK-IOS-005
+    title: iOS Plan — Budgets, Savings goals, Recurring/Subscriptions, Calendar, Forecast, Cost audits
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+    source_docs:
+      - ui/src/components/preview/panels/budgets-panel.tsx
+      - ui/src/components/preview/panels/recurring-panel.tsx
+      - ui/src/components/preview/panels/subscriptions-panel.tsx
+      - ui/src/components/preview/panels/calendar-panel.tsx
+      - ui/src/components/preview/panels/forecast-panel.tsx
+      - ui/src/components/preview/panels/leaks-panel.tsx
+    description: |
+      Build the Plan views: Budgets (list + CRUD + accept suggestions + add category), Savings goals
+      (CRUD + accept/edit/delete suggested goals), Recurring + Subscriptions (with lapsed/cancelled
+      lifecycle), Calendar, Forecast, and Cost audits / hidden fees (leaks). Use the budgets/goals
+      CRUD endpoints and audit engine output; no client-side opportunity-cost math.
+    acceptance_criteria:
+      - Budgets and goals support full CRUD + accepting suggestions on device
+      - Recurring/subscriptions show lifecycle; calendar/forecast/audits match web
+      - All amounts/opportunity-cost come from the API, not computed on device
+  - id: TASK-IOS-006
+    title: iOS Protect — Resilience & Inflation (personal CPI)
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+      - TASK-IOS-CHARTS-001
+    source_docs:
+      - ui/src/components/preview/panels/resilience-panel.tsx
+      - ui/src/components/preview/panels/inflation-panel.tsx
+    description: |
+      Build Resilience (emergency-fund months, shock scenarios, sub-scores with actions) and Inflation
+      (personal CPI, nominal vs real spending) views mirroring the web panels, rendering confidence +
+      caveats from the metric envelope.
+    acceptance_criteria:
+      - Resilience and Inflation views match their web counterparts
+      - Sub-scores, scenarios, and real-vs-nominal series render with caveats
+  - id: TASK-IOS-007
+    title: iOS Debt — credit/debt summary
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+    source_docs:
+      - ui/src/app/(dashboard)/debt/page.tsx
+    description: |
+      Build the Debt view: balances, utilization, APRs, minimum payments, and payoff guidance,
+      mirroring the web debt page using the credit-debt endpoint.
+    acceptance_criteria:
+      - Debt view shows balances, utilization, APR, and minimums from the API
+      - Matches the web debt page content and states
+  - id: TASK-IOS-008
+    title: iOS Family — household members, account assignment, invites
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+    source_docs:
+      - ui/src/app/(dashboard)/family/page.tsx
+      - ui/src/hooks/use-household.ts
+    description: |
+      Build the Family/household view: list members, create/edit/delete members, assign accounts to
+      members, and send/revoke invites. After mutations, invalidate/refresh the full feature set
+      (mirror the H1 fix) so all views reflect membership changes.
+    acceptance_criteria:
+      - Members can be created/edited/deleted and accounts assigned on device
+      - Invite/revoke flows work; membership changes refresh all dependent views
+  - id: TASK-IOS-009
+    title: iOS Profile — user profile wired into analytics
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-002
+    source_docs:
+      - ui/src/app/(dashboard)/profile/page.tsx
+      - backend/src/routes/user.ts
+    description: |
+      Build the Profile view: edit display name, age, household size, target retirement age, annual
+      gross income, employment status, risk tolerance, withdrawal rate, and real return — persisted via
+      /user/profile. Ensure saving age flows into FIRE (isDefaultAge=false) like the web.
+    acceptance_criteria:
+      - All profile fields are editable and persist via /user/profile
+      - Saving age updates FIRE (no default-age fallback after save)
+  - id: TASK-IOS-010
+    title: iOS SnapTrade brokerage connection flow
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/app/(dashboard)/accounts/snaptrade/callback/page.tsx
+      - backend/src/routes/snaptrade.ts
+    description: |
+      iOS only supports Plaid today. Add the SnapTrade connection flow (register/connect portal +
+      callback handling + sync) so users can link brokerage/retirement accounts, mirroring the web
+      SnapTrade flow. Reuse the backend snaptrade endpoints.
+    acceptance_criteria:
+      - Users can connect a SnapTrade brokerage account from iOS and see holdings sync
+      - Connection + callback + sync mirror the web flow and handle errors
+  - id: TASK-IOS-011
+    title: iOS recalculate-all + pull-to-refresh + full state invalidation
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-RECOMPUTE-001
+    source_docs:
+      - ui/src/components/layout/recalculate-analytics-button.tsx
+      - ui/src/lib/invalidate-financial-queries.ts
+    description: |
+      Add a recalculate-all control (parity with web RC2) that calls POST /analytics/recompute and
+      then refreshes all feature view-models, plus pull-to-refresh on list/detail screens. Ensure a
+      sync or recompute refreshes every dependent view (parity with the web full-invalidation set).
+    acceptance_criteria:
+      - A recalculate control triggers /analytics/recompute and refreshes all views
+      - Pull-to-refresh is available on primary screens
+      - After sync/recompute, no stale view remains
+  - id: TASK-IOS-CHARTS-001
+    title: iOS shared chart + paginated-list components (DesignSystem)
+    status: done
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - ui/src/components/ui/data-table.tsx
+      - docs/architecture/analytics-architecture.md
+      - ios/SpendFlow/DesignSystem
+    description: |
+      Add reusable SwiftUI components to the DesignSystem: (1) a chart component with labeled x/y
+      axes, value labels, and tap-to-inspect (mirroring the self-explanatory-chart rule from U1/W1),
+      and (2) a paginated list component that consumes the standard Page<T> contract with server-side
+      sort/filter/search (the DataTable equivalent). Feature views (IOS-003/004/006) build on these.
+    acceptance_criteria:
+      - A shared chart view renders axes, labels, and values and supports tap-to-inspect
+      - A shared paginated list consumes Page<T> with server sort/filter/search
+      - Components use design tokens and are reused by the feature views
+  - id: TASK-IOS-IMPORT-001
+    title: iOS statement import (deferred until web import ships)
+    status: done
+    assignee: cursor-agent
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/app/(dashboard)/accounts/import/page.tsx
+      - backend/src/routes/imports.ts
+    description: |
+      Parity with the web statement-import path (upload QFX/OFX/CSV/PDF, consent, batch status,
+      review). Per AGENTS.md the import path must ship on web first; this is queued but should remain
+      blocked until that gate lifts. Reuse the imports endpoints; do not parse files on device.
+    acceptance_criteria:
+      - Users can upload and import statements from iOS once the web gate lifts
+      - Consent + batch status + review mirror the web flow
+      - No on-device parsing; all handled by the backend

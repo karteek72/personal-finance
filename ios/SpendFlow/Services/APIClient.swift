@@ -1,9 +1,9 @@
 import Foundation
 
 final class APIClient: Sendable {
-    private let baseURL: URL
-    private let authService: AuthService?
-    private let urlSession: URLSession
+    let baseURL: URL
+    let authService: AuthService?
+    let urlSession: URLSession
 
     init(baseURL: URL = AppConfig.apiBaseURL, authService: AuthService?) {
         self.baseURL = baseURL
@@ -51,6 +51,15 @@ final class APIClient: Sendable {
 
     func getMe() async throws -> AuthMeResponse {
         try await send(APIRequest(path: "/auth/me"))
+    }
+
+    func registerDeviceToken(_ token: String) async throws {
+        struct Body: Encodable { let token: String; let platform: String }
+        struct Response: Decodable { let ok: Bool }
+        let body = try JSONEncoder.api.encode(Body(token: token, platform: "ios"))
+        let _: Response = try await send(
+            APIRequest(path: "/devices/register", method: .post, body: body)
+        )
     }
 
     // MARK: - Transactions & insights
@@ -123,7 +132,7 @@ final class APIClient: Sendable {
 
     // MARK: - Transport
 
-    private func send<T: Decodable>(
+    func send<T: Decodable>(
         _ request: APIRequest,
         retryOnUnauthorized: Bool = true
     ) async throws -> T {
@@ -146,7 +155,7 @@ final class APIClient: Sendable {
         return try decodeSuccess(data: data, response: response)
     }
 
-    private func rawSend(
+    func rawSend(
         _ request: APIRequest,
         accessToken: String?
     ) async throws -> (Data, HTTPURLResponse) {
@@ -194,7 +203,7 @@ final class APIClient: Sendable {
         }
     }
 
-    private func decodeSuccess<T: Decodable>(data: Data, response: HTTPURLResponse) throws -> T {
+    func decodeSuccess<T: Decodable>(data: Data, response: HTTPURLResponse) throws -> T {
         if response.statusCode == 204 {
             if T.self == EmptyResponse.self {
                 return EmptyResponse() as! T

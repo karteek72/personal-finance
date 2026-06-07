@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { transactions } from "../db/schema.js";
 import { formatMoneyAmount } from "../lib/money.js";
@@ -6,14 +6,15 @@ import {
   drizzleActiveTransactionWhere,
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
-import type { PatternsResponse } from "./insights-store.js";
+import type { PatternRow } from "./insights-store.js";
+import { averageSpendPerWeekdayOccurrence } from "./wellness-scoring.js";
 import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 export async function computePatternsFromTransactions(
   userIds: string[],
-): Promise<PatternsResponse> {
+): Promise<{ dayOfWeek: Array<{ day: string; value: string }>; patterns: PatternRow[] }> {
   const { accountIds, hasActiveAccounts } =
     await resolveActiveAccountScope(userIds);
 
@@ -28,6 +29,7 @@ export async function computePatternsFromTransactions(
     .select({
       dow: sql<number>`extract(dow from ${transactions.date})::int`,
       total: sql<string>`coalesce(sum(${transactions.amount}::numeric), 0)`,
+      distinctDates: sql<number>`count(distinct ${transactions.date})::int`,
     })
     .from(transactions)
     .where(
@@ -41,14 +43,19 @@ export async function computePatternsFromTransactions(
     )
     .groupBy(sql`extract(dow from ${transactions.date})`);
 
-  const dowTotals = new Map<number, number>();
+  const dowAverages = new Map<number, number>();
   for (const row of dowRows) {
-    dowTotals.set(row.dow, Number.parseFloat(row.total ?? "0"));
+    const total = Number.parseFloat(row.total ?? "0");
+    const distinctDates = row.distinctDates ?? 0;
+    dowAverages.set(
+      row.dow,
+      averageSpendPerWeekdayOccurrence(total, distinctDates),
+    );
   }
 
   const dayOfWeek = DOW_LABELS.map((day, index) => ({
     day,
-    value: formatMoneyAmount(dowTotals.get(index) ?? 0),
+    value: formatMoneyAmount(dowAverages.get(index) ?? 0),
   }));
 
   const categoryRows = await db
@@ -68,8 +75,7 @@ export async function computePatternsFromTransactions(
       ),
     )
     .groupBy(transactions.category)
-    .orderBy(sql`sum(${transactions.amount}::numeric) desc`)
-    .limit(5);
+    .orderBy(sql`sum(${transactions.amount}::numeric) desc`);
 
   const patterns = categoryRows.map((row) => ({
     label: row.category,

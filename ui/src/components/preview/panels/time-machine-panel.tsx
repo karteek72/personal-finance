@@ -10,15 +10,10 @@ interface PastHabit {
   id: string;
   emoji: string;
   category: string;
-  spent: number; // total spent over the lookback
+  spent: number;
   yearsAgo: number;
-  // Hypothetical value if invested in S&P 500 instead
   investedValue: number;
 }
-
-const LOOKBACK_YEARS = 3;
-// Approx S&P 500 growth multiple over the lookback (illustrative)
-const INVEST_MULTIPLE = 1.45;
 
 function money(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
@@ -32,18 +27,20 @@ export function TimeMachinePanel() {
   const seeded = useRef(false);
 
   const investmentHistory = investments?.investmentHistory ?? null;
+  const timeMachine = data?.timeMachine ?? null;
+  const lookbackYears = timeMachine?.lookbackYears ?? 3;
+  const investMultiple = timeMachine?.investMultiple ?? 1.45;
+  const futureRate = timeMachine?.futureCompoundRate ?? 0.07;
+  const futureYears = timeMachine?.futureYears ?? 20;
 
-  const HABITS: PastHabit[] = (data?.leaks.habits ?? []).map((h) => {
-    const spent = Number.parseFloat(h.monthly) * 12 * LOOKBACK_YEARS;
-    return {
-      id: h.id,
-      emoji: h.emoji ?? "💸",
-      category: h.label,
-      spent,
-      yearsAgo: LOOKBACK_YEARS,
-      investedValue: Math.round(spent * INVEST_MULTIPLE),
-    };
-  });
+  const HABITS: PastHabit[] = (timeMachine?.habits ?? []).map((h) => ({
+    id: h.id,
+    emoji: h.emoji ?? "💸",
+    category: h.label,
+    spent: Number.parseFloat(h.spent),
+    yearsAgo: h.yearsAgo,
+    investedValue: Number.parseFloat(h.investedValue),
+  }));
 
   useEffect(() => {
     if (HABITS.length > 0 && !seeded.current) {
@@ -64,9 +61,7 @@ export function TimeMachinePanel() {
   const totalSpent = chosen.reduce((s, h) => s + h.spent, 0);
   const totalInvested = chosen.reduce((s, h) => s + h.investedValue, 0);
   const missedGain = totalInvested - totalSpent;
-
-  // Future projection of the missed gain (compounded forward 20y at 7%)
-  const future20 = totalInvested * Math.pow(1.07, 20);
+  const future20 = totalInvested * Math.pow(1 + futureRate, futureYears);
 
   return (
     <div className="space-y-5">
@@ -90,20 +85,6 @@ export function TimeMachinePanel() {
             <strong className="text-text">
               ${Number.parseFloat(investmentHistory.currentPortfolioValue).toLocaleString()}
             </strong>
-            {Number.parseFloat(investmentHistory.estimatedValueToday) >
-            Number.parseFloat(investmentHistory.totalContributed) ? (
-              <>
-                . If your past contributions grew at the same rate as today&apos;s
-                holdings, they&apos;d be worth about{" "}
-                <strong className="text-text">
-                  $
-                  {Number.parseFloat(
-                    investmentHistory.estimatedValueToday,
-                  ).toLocaleString()}
-                </strong>
-                .
-              </>
-            ) : null}
           </p>
         </div>
       ) : null}
@@ -120,14 +101,13 @@ export function TimeMachinePanel() {
         </div>
       ) : null}
 
-      {/* Hero */}
       {HABITS.length > 0 ? (
         <>
           <div className="rounded-[var(--radius-lg)] p-5" style={{ background: "var(--gradient-hero)" }}>
             <p className="text-xs font-semibold uppercase tracking-wide text-white/60">If you&apos;d invested instead of spent…</p>
             <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">{money(totalInvested)}</p>
             <p className="mt-1 text-sm text-white/70">
-              The {money(totalSpent)} you spent on selected habits over the last 3 years would be worth <strong>{money(totalInvested)}</strong> today in an S&P 500 index fund — a missed gain of <strong>{money(missedGain)}</strong>.
+              The {money(totalSpent)} you spent on selected habits over the last {lookbackYears} years would be worth <strong>{money(totalInvested)}</strong> today if they had been invested in an S&P 500 index fund at an illustrative {investMultiple}× return — a hypothetical missed gain of <strong>{money(missedGain)}</strong> (not a personalized backtest).
             </p>
           </div>
 
@@ -154,7 +134,7 @@ export function TimeMachinePanel() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold tabular-nums text-success">+{money(gain)}</p>
-                      <p className="text-[11px] text-text-muted">would-be worth {money(h.investedValue)}</p>
+                      <p className="text-[11px] text-text-muted">would-be worth {money(h.investedValue)} (illustrative {investMultiple}×)</p>
                     </div>
                   </button>
                 );
@@ -188,8 +168,8 @@ export function TimeMachinePanel() {
             </div>
 
             <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
-              <p className="mb-1 text-sm font-bold text-text">Fast-forward 20 years</p>
-              <p className="text-[11px] text-text-muted">If left to compound at 7%/yr from today</p>
+              <p className="mb-1 text-sm font-bold text-text">Fast-forward {futureYears} years</p>
+              <p className="text-[11px] text-text-muted">If left to compound at {(futureRate * 100).toFixed(0)}%/yr from today</p>
               <p className="mt-3 text-4xl font-extrabold tabular-nums text-text">{money(future20)}</p>
               <p className="mt-1 text-sm text-text-muted">
                 The same habits, redirected to investing going forward, turn into a meaningful chunk of your future net worth.

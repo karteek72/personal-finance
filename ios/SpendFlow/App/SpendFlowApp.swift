@@ -3,7 +3,9 @@ import SwiftUI
 
 @main
 struct SpendFlowApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appState = AppState()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -12,6 +14,11 @@ struct SpendFlowApp: App {
                 .task {
                     configureGoogleSignIn()
                     await appState.bootstrap()
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .background {
+                        appState.appLock.resetLockOnBackground()
+                    }
                 }
         }
     }
@@ -36,11 +43,24 @@ struct RootView: View {
             if appState.authService.isBootstrapping {
                 LoadingStateView(message: "Loading…")
             } else if appState.authService.isAuthenticated {
-                MainTabView()
+                if appState.appLock.isEnabled && !appState.appLock.isUnlocked {
+                    AppLockView()
+                } else {
+                    MainTabView()
+                }
             } else {
                 LoginView()
             }
         }
         .background(SpendFlowTheme.background.ignoresSafeArea())
+        .onReceive(NotificationCenter.default.publisher(for: .didRegisterPushToken)) { note in
+            guard let tokenData = note.object as? Data else { return }
+            Task {
+                await PushNotificationService.shared.registerTokenWithBackend(
+                    tokenData,
+                    api: appState.apiClient
+                )
+            }
+        }
     }
 }

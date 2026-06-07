@@ -19,6 +19,9 @@ import {
 } from "../category-rules.js";
 import { classifyBankingTransaction } from "../classify-banking-transaction.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
+import { upsertBalanceSnapshots, type BalanceSnapshotInput } from "../balance-snapshots.js";
+import { backfillTransactionMerchantIds } from "../dim-merchant-store.js";
+import { recomputeAllAnalytics } from "../recompute-all-analytics.js";
 import { mapPlaidTransaction } from "./map-transaction.js";
 import { syncCreditCardLiabilities } from "./sync-liabilities.js";
 import {
@@ -209,6 +212,7 @@ export async function syncPlaidItem(
   });
 
   const accountIdByPlaidId = new Map<string, string>();
+  const balanceSnapshotBatch: BalanceSnapshotInput[] = [];
   const accountSummaries: {
     accountId: string;
     plaidAccountId: string;
@@ -223,6 +227,10 @@ export async function syncPlaidItem(
       plaidAccount.balances.current?.toFixed(2) ?? "0.00";
     const balanceAvailable =
       plaidAccount.balances.available?.toFixed(2) ?? null;
+    const creditLimit =
+      plaidAccount.type === "credit" && plaidAccount.balances.limit != null
+        ? plaidAccount.balances.limit.toFixed(2)
+        : null;
 
     const existing = await db
       .select()
@@ -242,12 +250,19 @@ export async function syncPlaidItem(
           institutionName,
           balanceCurrent,
           balanceAvailable,
+          creditLimit,
           lastSyncedAt: new Date(),
           status: "active",
           isActive: true,
         })
         .where(eq(accounts.id, existing[0].id));
       accountIdByPlaidId.set(plaidAccount.account_id, existing[0].id);
+      balanceSnapshotBatch.push({
+        accountId: existing[0].id,
+        balanceCurrent,
+        balanceAvailable,
+        creditLimit,
+      });
       accountSummaries.push({
         accountId: existing[0].id,
         plaidAccountId: plaidAccount.account_id,
@@ -274,12 +289,19 @@ export async function syncPlaidItem(
         source: "plaid",
         balanceCurrent,
         balanceAvailable,
+        creditLimit,
         lastSyncedAt: new Date(),
         status: "active",
       })
       .returning();
 
     accountIdByPlaidId.set(plaidAccount.account_id, inserted!.id);
+    balanceSnapshotBatch.push({
+      accountId: inserted!.id,
+      balanceCurrent,
+      balanceAvailable,
+      creditLimit,
+    });
     accountSummaries.push({
       accountId: inserted!.id,
       plaidAccountId: plaidAccount.account_id,
@@ -288,6 +310,8 @@ export async function syncPlaidItem(
       type: plaidAccount.type,
     });
   }
+
+  await upsertBalanceSnapshots(balanceSnapshotBatch);
 
   logOperation(log, "accounts_synced", "Plaid accounts loaded and balances updated", {
     ...baseContext,
@@ -436,6 +460,9 @@ export async function syncPlaidItem(
     transactionPages: page,
     durationMs: elapsed(),
   });
+
+  await backfillTransactionMerchantIds(item.userId);
+  await recomputeAllAnalytics(item.userId);
 
   return result;
 }

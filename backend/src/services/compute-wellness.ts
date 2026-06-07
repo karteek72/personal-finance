@@ -1,25 +1,38 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
-import { accounts, savingsGoals, transactions } from "../db/schema.js";
-import { formatMoneyAmount, roundPercent } from "../lib/money.js";
+import { savingsGoals, transactions } from "../db/schema.js";
+import { formatMoneyAmount } from "../lib/money.js";
 import {
   drizzleActiveTransactionWhere,
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
-import { computeInvestmentGrowthScore } from "./investment-analytics.js";
+import { getAccountMetricsAsOf } from "./balance-snapshots.js";
+import { getCompositeDataQualityConfidence } from "./data-quality.js";
+import {
+  resolveEffectiveMonthlyIncome,
+} from "./effective-income.js";
 import { emptyWellnessResponse, type WellnessResponse } from "./insights-store.js";
-import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
-
-function clampScore(n: number): number {
-  return Math.max(0, Math.min(100, Math.round(n)));
-}
-
-function scoreFromRatio(value: number, target: number, higherIsBetter: boolean): number {
-  if (target <= 0) return 50;
-  const ratio = value / target;
-  const raw = higherIsBetter ? ratio * 100 : (1 / Math.max(ratio, 0.01)) * 100;
-  return clampScore(raw);
-}
+import {
+  averageMonthlyInvestment,
+  averageMonthlyCashSpending,
+} from "./investment-analytics.js";
+import {
+  computeBurnRate,
+  computeEmergencyMonths,
+  computeFreeCashFlow,
+  computeSavingsRate,
+  metricNumericValue,
+  savingsRateMetric,
+} from "./metrics/index.js";
+import { discretionaryOutflowForPeriod } from "./metrics/spend-class.js";
+import { monthCashflowTotals, trailingEssentialOutflow } from "./metrics/transaction-aggregates.js";
+import {
+  buildWellnessDimensions,
+  compositeCashFlowScore,
+  compositeConfidence,
+  compositeScore,
+  type GoalPaceInput,
+} from "./wellness-scoring.js";
 
 function monthBounds(period: string): { start: string; end: string } {
   const [y, mo] = period.split("-").map(Number);
@@ -30,146 +43,167 @@ function monthBounds(period: string): { start: string; end: string } {
   };
 }
 
-async function monthTotals(
+function utilizationPercent(
+  creditBalance: number,
+  creditLimit: number,
+  hasCreditLimit: boolean,
+): number | null {
+  if (!hasCreditLimit || creditLimit <= 0) {
+    return null;
+  }
+  return (creditBalance / creditLimit) * 100;
+}
+
+async function resolveEmergencyMonths(input: {
+  userIds: string[];
+  accountIds: string[];
+  liquidCash: number;
+  asOfDate: string;
+}): Promise<number> {
+  const { total, months } = await trailingEssentialOutflow(
+    input.userIds,
+    input.accountIds,
+    input.asOfDate,
+    3,
+  );
+  const essentialBurn = computeBurnRate({
+    essentialOutflowTotal: total,
+    months,
+  });
+  return computeEmergencyMonths({
+    liquidReserves: input.liquidCash,
+    essentialBurnRate: essentialBurn,
+  });
+}
+
+async function spendingVolatility(
   userIds: string[],
   accountIds: string[],
-  period: string,
-): Promise<{ income: number; spending: number; savingsRate: number }> {
+  endDate: string,
+): Promise<number | null> {
+  if (accountIds.length === 0) return null;
+
   const db = getDb();
-  const { start, end } = monthBounds(period);
-  const [row] = await db
+  const start = new Date(`${endDate}T12:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - 90);
+  const startDate = start.toISOString().slice(0, 10);
+
+  const rows = await db
     .select({
-      income: sql<string>`coalesce(sum(case when ${transactions.transactionType} = 'income' and ${transactions.isTransfer} = false then abs(${transactions.amount}::numeric) else 0 end), 0)`,
-      spending: sql<string>`coalesce(sum(case when ${transactions.transactionType} = 'expense' and ${transactions.isTransfer} = false and ${transactions.category} != ${INTERNAL_TRANSFER_CATEGORY} then ${transactions.amount}::numeric else 0 end), 0)`,
+      day: transactions.date,
+      total: sql<string>`coalesce(sum(${transactions.amount}::numeric), 0)`,
     })
     .from(transactions)
     .where(
       and(
         drizzleActiveTransactionWhere(userIds, accountIds),
         eq(transactions.pending, false),
-        sql`${transactions.date} >= ${start} and ${transactions.date} <= ${end}`,
+        eq(transactions.transactionType, "expense"),
+        eq(transactions.isTransfer, false),
+        sql`${transactions.date} >= ${startDate} and ${transactions.date} <= ${endDate}`,
       ),
-    );
-  const income = Number.parseFloat(row?.income ?? "0");
-  const spending = Number.parseFloat(row?.spending ?? "0");
-  const savingsRate =
-    income > 0 ? roundPercent(((income - spending) / income) * 100) : 0;
-  return { income, spending, savingsRate };
+    )
+    .groupBy(transactions.date);
+
+  if (rows.length < 7) return null;
+
+  const dailyTotals = rows.map((r) => Number.parseFloat(r.total));
+  const mean = dailyTotals.reduce((a, b) => a + b, 0) / dailyTotals.length;
+  if (mean <= 0) return null;
+  const variance =
+    dailyTotals.reduce((s, v) => s + Math.pow(v - mean, 2), 0) /
+    dailyTotals.length;
+  return Math.sqrt(variance) / mean;
 }
 
-async function accountMetrics(userIds: string[]): Promise<{
+async function buildHealthInputs(input: {
+  userIds: string[];
+  primaryUserId: string;
+  accountIds: string[];
+  period: string;
+  asOfDate: string;
   liquidCash: number;
-  creditBalance: number;
-  creditLimit: number;
-}> {
-  const db = getDb();
-  const rows = await db
-    .select({
-      type: accounts.type,
-      balanceAvailable: accounts.balanceAvailable,
-      balanceCurrent: accounts.balanceCurrent,
-    })
-    .from(accounts)
-    .where(and(inArray(accounts.userId, userIds), eq(accounts.isActive, true)));
+  utilization: number | null;
+  goals: GoalPaceInput[];
+  dataQualityConfidence: number;
+}): Promise<WellnessResponse["dimensions"]> {
+  const totals = await monthCashflowTotals(
+    input.userIds,
+    input.accountIds,
+    input.period,
+  );
+  const effectiveIncome = await resolveEffectiveMonthlyIncome(
+    input.primaryUserId,
+    totals.income,
+  );
+  const incomeForMetrics =
+    effectiveIncome.source === "stated"
+      ? effectiveIncome.monthlyIncome
+      : totals.income;
+  const savingsRate = computeSavingsRate({
+    income: incomeForMetrics,
+    expense: totals.expense,
+  });
+  const freeCashFlow = computeFreeCashFlow({
+    income: incomeForMetrics,
+    essentialOutflow: totals.essentialExpense,
+  });
+  const emergencyMonths = await resolveEmergencyMonths({
+    userIds: input.userIds,
+    accountIds: input.accountIds,
+    liquidCash: input.liquidCash,
+    asOfDate: input.asOfDate,
+  });
 
-  let liquidCash = 0;
-  let creditBalance = 0;
-  let creditLimit = 0;
-  for (const a of rows) {
-    if (a.type === "depository") {
-      liquidCash += Number.parseFloat(a.balanceAvailable ?? a.balanceCurrent ?? "0");
-    } else if (a.type === "credit") {
-      const bal = Math.abs(Number.parseFloat(a.balanceCurrent ?? "0"));
-      creditBalance += bal;
-      creditLimit += bal * 2.5; // estimate when limit unknown
-    }
+  const monthlyInvest = await averageMonthlyInvestment(input.userIds, 3);
+  const monthlySpend = await averageMonthlyCashSpending(input.userIds, 3);
+  const netInvestRate =
+    incomeForMetrics > 0 ? monthlyInvest / incomeForMetrics : null;
+
+  const { discretionary, total } = await discretionaryOutflowForPeriod(
+    input.userIds,
+    input.accountIds,
+    input.period,
+  );
+  const discretionaryShare = total > 0 ? discretionary / total : null;
+  const volatility = await spendingVolatility(
+    input.userIds,
+    input.accountIds,
+    input.asOfDate,
+  );
+
+  const dimensions = buildWellnessDimensions({
+    savingsRate,
+    freeCashFlow,
+    income: incomeForMetrics,
+    emergencyMonths,
+    utilization: input.utilization,
+    netInvestRate,
+    spendingVolatility: volatility,
+    discretionaryShare,
+    goals: input.goals,
+    dataQualityConfidence: input.dataQualityConfidence,
+  });
+
+  if (effectiveIncome.caveats.length === 0) {
+    return dimensions;
   }
-  return { liquidCash, creditBalance, creditLimit };
-}
 
-function buildDimensions(input: {
-  savingsRate: number;
-  utilization: number;
-  emergencyMonths: number;
-  expenseRatio: number;
-  goalsOnTrack: number;
-  goalCount: number;
-  investmentGrowth: { score: number; description: string; trend: string };
-}): WellnessResponse["dimensions"] {
-  const savingsScore = scoreFromRatio(input.savingsRate, 20, true);
-  const debtScore = scoreFromRatio(30, Math.max(input.utilization, 0.01), false);
-  const emergencyScore = scoreFromRatio(input.emergencyMonths, 6, true);
-  const incomeExpenseScore = scoreFromRatio(72, input.expenseRatio, false);
-  const goalScore =
-    input.goalCount > 0
-      ? clampScore((input.goalsOnTrack / input.goalCount) * 100)
-      : 50;
-
-  return [
-    {
-      name: "Savings Rate",
-      score: savingsScore,
-      weight: 20,
-      description: `You save ${input.savingsRate.toFixed(1)}% of income. Target: 20%+`,
-      trend: savingsScore >= 70 ? "up" : savingsScore >= 50 ? "neutral" : "down",
-    },
-    {
-      name: "Debt Health",
-      score: debtScore,
-      weight: 20,
-      description: `Credit utilization est. ${input.utilization.toFixed(0)}%. Target: <30%`,
-      trend: debtScore >= 70 ? "up" : "down",
-    },
-    {
-      name: "Emergency Fund",
-      score: emergencyScore,
-      weight: 15,
-      description: `${input.emergencyMonths.toFixed(1)} months runway. Target: 6+ months`,
-      trend: emergencyScore >= 70 ? "up" : "neutral",
-    },
-    {
-      name: "Income-to-Expense",
-      score: incomeExpenseScore,
-      weight: 20,
-      description: `Expenses are ${input.expenseRatio.toFixed(0)}% of income`,
-      trend: incomeExpenseScore >= 70 ? "up" : "down",
-    },
-    {
-      name: "Inflation Beat",
-      score: clampScore(savingsScore * 0.85),
-      weight: 10,
-      description: `Real savings pace based on ${input.savingsRate.toFixed(1)}% savings rate`,
-      trend: "neutral",
-    },
-    {
-      name: "Investment Growth",
-      score: input.investmentGrowth.score,
-      weight: 10,
-      description: input.investmentGrowth.description,
-      trend: input.investmentGrowth.trend,
-    },
-    {
-      name: "Goal Pace",
-      score: goalScore,
-      weight: 5,
-      description:
-        input.goalCount > 0
-          ? `${input.goalsOnTrack}/${input.goalCount} goals on track`
-          : "Add savings goals to track progress",
-      trend: goalScore >= 70 ? "up" : "neutral",
-    },
-  ];
-}
-
-function compositeScore(dimensions: WellnessResponse["dimensions"]): number {
-  const totalWeight = dimensions.reduce((s, d) => s + d.weight, 0);
-  const weighted = dimensions.reduce((s, d) => s + d.score * d.weight, 0);
-  return totalWeight > 0 ? clampScore(weighted / totalWeight) : 0;
+  const caveatNote = effectiveIncome.caveats.join(" ");
+  return dimensions.map((dimension) =>
+    dimension.name === "Savings"
+      ? {
+          ...dimension,
+          description: `${dimension.description} ${caveatNote}`.trim(),
+        }
+      : dimension,
+  );
 }
 
 /** Compute wellness score from live transactions and accounts. */
 export async function computeWellnessFromTransactions(
   userIds: string[],
+  primaryUserId: string,
 ): Promise<WellnessResponse> {
   const { accountIds, hasActiveAccounts } =
     await resolveActiveAccountScope(userIds);
@@ -177,11 +211,11 @@ export async function computeWellnessFromTransactions(
     return emptyWellnessResponse();
   }
 
-  const investmentGrowth = await computeInvestmentGrowthScore(userIds);
-  const defaultInvestmentGrowth = investmentGrowth;
-
   const db = getDb();
   const txScope = drizzleActiveTransactionWhere(userIds, accountIds);
+  const dataQualityConfidence =
+    await getCompositeDataQualityConfidence(primaryUserId);
+
   const months = await db
     .select({
       month: sql<string>`to_char(${transactions.date}, 'YYYY-MM')`,
@@ -191,85 +225,114 @@ export async function computeWellnessFromTransactions(
     .groupBy(sql`to_char(${transactions.date}, 'YYYY-MM')`)
     .orderBy(sql`to_char(${transactions.date}, 'YYYY-MM')`);
 
-  const monthKeys = months.map((m) => m.month).slice(-8);
-  const history: WellnessResponse["history"] = [];
-
-  for (const mk of monthKeys) {
-    const totals = await monthTotals(userIds, accountIds, mk);
-    const { liquidCash, creditBalance, creditLimit } = await accountMetrics(userIds);
-    const utilization =
-      creditLimit > 0 ? (creditBalance / creditLimit) * 100 : 0;
-    const monthlySpend = totals.spending || 1;
-    const emergencyMonths = liquidCash / monthlySpend;
-    const expenseRatio =
-      totals.income > 0 ? (totals.spending / totals.income) * 100 : 100;
-    const dims = buildDimensions({
-      savingsRate: totals.savingsRate,
-      utilization,
-      emergencyMonths,
-      expenseRatio,
-      goalsOnTrack: 0,
-      goalCount: 0,
-      investmentGrowth: defaultInvestmentGrowth,
-    });
-    history.push({ month: mk.slice(5), score: compositeScore(dims) });
-  }
-
-  const latestPeriod = monthKeys[monthKeys.length - 1] ?? new Date().toISOString().slice(0, 7);
-  const latestTotals = await monthTotals(userIds, accountIds, latestPeriod);
-  const priorPeriod = monthKeys[monthKeys.length - 2];
-  const priorTotals = priorPeriod
-    ? await monthTotals(userIds, accountIds, priorPeriod)
-    : null;
-
-  const { liquidCash, creditBalance, creditLimit } = await accountMetrics(userIds);
-  const utilization = creditLimit > 0 ? (creditBalance / creditLimit) * 100 : 0;
-  const monthlySpend = latestTotals.spending || 1;
-  const emergencyMonths = liquidCash / monthlySpend;
-  const expenseRatio =
-    latestTotals.income > 0
-      ? (latestTotals.spending / latestTotals.income) * 100
-      : 100;
-
   const goalRows = await db
     .select()
     .from(savingsGoals)
     .where(inArray(savingsGoals.userId, userIds));
-  const goalsOnTrack = goalRows.filter((g) => {
-    const target = Number.parseFloat(g.targetAmount);
-    const current = Number.parseFloat(g.currentAmount);
-    return target > 0 && current / target >= 0.5;
-  }).length;
+  const goals: GoalPaceInput[] = goalRows.map((g) => ({
+    target: Number.parseFloat(g.targetAmount),
+    current: Number.parseFloat(g.currentAmount),
+    deadline: g.deadline,
+    createdAt: g.createdAt,
+  }));
 
-  const dimensions = buildDimensions({
-    savingsRate: latestTotals.savingsRate,
+  const monthKeys = months.map((m) => m.month).slice(-8);
+  const history: WellnessResponse["history"] = [];
+
+  for (const mk of monthKeys) {
+    const { end: monthEnd } = monthBounds(mk);
+    const snapshot = await getAccountMetricsAsOf(userIds, monthEnd);
+    const utilization = utilizationPercent(
+      snapshot.creditBalance,
+      snapshot.creditLimit,
+      snapshot.hasCreditLimit,
+    );
+
+    let score: number;
+    if (snapshot.hasSnapshot) {
+      const dims = await buildHealthInputs({
+        userIds,
+        primaryUserId,
+        accountIds,
+        period: mk,
+        asOfDate: monthEnd,
+        liquidCash: snapshot.liquidCash,
+        utilization,
+        goals: [],
+        dataQualityConfidence,
+      });
+      score = compositeScore(dims);
+    } else {
+      const dims = await buildHealthInputs({
+        userIds,
+        primaryUserId,
+        accountIds,
+        period: mk,
+        asOfDate: monthEnd,
+        liquidCash: 0,
+        utilization: null,
+        goals: [],
+        dataQualityConfidence,
+      });
+      score = compositeCashFlowScore(dims);
+    }
+
+    history.push({ month: mk.slice(5), score });
+  }
+
+  const latestPeriod =
+    monthKeys[monthKeys.length - 1] ?? new Date().toISOString().slice(0, 7);
+  const priorPeriod = monthKeys[monthKeys.length - 2];
+  const today = new Date().toISOString().slice(0, 10);
+  const { liquidCash, creditBalance, creditLimit, hasCreditLimit } =
+    await getAccountMetricsAsOf(userIds, today);
+  const utilization = utilizationPercent(
+    creditBalance,
+    creditLimit,
+    hasCreditLimit,
+  );
+
+  const dimensions = await buildHealthInputs({
+    userIds,
+    primaryUserId,
+    accountIds,
+    period: latestPeriod,
+    asOfDate: today,
+    liquidCash,
     utilization,
-    emergencyMonths,
-    expenseRatio,
-    goalsOnTrack,
-    goalCount: goalRows.length,
-    investmentGrowth,
+    goals,
+    dataQualityConfidence,
   });
   const score = compositeScore(dimensions);
-  const priorDims = priorTotals
-    ? buildDimensions({
-        savingsRate: priorTotals.savingsRate,
-        utilization,
-        emergencyMonths,
-        expenseRatio:
-          priorTotals.income > 0
-            ? (priorTotals.spending / priorTotals.income) * 100
-            : 100,
-        goalsOnTrack,
-        goalCount: goalRows.length,
-        investmentGrowth,
-      })
-    : null;
-  const priorScore = priorDims ? compositeScore(priorDims) : score;
+  const confidence = compositeConfidence(dimensions);
+
+  let priorScore = score;
+  if (priorPeriod) {
+    const { end: priorEnd } = monthBounds(priorPeriod);
+    const priorSnapshot = await getAccountMetricsAsOf(userIds, priorEnd);
+    const priorUtil = utilizationPercent(
+      priorSnapshot.creditBalance,
+      priorSnapshot.creditLimit,
+      priorSnapshot.hasCreditLimit,
+    );
+    const priorDims = await buildHealthInputs({
+      userIds,
+      primaryUserId,
+      accountIds,
+      period: priorPeriod,
+      asOfDate: priorEnd,
+      liquidCash: priorSnapshot.liquidCash,
+      utilization: priorUtil,
+      goals,
+      dataQualityConfidence,
+    });
+    priorScore = compositeScore(priorDims);
+  }
 
   return {
     score,
     delta: score - priorScore,
+    confidence,
     history,
     dimensions,
     isLive: history.length > 0,
@@ -301,7 +364,11 @@ export async function buildMonthlySummary(
       safeToSpend: "0.00",
     };
   }
-  const totals = await monthTotals(userIds, accountIds, period);
+  const totals = await monthCashflowTotals(userIds, accountIds, period);
+  const savingsRate = computeSavingsRate({
+    income: totals.income,
+    expense: totals.expense,
+  });
   const { start, end } = monthBounds(period);
   const db = getDb();
   const txScope = drizzleActiveTransactionWhere(userIds, accountIds);
@@ -328,14 +395,14 @@ export async function buildMonthlySummary(
   const now = new Date();
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysRemaining = Math.max(lastDay - now.getDate(), 1);
-  const remaining = Math.max(totals.income - totals.spending, 0);
+  const remaining = Math.max(totals.income - totals.expense, 0);
   const safeToSpend = remaining / daysRemaining;
 
   return {
     period,
     income: formatMoneyAmount(totals.income),
-    spending: formatMoneyAmount(totals.spending),
-    savingsRate: totals.savingsRate,
+    spending: formatMoneyAmount(totals.expense),
+    savingsRate,
     topCategory: top
       ? {
           name: top.category,

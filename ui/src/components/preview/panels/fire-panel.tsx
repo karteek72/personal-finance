@@ -20,33 +20,35 @@ function compactMoney(n: number) {
   return money(n);
 }
 
-/** Years to FIRE: monthly compound growth + fixed monthly contributions. */
-function yearsToTarget(
-  start: number,
-  monthly: number,
-  target: number,
-  annualReturn: number,
-): number {
-  let balance = start;
-  const monthlyReturn = annualReturn / 12;
-  let months = 0;
-  while (balance < target && months < 1200) {
-    balance = balance * (1 + monthlyReturn) + monthly;
-    months++;
-  }
-  return months / 12;
-}
-
 const CHART_HEIGHT = 140;
 
 export function FirePanel() {
   const gate = useFeaturePanelGate("FIRE projection");
-  const { data: fire, isLoading, isError } = useFire();
 
   const [monthlySpend, setMonthlySpend] = useState(4200);
   const [monthlyInvest, setMonthlyInvest] = useState(2100);
   const [withdrawalRate, setWithdrawalRate] = useState(4);
-  const [realReturn, setRealReturn] = useState(6);
+  const [realReturn, setRealReturn] = useState(4.5);
+
+  const { data: fire, isLoading, isError } = useFire({
+    monthlySpend,
+    monthlyInvest,
+    withdrawalRate,
+    realReturn,
+  });
+
+  const { data: investMoreFire } = useFire({
+    monthlySpend,
+    monthlyInvest: monthlyInvest + 300,
+    withdrawalRate,
+    realReturn,
+  });
+  const { data: spendLessFire } = useFire({
+    monthlySpend: Math.max(monthlySpend - 400, 0),
+    monthlyInvest,
+    withdrawalRate,
+    realReturn,
+  });
 
   const seeded = useRef(false);
   useEffect(() => {
@@ -60,34 +62,14 @@ export function FirePanel() {
   }, [fire]);
 
   const currentAge = fire?.currentAge ?? 35;
-  const currentNetWorth = fire
-    ? Number.parseFloat(fire.currentNetWorth)
+  const projection = fire?.projection;
+  const fireNumber = projection
+    ? Number.parseFloat(projection.fireNumber)
     : 0;
-
-  const fireNumber = (monthlySpend * 12) / (withdrawalRate / 100);
-  const years = yearsToTarget(
-    currentNetWorth,
-    monthlyInvest,
-    fireNumber,
-    realReturn / 100,
-  );
-  const fireAge = currentAge + years;
-  const savingsRate = Math.round(
-    (monthlyInvest / (monthlyInvest + monthlySpend)) * 100,
-  );
-
-  const curve = useMemo(() => {
-    const pts: number[] = [];
-    let balance = currentNetWorth;
-    const cap = Math.min(Math.ceil(years) + 2, 45);
-    for (let y = 0; y <= cap; y++) {
-      pts.push(balance);
-      for (let m = 0; m < 12; m++) {
-        balance = balance * (1 + realReturn / 100 / 12) + monthlyInvest;
-      }
-    }
-    return pts;
-  }, [currentNetWorth, monthlyInvest, realReturn, years]);
+  const years = projection?.yearsToFire ?? 0;
+  const fireAge = projection?.fireAge ?? currentAge;
+  const investingRate = projection?.investingRate ?? 0;
+  const curve = projection?.curve ?? [];
 
   const maxVal = Math.max(...curve, fireNumber);
 
@@ -120,25 +102,66 @@ export function FirePanel() {
     );
   }
 
+  const isDefaultAge = fire.isDefaultAge;
+
   return (
     <div className="space-y-5">
-      {fire.isDefaultAge ? (
+      {isDefaultAge ? (
         <div className="rounded-[var(--radius-md)] border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-text">
-          <strong>Age 35 is a placeholder.</strong>{" "}
+          <strong>Age is unset.</strong>{" "}
           <Link href="/profile" className="font-semibold text-primary hover:underline">
             Set your age in Profile
           </Link>{" "}
-          so FIRE Age and the chart timeline are accurate.
+          to see your projected FIRE age. Years-to-FIRE below still uses your spending and investing
+          inputs.
         </div>
       ) : null}
 
+      <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4 text-sm text-text-muted">
+        <p className="font-bold text-text">Assumptions</p>
+        <ul className="mt-2 space-y-1">
+          <li>
+            <strong className="text-text">{realReturn}%</strong> expected real return (after
+            inflation)
+          </li>
+          <li>
+            <strong className="text-text">{withdrawalRate}%</strong> safe withdrawal rate
+          </li>
+          <li>
+            All figures are in <strong className="text-text">today&apos;s dollars</strong> —
+            inflation is handled by using a real (inflation-adjusted) return, not by inflating the
+            FIRE number.
+          </li>
+        </ul>
+        {fire.caveats && fire.caveats.length > 0 ? (
+          <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs">
+            {fire.caveats.map((caveat) => (
+              <li key={caveat}>{caveat}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+
       <p className="text-xs text-text-muted">
-        Using Age <strong className="text-text">{currentAge}</strong>, withdrawal{" "}
-        {withdrawalRate}%, and {realReturn}% real return from your{" "}
-        <Link href="/profile" className="font-semibold text-primary hover:underline">
-          analytics profile
-        </Link>
-        . Sliders below are local what-if only.
+        {isDefaultAge ? (
+          <>
+            Age is not set —{" "}
+            <Link href="/profile" className="font-semibold text-primary hover:underline">
+              add it in Profile
+            </Link>{" "}
+            for a FIRE age timeline.
+          </>
+        ) : (
+          <>
+            Using Age <strong className="text-text">{currentAge}</strong>, withdrawal{" "}
+            {withdrawalRate}%, and {realReturn}% real return from your{" "}
+            <Link href="/profile" className="font-semibold text-primary hover:underline">
+              analytics profile
+            </Link>
+            .
+          </>
+        )}{" "}
+        Sliders below are local what-if only.
       </p>
 
       <div
@@ -146,20 +169,39 @@ export function FirePanel() {
         style={{ background: "var(--gradient-hero)" }}
       >
         <p className="text-xs font-semibold uppercase tracking-wide text-white/60">
-          You can reach financial independence at
+          {isDefaultAge
+            ? "Estimated time to financial independence"
+            : "You can reach financial independence at"}
         </p>
-        <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">
-          Age {fireAge.toFixed(0)}
-        </p>
-        <p className="mt-1 text-sm text-white/70">
-          That&apos;s <strong>{years.toFixed(1)} years</strong> from now. Your
-          FIRE number is <strong>{money(fireNumber)}</strong> — annual spending{" "}
-          {money(monthlySpend * 12)} divided by a {withdrawalRate}% safe
-          withdrawal rate.
-        </p>
+        {isDefaultAge ? (
+          <>
+            <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">
+              {years.toFixed(1)} years
+            </p>
+            <p className="mt-1 text-sm text-white/70">
+              <Link href="/profile" className="font-semibold text-white underline hover:text-white/90">
+                Set your age in Profile
+              </Link>{" "}
+              to see your projected FIRE age. Your FIRE number is{" "}
+              <strong>{money(fireNumber)}</strong> — annual spending {money(monthlySpend * 12)}{" "}
+              divided by a {withdrawalRate}% safe withdrawal rate.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">
+              Age {fireAge.toFixed(0)}
+            </p>
+            <p className="mt-1 text-sm text-white/70">
+              That&apos;s <strong>{years.toFixed(1)} years</strong> from now. Your FIRE number is{" "}
+              <strong>{money(fireNumber)}</strong> — annual spending {money(monthlySpend * 12)}{" "}
+              divided by a {withdrawalRate}% safe withdrawal rate.
+            </p>
+          </>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">
-            Savings rate {savingsRate}%
+            Investing rate {investingRate}%
           </span>
           <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">
             FIRE number {money(fireNumber)}
@@ -348,21 +390,11 @@ export function FirePanel() {
           {[
             {
               label: "Invest $300/mo more",
-              delta: yearsToTarget(
-                currentNetWorth,
-                monthlyInvest + 300,
-                fireNumber,
-                realReturn / 100,
-              ),
+              delta: investMoreFire?.projection.yearsToFire ?? years,
             },
             {
               label: "Cut $400/mo of spending (lowers FIRE number too)",
-              delta: yearsToTarget(
-                currentNetWorth,
-                monthlyInvest + 400,
-                ((monthlySpend - 400) * 12) / (withdrawalRate / 100),
-                realReturn / 100,
-              ),
+              delta: spendLessFire?.projection.yearsToFire ?? years,
             },
           ].map((row) => {
             const saved = years - row.delta;
@@ -373,8 +405,13 @@ export function FirePanel() {
               >
                 <span className="text-text">{row.label}</span>
                 <span className="font-semibold text-success">
-                  −{saved.toFixed(1)} yrs → Age{" "}
-                  {(currentAge + row.delta).toFixed(0)}
+                  −{saved.toFixed(1)} yrs
+                  {!isDefaultAge ? (
+                    <>
+                      {" "}
+                      → Age {(currentAge + row.delta).toFixed(0)}
+                    </>
+                  ) : null}
                 </span>
               </div>
             );

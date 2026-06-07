@@ -24,6 +24,7 @@ ok() {
 spendflow_require_cmd podman
 spendflow_require_cmd curl
 spendflow_load_env
+spendflow_parse_image_version_args "$@"
 spendflow_export_compose_runtime_env
 
 echo "==> SpendFlow container verify"
@@ -53,7 +54,9 @@ else
   ok "Plaid credentials present"
 fi
 
-for img in localhost/spendflow-api:latest localhost/spendflow-ui:latest; do
+echo "    Image tag: ${SPENDFLOW_IMAGE_TAG}"
+
+for img in "localhost/spendflow-api:${SPENDFLOW_IMAGE_TAG}" "localhost/spendflow-ui:${SPENDFLOW_IMAGE_TAG}"; do
   if podman image exists "${img}" 2>/dev/null; then
     ok "image ${img}"
   else
@@ -76,6 +79,17 @@ check_http() {
 # Use loopback for checks even when SPENDFLOW_HOST is 0.0.0.0
 check_http "API health" "http://127.0.0.1:${SPENDFLOW_API_PORT}/api/v1/health"
 check_http "UI" "http://127.0.0.1:${SPENDFLOW_UI_PORT}/"
+
+if [[ -n "${SPENDFLOW_API_PUBLIC_URL:-}" ]] && podman container exists spendflow-ui 2>/dev/null; then
+  api_host="${SPENDFLOW_API_PUBLIC_URL#https://}"
+  api_host="${api_host#http://}"
+  api_host="${api_host%%/*}"
+  if podman exec spendflow-ui sh -c "grep -rq '${api_host}' /usr/share/nginx/html 2>/dev/null"; then
+    ok "UI static bundle references public API host (${api_host})"
+  else
+    fail "UI bundle missing ${api_host} — rebuild: SPENDFLOW_BUILD_TARGET=public ./scripts/podman/build.sh && ./scripts/podman/deploy.sh --build"
+  fi
+fi
 
 for c in spendflow-postgres spendflow-redis spendflow-api spendflow-worker spendflow-ui; do
   if podman container exists "${c}" 2>/dev/null; then

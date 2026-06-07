@@ -3,6 +3,21 @@ export const CREDIT_CARD_PAYMENT_PFC = "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT";
 
 export const INTERNAL_TRANSFER_CATEGORY = "Transfers (internal)" as const;
 export const CREDIT_CARD_PAYMENT_SUBCATEGORY = "Credit Card Payments" as const;
+export const BANK_TRANSFER_SUBCATEGORY = "Bank Transfers" as const;
+
+const TRANSFER_LIKE_NAME_PATTERNS = [
+  /\btransfer\b/i,
+  /\bxfer\b/i,
+  /\bach\b/i,
+  /\bwire\b/i,
+  /move money/i,
+  /online banking/i,
+  /mobile banking/i,
+  /savings? transfer/i,
+  /checking transfer/i,
+  /internal transfer/i,
+  /between accounts/i,
+];
 
 const CREDIT_CARD_PAYMENT_PATTERNS = [
   /payment thank you/i,
@@ -74,11 +89,22 @@ export function resolveInternalTransfer(
   if (input.category === INTERNAL_TRANSFER_CATEGORY) {
     return {
       category: INTERNAL_TRANSFER_CATEGORY,
-      subCategory: input.subCategory ?? "Bank Transfers",
+      subCategory: input.subCategory ?? BANK_TRANSFER_SUBCATEGORY,
       transactionType: "transfer",
       isTransfer: true,
     };
   }
 
   return null;
+}
+
+/** Conservative name/category heuristic for transfer-looking outflows. */
+export function looksLikeTransfer(input: {
+  name: string;
+  merchantName?: string | null;
+  category?: string;
+}): boolean {
+  if (input.category === INTERNAL_TRANSFER_CATEGORY) return true;
+  const haystack = `${input.merchantName ?? ""} ${input.name}`.trim();
+  return TRANSFER_LIKE_NAME_PATTERNS.some((pattern) => pattern.test(haystack));
 }

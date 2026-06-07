@@ -243,6 +243,10 @@ export async function acceptHouseholdInvitation(
     .where(eq(households.id, row.invitation.householdId))
     .limit(1);
 
+  const { scheduleHouseholdRecompute } = await import("./household-recompute.js");
+  scheduleHouseholdRecompute(userId);
+  scheduleHouseholdRecompute(row.invitation.invitedByUserId);
+
   return {
     householdId: row.invitation.householdId,
     householdName: household?.name ?? "Family",

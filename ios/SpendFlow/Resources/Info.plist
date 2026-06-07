@@ -35,6 +35,12 @@
 	<string>$(GOOGLE_CLIENT_ID)</string>
 	<key>GoogleServerClientID</key>
 	<string>$(GOOGLE_SERVER_CLIENT_ID)</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>SpendFlow uses Face ID to unlock the app and protect your financial data on this device.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

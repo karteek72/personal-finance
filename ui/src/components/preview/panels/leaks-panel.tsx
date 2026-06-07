@@ -1,72 +1,192 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
+import {
+  FeatureEmptyState,
+  FeaturePanelLoading,
+} from "@/components/preview/feature-empty-state";
 import { useRecurring } from "@/hooks/use-features";
+import { formatMoney } from "@/lib/format-money";
+import type { CostAudit } from "@/types/api";
 
 interface Fee {
   id: string;
   label: string;
   source: string;
   count: number;
-  total: number; // last 12 months
+  total: number;
   fixable: boolean;
 }
 
-interface Habit {
-  id: string;
-  emoji: string;
-  label: string;
-  monthly: number;
+const AUDIT_PAGE_SIZE = 8;
+
+function confidenceBadge(confidence: number): string {
+  if (confidence >= 0.75) return "High impact";
+  if (confidence >= 0.5) return "Medium impact";
+  return "Lower confidence";
 }
 
-function money(n: number) {
-  return `$${n.toLocaleString(undefined, { maximumFractionDigits: n % 1 === 0 ? 0 : 2 })}`;
+function AuditCard({ audit }: { audit: CostAudit }) {
+  return (
+    <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-text">
+            {audit.emoji} {audit.title}
+          </p>
+          <p className="mt-1 text-xs text-text-muted">{audit.rationale}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-bg px-2 py-0.5 text-[10px] font-semibold text-text-muted">
+          {confidenceBadge(audit.confidence)}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-[var(--radius-sm)] bg-bg p-2">
+          <p className="text-[10px] text-text-muted">Monthly</p>
+          <p className="text-sm font-bold tabular-nums text-text">
+            {formatMoney(audit.monthly)}
+          </p>
+        </div>
+        <div className="rounded-[var(--radius-sm)] bg-bg p-2">
+          <p className="text-[10px] text-text-muted">Annual</p>
+          <p className="text-sm font-bold tabular-nums text-text">
+            {formatMoney(audit.annual)}
+          </p>
+        </div>
+        <div className="rounded-[var(--radius-sm)] bg-bg p-2">
+          <p className="text-[10px] text-text-muted">10y opportunity</p>
+          <p className="text-sm font-bold tabular-nums text-warning">
+            {formatMoney(audit.opportunityCost10y)}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2 rounded-[var(--radius-sm)] bg-success/5 px-3 py-2">
+        <p className="text-[12px] text-text">{audit.action}</p>
+        <p className="shrink-0 text-xs font-bold tabular-nums text-success">
+          Save ~{formatMoney(audit.savingsEstimate)}/mo
+        </p>
+      </div>
+    </div>
+  );
 }
 
-// Future value of a recurring monthly amount over `years` at 7% annual
-function fv(monthly: number, years: number, rate = 0.07): number {
-  const r = rate / 12;
-  const n = years * 12;
-  return monthly * ((Math.pow(1 + r, n) - 1) / r);
+function LapsedSubscriptionCard({
+  audit,
+  onConfirm,
+}: {
+  audit: CostAudit;
+  onConfirm: (id: string) => void;
+}) {
+  return (
+    <div className="rounded-[var(--radius-md)] border border-success/40 bg-success/5 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-text">
+            {audit.emoji} {audit.title}
+          </p>
+          <p className="mt-1 text-xs text-text-muted">{audit.rationale}</p>
+          <p className="mt-2 text-sm text-text">
+            Saving about{" "}
+            <strong className="tabular-nums text-success">
+              {formatMoney(audit.annual)}/yr
+            </strong>{" "}
+            if this subscription is cancelled.
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => onConfirm(audit.id)}
+          className="flex-1 rounded-[var(--radius-sm)] bg-success px-3 py-2 text-xs font-semibold text-white"
+        >
+          Yes, looks cancelled
+        </button>
+        <button
+          type="button"
+          onClick={() => onConfirm(audit.id)}
+          className="rounded-[var(--radius-sm)] border border-border px-3 py-2 text-xs font-semibold text-text-muted hover:text-text"
+        >
+          Still active
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function LeaksPanel() {
   const [tab, setTab] = useState<"fees" | "audit">("fees");
-  const { data } = useRecurring();
+  const [auditPage, setAuditPage] = useState(1);
+  const [dismissedLapsed, setDismissedLapsed] = useState<Set<string>>(new Set());
+  const { data, isLoading } = useRecurring();
 
-  const fees: Fee[] = (data?.leaks.fees ?? []).map((f) => ({
-    id: f.id,
-    label: f.label,
-    source: f.source,
-    count: f.count,
-    total: Number.parseFloat(f.total),
-    fixable: f.fixable,
-  }));
+  const fees: Fee[] = useMemo(
+    () =>
+      (data?.leaks.fees ?? []).map((f) => ({
+        id: f.id,
+        label: f.label,
+        source: f.source,
+        count: f.count,
+        total: Number.parseFloat(f.total),
+        fixable: f.fixable,
+      })),
+    [data?.leaks.fees],
+  );
 
-  const habits: Habit[] = (data?.leaks.habits ?? []).map((h) => ({
-    id: h.id,
-    emoji: h.emoji ?? "💸",
-    label: h.label,
-    monthly: Number.parseFloat(h.monthly),
-  }));
+  const audits = data?.leaks.audits ?? [];
+  const lapsedAudits = useMemo(
+    () =>
+      audits.filter(
+        (a) => a.type === "lapsed_subscription" && !dismissedLapsed.has(a.id),
+      ),
+    [audits, dismissedLapsed],
+  );
+  const lifestyleAudits = useMemo(
+    () => audits.filter((a) => a.type !== "lapsed_subscription"),
+    [audits],
+  );
+
+  const visibleAuditCount = auditPage * AUDIT_PAGE_SIZE;
+  const pagedAudits = lifestyleAudits.slice(0, visibleAuditCount);
+  const hasMoreAudits = lifestyleAudits.length > visibleAuditCount;
+
+  if (isLoading) {
+    return <FeaturePanelLoading />;
+  }
 
   const feeTotal = fees.reduce((s, f) => s + f.total, 0);
   const recoverable = fees.filter((f) => f.fixable).reduce((s, f) => s + f.total, 0);
 
+  if (fees.length === 0 && audits.length === 0) {
+    return (
+      <FeatureEmptyState feature="money leaks" variant="insufficient-data" />
+    );
+  }
+
+  const confirmLapsed = (id: string) => {
+    setDismissedLapsed((prev) => new Set(prev).add(id));
+  };
+
   return (
     <div className="space-y-5">
-
-      {/* Hero */}
-      <div className="rounded-[var(--radius-lg)] p-5" style={{ background: "var(--gradient-hero)" }}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Silently draining your accounts</p>
-        <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">{money(feeTotal)}</p>
+      <div
+        className="rounded-[var(--radius-lg)] p-5"
+        style={{ background: "var(--gradient-hero)" }}
+      >
+        <p className="text-xs font-semibold uppercase tracking-wide text-white/60">
+          Silently draining your accounts
+        </p>
+        <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">
+          {formatMoney(String(feeTotal))}
+        </p>
         <p className="mt-1 text-sm text-white/70">
-          In fees over the last 12 months. <strong>{money(recoverable)}</strong> of that is avoidable with a few account changes.
+          In fees over the last 12 months.{" "}
+          <strong>{formatMoney(String(recoverable))}</strong> of that is avoidable
+          with a few account changes.
         </p>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-2">
         {[
           { id: "fees" as const, label: "Hidden fees" },
@@ -74,9 +194,12 @@ export function LeaksPanel() {
         ].map((t) => (
           <button
             key={t.id}
+            type="button"
             onClick={() => setTab(t.id)}
             className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition-all ${
-              tab === t.id ? "border-primary bg-primary-soft text-primary" : "border-border text-text-muted hover:text-text"
+              tab === t.id
+                ? "border-primary bg-primary-soft text-primary"
+                : "border-border text-text-muted hover:text-text"
             }`}
           >
             {t.label}
@@ -87,75 +210,89 @@ export function LeaksPanel() {
       {tab === "fees" ? (
         <div className="space-y-2">
           {fees.map((f) => (
-            <div key={f.id} className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
+            <div
+              key={f.id}
+              className="rounded-[var(--radius-md)] border border-border bg-surface p-4"
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-text">{f.label}</p>
-                  <p className="text-[11px] text-text-muted">{f.source} · {f.count}× this year</p>
+                  <p className="text-[11px] text-text-muted">
+                    {f.source} · {f.count}× this year
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-base font-bold tabular-nums text-danger">{money(f.total)}</p>
+                  <p className="text-base font-bold tabular-nums text-danger">
+                    {formatMoney(String(f.total))}
+                  </p>
                   {f.fixable ? (
-                    <span className="text-[10px] font-semibold text-success">Avoidable</span>
+                    <span className="text-[10px] font-semibold text-success">
+                      Avoidable
+                    </span>
                   ) : (
-                    <span className="text-[10px] font-semibold text-text-muted">Reduce balance</span>
+                    <span className="text-[10px] font-semibold text-text-muted">
+                      Reduce balance
+                    </span>
                   )}
                 </div>
               </div>
-              {f.fixable && (
+              {f.fixable ? (
                 <div className="mt-2 rounded-[var(--radius-sm)] bg-success/5 px-3 py-1.5 text-[12px] text-text">
-                  {f.id === "atm" && "💡 Switch to a fee-free online bank or use in-network ATMs."}
-                  {f.id === "overdraft" && "💡 Enable balance alerts at $100 + link a savings buffer."}
-                  {f.id === "maint" && "💡 You qualify for a no-fee account with direct deposit."}
-                  {f.id === "late" && "💡 Set autopay for the statement minimum to never miss again."}
-                  {f.id === "fx" && "💡 Use a no-FX-fee travel card abroad."}
+                  {f.id === "atm" &&
+                    "💡 Switch to a fee-free online bank or use in-network ATMs."}
+                  {f.id === "overdraft" &&
+                    "💡 Enable balance alerts at $100 + link a savings buffer."}
+                  {f.id === "maint" &&
+                    "💡 You qualify for a no-fee account with direct deposit."}
+                  {f.id === "late" &&
+                    "💡 Set autopay for the statement minimum to never miss again."}
+                  {f.id === "fx" &&
+                    "💡 Use a no-FX-fee travel card abroad."}
                 </div>
-              )}
+              ) : null}
             </div>
           ))}
         </div>
       ) : (
-        <div className="space-y-3">
-          <p className="px-1 text-[11px] text-text-muted">
-            The real cost of a habit isn&apos;t the monthly bill — it&apos;s what that money becomes if invested. Below: annual cost and 10-year opportunity cost at 7%.
-          </p>
-          {habits.length === 0 ? (
-            <p className="px-1 text-xs text-text-muted">No recurring habits detected yet.</p>
-          ) : null}
-          {habits.map((h) => (
-            <div key={h.id} className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-semibold text-text">{h.emoji} {h.label}</span>
-                <span className="text-sm font-bold tabular-nums text-text">{money(h.monthly)}/mo</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-[var(--radius-sm)] bg-bg p-2">
-                  <p className="text-[10px] text-text-muted">Per year</p>
-                  <p className="text-sm font-bold tabular-nums text-text">{money(h.monthly * 12)}</p>
-                </div>
-                <div className="rounded-[var(--radius-sm)] bg-bg p-2">
-                  <p className="text-[10px] text-text-muted">10y invested</p>
-                  <p className="text-sm font-bold tabular-nums text-warning">{money(Math.round(fv(h.monthly, 10)))}</p>
-                </div>
-                <div className="rounded-[var(--radius-sm)] bg-bg p-2">
-                  <p className="text-[10px] text-text-muted">30y invested</p>
-                  <p className="text-sm font-bold tabular-nums text-danger">{money(Math.round(fv(h.monthly, 30)))}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-          {habits.length > 0 ? (
-            <div className="rounded-[var(--radius-md)] border border-primary/30 bg-primary-soft/40 p-4">
-              <p className="text-sm font-bold text-text">
-                If you redirected your {habits[0]!.label.toLowerCase()} habit…
+        <div className="space-y-4">
+          {lapsedAudits.length > 0 ? (
+            <div className="space-y-2">
+              <p className="px-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+                Possibly cancelled subscriptions
               </p>
-              <p className="mt-1 text-sm text-text-muted">
-                {money(habits[0]!.monthly)}/mo invested for 30 years becomes{" "}
-                <strong className="text-primary">{money(Math.round(fv(habits[0]!.monthly, 30)))}</strong>.
-                Small leaks, big ocean.
-              </p>
+              {lapsedAudits.map((audit) => (
+                <LapsedSubscriptionCard
+                  key={audit.id}
+                  audit={audit}
+                  onConfirm={confirmLapsed}
+                />
+              ))}
             </div>
           ) : null}
+
+          <div className="space-y-3">
+            <p className="px-1 text-[11px] text-text-muted">
+              Ranked by estimated savings. Opportunity cost is computed from your
+              data — not a client-side estimate.
+            </p>
+            {lifestyleAudits.length === 0 ? (
+              <p className="px-1 text-xs text-text-muted">
+                No lifestyle audits detected yet.
+              </p>
+            ) : null}
+            {pagedAudits.map((audit) => (
+              <AuditCard key={audit.id} audit={audit} />
+            ))}
+            {hasMoreAudits ? (
+              <button
+                type="button"
+                onClick={() => setAuditPage((p) => p + 1)}
+                className="w-full rounded-[var(--radius-md)] border border-border py-2.5 text-sm font-semibold text-primary hover:bg-primary-soft/30"
+              >
+                Show more ({lifestyleAudits.length - visibleAuditCount} remaining)
+              </button>
+            ) : null}
+          </div>
         </div>
       )}
     </div>

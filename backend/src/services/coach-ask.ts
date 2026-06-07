@@ -48,6 +48,8 @@ export async function askCoach(
 
   const categories = await getCategories(ctx.userIds, start, end);
 
+  const savingsRatePct = (summary.savingsRate * 100).toFixed(1);
+
   if (/food|delivery|dining|restaurant|doordash|uber eats|grubhub/.test(q)) {
     const dining =
       categories.categories.find((c) =>
@@ -55,7 +57,7 @@ export async function askCoach(
       ) ?? categories.categories[0];
     const amt = dining?.amount ?? "0.00";
     return {
-      answer: `This month you've spent **${amt}** on ${dining?.name ?? "food & dining"}. Total spending is **${summary.spending}** with a **${summary.savingsRate.toFixed(1)}%** savings rate.`,
+      answer: `This month you've spent **${amt}** on ${dining?.name ?? "food & dining"}. Total spending is **${summary.spending}** with a **${savingsRatePct}%** savings rate.`,
       isLive: true,
     };
   }
@@ -72,7 +74,7 @@ export async function askCoach(
             .join("; ")
         : "No savings goals set yet.";
     return {
-      answer: `Your savings rate this month is **${summary.savingsRate.toFixed(1)}%**. Safe to spend today: **${budgets.safeToSpend}**. Goals: ${goalText}`,
+      answer: `Your savings rate this month is **${savingsRatePct}%**. Safe to spend today: **${budgets.safeToSpend}**. Goals: ${goalText}`,
       isLive: true,
     };
   }
@@ -102,13 +104,13 @@ export async function askCoach(
 
   if (/spent|spend|how much|total/.test(q)) {
     return {
-      answer: `This month (${summary.period}): spent **${summary.spending}**, earned **${summary.income}**, savings rate **${summary.savingsRate.toFixed(1)}%**. Top category: **${summary.topCategory?.name ?? "N/A"}** at **${summary.topCategory?.amount ?? "$0.00"}**.`,
+      answer: `This month (${summary.period}): spent **${summary.spending}**, earned **${summary.income}**, savings rate **${savingsRatePct}%**. Top category: **${summary.topCategory?.name ?? "N/A"}** at **${summary.topCategory?.amount ?? "$0.00"}**.`,
       isLive: true,
     };
   }
 
   return {
-    answer: `Based on ${summary.period}: you spent **${summary.spending}** and saved **${summary.savingsRate.toFixed(1)}%** of **${summary.income}** income. Ask about food delivery, subscriptions, goals, or total spending for more detail.`,
+    answer: `Based on ${summary.period}: you spent **${summary.spending}** and saved **${savingsRatePct}%** of **${summary.income}** income. Ask about food delivery, subscriptions, goals, or total spending for more detail.`,
     isLive: true,
   };
 }

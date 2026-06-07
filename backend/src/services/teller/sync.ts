@@ -11,6 +11,9 @@ import {
 } from "../category-rules.js";
 import { classifyBankingTransaction } from "../classify-banking-transaction.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
+import { upsertBalanceSnapshotsForAccountIds } from "../balance-snapshots.js";
+import { backfillTransactionMerchantIds } from "../dim-merchant-store.js";
+import { recomputeAllAnalytics } from "../recompute-all-analytics.js";
 import {
   PLAID_TXN_BATCH_SIZE,
   upsertPlaidTransactionBatch,
@@ -177,6 +180,8 @@ export async function syncTellerEnrollment(
     [...accountIdByTellerId.values()],
   );
 
+  await upsertBalanceSnapshotsForAccountIds([...accountIdByTellerId.values()]);
+
   const categoryRules = await getMerchantCategoryRulesMap(enrollment.userId);
   const startDate = daysAgoIso(730);
   const endDate = daysAgoIso(0);
@@ -226,6 +231,9 @@ export async function syncTellerEnrollment(
     },
     "teller enrollment synced",
   );
+
+  await backfillTransactionMerchantIds(enrollment.userId);
+  await recomputeAllAnalytics(enrollment.userId);
 
   return {
     enrollmentId: enrollment.tellerEnrollmentId,

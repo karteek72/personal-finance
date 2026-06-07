@@ -7,6 +7,7 @@ import {
   FeaturePanelLoading,
 } from "@/components/preview/feature-empty-state";
 import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
+import { MetricLiveBadge } from "@/components/ui/metric-live-badge";
 import { useDna } from "@/hooks/use-features";
 
 interface Axis {
@@ -63,6 +64,9 @@ export function DnaPanel() {
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end">
+        <MetricLiveBadge isLive={data.isLive ?? false} />
+      </div>
       {/* Hero */}
       <div className="rounded-[var(--radius-lg)] p-5" style={{ background: "var(--gradient-hero)" }}>
         <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Your spending fingerprint</p>

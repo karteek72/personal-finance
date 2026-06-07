@@ -346,6 +346,9 @@ export async function assignAccountToMember(
       set: { memberId, householdId: ctx.householdId },
     });
 
+  const { scheduleHouseholdRecompute } = await import("./household-recompute.js");
+  scheduleHouseholdRecompute(userId);
+
   return { accountId, memberId };
 }
 

@@ -1,10 +1,13 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   date,
+  index,
   integer,
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uuid,
@@ -131,6 +134,7 @@ export const accounts = pgTable(
     source: text("source").notNull().default("import"), // import | plaid | teller | snaptrade
     balanceCurrent: numeric("balance_current", { precision: 12, scale: 2 }),
     balanceAvailable: numeric("balance_available", { precision: 12, scale: 2 }),
+    creditLimit: numeric("credit_limit", { precision: 12, scale: 2 }),
     status: text("status").notNull().default("active"),
     isActive: boolean("is_active").notNull().default(true),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
@@ -173,6 +177,31 @@ export const creditCardLiabilities = pgTable("credit_card_liabilities", {
     .defaultNow(),
 });
 
+export const dimCategory = pgTable("dim_category", {
+  category: text("category").primaryKey(),
+  spendClass: text("spend_class").notNull(),
+  isEssential: boolean("is_essential").notNull().default(false),
+  cpiWeightEligible: boolean("cpi_weight_eligible").notNull().default(false),
+});
+
+export const dimMerchant = pgTable(
+  "dim_merchant",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    displayName: text("display_name").notNull(),
+    canonicalKey: text("canonical_key").notNull(),
+  },
+  (table) => [
+    uniqueIndex("dim_merchant_user_canonical_idx").on(
+      table.userId,
+      table.canonicalKey,
+    ),
+  ],
+);
+
 export const transactions = pgTable(
   "transactions",
   {
@@ -196,6 +225,16 @@ export const transactions = pgTable(
     pending: boolean("pending").notNull().default(false),
     source: text("source").notNull(), // qfx | bofa_pdf | csv | plaid
     dedupFingerprint: text("dedup_fingerprint"),
+    merchantId: uuid("merchant_id").references(() => dimMerchant.id, {
+      onDelete: "set null",
+    }),
+    signedAmount: numeric("signed_amount", { precision: 14, scale: 2 }).generatedAlwaysAs(
+      sql`CASE
+        WHEN transaction_type = 'expense' THEN -abs(amount)
+        WHEN transaction_type = 'income' THEN abs(amount)
+        ELSE 0
+      END`,
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -205,6 +244,29 @@ export const transactions = pgTable(
       table.accountId,
       table.externalId,
     ),
+    index("tx_user_date_idx").on(table.userId, table.date),
+    index("tx_user_cat_date_idx").on(table.userId, table.category, table.date),
+    index("tx_user_merchant_date_idx").on(
+      table.userId,
+      table.merchantId,
+      table.date,
+    ),
+  ],
+);
+
+export const balanceSnapshots = pgTable(
+  "balance_snapshots",
+  {
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    asOfDate: date("as_of_date").notNull(),
+    balanceCurrent: numeric("balance_current", { precision: 14, scale: 2 }),
+    balanceAvailable: numeric("balance_available", { precision: 14, scale: 2 }),
+    creditLimit: numeric("credit_limit", { precision: 14, scale: 2 }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.accountId, table.asOfDate] }),
   ],
 );
 
@@ -311,6 +373,48 @@ export const securities = pgTable("securities", {
   asOf: timestamp("as_of", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const securityPrices = pgTable(
+  "security_prices",
+  {
+    securityId: uuid("security_id")
+      .notNull()
+      .references(() => securities.id, { onDelete: "cascade" }),
+    asOfDate: date("as_of_date").notNull(),
+    closePrice: numeric("close_price", { precision: 18, scale: 4 }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.securityId, table.asOfDate] }),
+  ],
+);
+
+export const holdingsSnapshots = pgTable(
+  "holdings_snapshots",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    securityId: uuid("security_id")
+      .notNull()
+      .references(() => securities.id, { onDelete: "cascade" }),
+    asOfDate: date("as_of_date").notNull(),
+    quantity: numeric("quantity", { precision: 20, scale: 8 }).notNull(),
+    marketValue: numeric("market_value", { precision: 14, scale: 2 }).notNull(),
+    costBasisTotal: numeric("cost_basis_total", {
+      precision: 14,
+      scale: 2,
+    }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.accountId, table.securityId, table.asOfDate],
+    }),
+    index("holdings_snapshots_user_date_idx").on(table.userId, table.asOfDate),
+  ],
+);
+
 export const holdings = pgTable(
   "holdings",
   {
@@ -373,6 +477,66 @@ export const investmentTransactions = pgTable(
   ],
 );
 
+export const transferLinks = pgTable(
+  "transfer_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    outflowTxnId: uuid("outflow_txn_id").references(() => transactions.id, {
+      onDelete: "cascade",
+    }),
+    inflowTxnId: uuid("inflow_txn_id").references(() => transactions.id, {
+      onDelete: "cascade",
+    }),
+    inflowInvestmentTxnId: uuid("inflow_investment_txn_id").references(
+      () => investmentTransactions.id,
+      { onDelete: "cascade" },
+    ),
+    matchConfidence: numeric("match_confidence", {
+      precision: 4,
+      scale: 3,
+    }).notNull(),
+    linkKind: text("link_kind").notNull(), // bank_bank | bank_brokerage | cc_payment
+  },
+  (table) => [index("transfer_links_user_idx").on(table.userId)],
+);
+
+export const taxLots = pgTable(
+  "tax_lots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    securityId: uuid("security_id")
+      .notNull()
+      .references(() => securities.id, { onDelete: "cascade" }),
+    openTxnId: uuid("open_txn_id").references(() => investmentTransactions.id, {
+      onDelete: "set null",
+    }),
+    openDate: date("open_date").notNull(),
+    quantityOpen: numeric("quantity_open", { precision: 20, scale: 8 }).notNull(),
+    quantityRemaining: numeric("quantity_remaining", {
+      precision: 20,
+      scale: 8,
+    }).notNull(),
+    costPerUnit: numeric("cost_per_unit", { precision: 18, scale: 4 }).notNull(),
+  },
+  (table) => [
+    index("tax_lots_user_security_idx").on(table.userId, table.securityId),
+    index("tax_lots_account_security_idx").on(
+      table.accountId,
+      table.securityId,
+      table.openDate,
+    ),
+  ],
+);
+
 /* ------------------------------------------------------------------ *
  * Planning: net worth, budgets, goals, recurring, FIRE
  * ------------------------------------------------------------------ */
@@ -413,6 +577,8 @@ export const budgets = pgTable(
     limitAmount: numeric("limit_amount", { precision: 12, scale: 2 }).notNull(),
     emoji: text("emoji"),
     color: text("color"),
+    source: text("source").notNull().default("user"), // user | suggested
+    class: text("class"), // essential | discretionary
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -443,6 +609,9 @@ export const savingsGoals = pgTable("savings_goals", {
   accountId: uuid("account_id").references(() => accounts.id, {
     onDelete: "set null",
   }),
+  kind: text("kind").notNull().default("custom"), // emergency | debt | sinking | surplus | custom
+  status: text("status").notNull().default("active"), // active | achieved | dismissed
+  source: text("source").notNull().default("user"), // user | suggested
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -486,6 +655,7 @@ export const fireProfiles = pgTable("fire_profiles", {
   }).notNull(),
   withdrawalRate: numeric("withdrawal_rate", { precision: 5, scale: 2 }).notNull(),
   realReturn: numeric("real_return", { precision: 5, scale: 2 }).notNull(),
+  realReturnUserSet: boolean("real_return_user_set").notNull().default(false),
   householdSize: integer("household_size"),
   annualGrossIncome: numeric("annual_gross_income", { precision: 14, scale: 2 }),
   targetRetirementAge: integer("target_retirement_age"),
@@ -571,6 +741,7 @@ export const challenges = pgTable("challenges", {
   progressPercent: integer("progress_percent").notNull().default(0),
   daysRemaining: integer("days_remaining").notNull().default(0),
   complete: boolean("complete").notNull().default(false),
+  dismissed: boolean("dismissed").notNull().default(false),
   color: text("color"),
 });
 
@@ -661,6 +832,104 @@ export const resilienceScenarios = pgTable("resilience_scenarios", {
   detail: text("detail"),
   sortOrder: integer("sort_order").notNull().default(0),
 });
+
+/* ------------------------------------------------------------------ *
+ * Alert engine (table-driven, post-sync)
+ * ------------------------------------------------------------------ */
+
+export const alertRules = pgTable("alert_rules", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  severity: text("severity").notNull(),
+  basis: text("basis").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  thresholdJson: jsonb("threshold_json").notNull().default({}),
+});
+
+export const userAlerts = pgTable(
+  "user_alerts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    ruleId: text("rule_id")
+      .notNull()
+      .references(() => alertRules.id, { onDelete: "cascade" }),
+    severity: text("severity").notNull(),
+    title: text("title").notNull(),
+    message: text("message").notNull(),
+    basis: text("basis").notNull(),
+    confidence: numeric("confidence", { precision: 4, scale: 3 }),
+    evidenceJson: jsonb("evidence_json"),
+    dismissible: boolean("dismissible").notNull().default(true),
+    dismissed: boolean("dismissed").notNull().default(false),
+    triggeredAt: timestamp("triggered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("user_alerts_user_rule_idx").on(table.userId, table.ruleId),
+    index("user_alerts_user_active_idx").on(
+      table.userId,
+      table.dismissed,
+      table.triggeredAt,
+    ),
+  ],
+);
+
+export const accountDuplicateDismissals = pgTable(
+  "account_duplicate_dismissals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accountAId: uuid("account_a_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    accountBId: uuid("account_b_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("account_duplicate_dismissals_pair_idx").on(
+      table.userId,
+      table.accountAId,
+      table.accountBId,
+    ),
+    index("account_duplicate_dismissals_user_idx").on(table.userId),
+  ],
+);
+
+export const deviceTokens = pgTable(
+  "device_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    platform: text("platform").notNull().default("ios"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("device_tokens_user_token_idx").on(table.userId, table.token),
+    index("device_tokens_user_idx").on(table.userId),
+  ],
+);
 
 /* ------------------------------------------------------------------ *
  * Coach & Wrapped

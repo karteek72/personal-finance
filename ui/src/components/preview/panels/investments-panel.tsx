@@ -29,9 +29,6 @@ export function InvestmentsPanel() {
     ? Number.parseFloat(investments.portfolioValue)
     : investmentAccounts.reduce((s, a) => s + Number.parseFloat(a.balanceCurrent ?? "0"), 0);
 
-  const positions = investments?.positions ?? [];
-  const stockAggregates = investments?.stockAggregates ?? [];
-  const optionPositions = investments?.optionPositions ?? [];
   const portfolioBreakdown = investments?.portfolioBreakdown ?? {
     stocksValue: "0",
     optionsValue: "0",
@@ -42,7 +39,8 @@ export function InvestmentsPanel() {
     totalPositionCount: 0,
     otherValue: "0",
   };
-  const hasHoldings = positions.length > 0;
+  const hasHoldings =
+    (investments?.positions?.total ?? investments?.positions?.rows.length ?? 0) > 0;
 
   const behavioralAlerts = investments?.behavioralAlerts ?? [];
   const monthlyActivity = investments?.monthlyActivity ?? null;
@@ -111,17 +109,7 @@ export function InvestmentsPanel() {
 
         {activeTab === "portfolio" && (
           hasHoldings ? (
-            <HoldingsPortfolioSection
-              positions={positions}
-              stockAggregates={stockAggregates}
-              optionPositions={optionPositions}
-              portfolioBreakdown={portfolioBreakdown}
-              accountOptions={investmentAccounts.map((a) => ({
-                id: a.id,
-                name: a.name,
-                mask: a.mask,
-              }))}
-            />
+            <HoldingsPortfolioSection portfolioBreakdown={portfolioBreakdown} />
           ) : (
             <p className="px-1 py-4 text-center text-sm text-text-muted">
               {investmentAccounts.length > 0

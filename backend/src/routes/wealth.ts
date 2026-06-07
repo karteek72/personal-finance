@@ -2,8 +2,13 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { AppError } from "../lib/errors.js";
 import { requireRequestUser } from "../lib/auth-http.js";
+import { parseListQuery } from "../lib/list-query.js";
 import { parseBody } from "../lib/validate.js";
-import { getInvestments, getNetWorth } from "../services/investments-store.js";
+import {
+  getInvestments,
+  getNetWorth,
+  HOLDING_SORTABLE,
+} from "../services/investments-store.js";
 import { getFire, updateFireProfile } from "../services/planning-store.js";
 
 const patchFireSchema = z
@@ -20,6 +25,13 @@ const patchFireSchema = z
     { message: "At least one field is required" },
   );
 
+const fireQuerySchema = z.object({
+  monthlySpend: z.coerce.number().min(0).optional(),
+  monthlyInvest: z.coerce.number().min(0).optional(),
+  withdrawalRate: z.coerce.number().min(1).max(10).optional(),
+  realReturn: z.coerce.number().min(0).max(15).optional(),
+});
+
 export const wealthRoutes: FastifyPluginAsync = async (app) => {
   app.get("/wealth/net-worth", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
@@ -28,12 +40,25 @@ export const wealthRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/wealth/investments", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
-    return getInvestments(user.id);
+    const query = parseListQuery(request.query, {
+      sortable: HOLDING_SORTABLE,
+      defaultSort: "value",
+      defaultDir: "desc",
+    });
+    const accountId =
+      typeof request.query === "object" &&
+      request.query != null &&
+      "accountId" in request.query &&
+      typeof request.query.accountId === "string"
+        ? request.query.accountId
+        : undefined;
+    return getInvestments(user.id, query, accountId);
   });
 
   app.get("/wealth/fire", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
-    const fire = await getFire(user.id);
+    const overrides = fireQuerySchema.parse(request.query);
+    const fire = await getFire(user.id, overrides);
     if (!fire) {
       throw AppError.notFound("No FIRE profile found");
     }

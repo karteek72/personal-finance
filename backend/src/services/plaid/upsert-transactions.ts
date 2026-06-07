@@ -1,6 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { getDb } from "../../db/client.js";
 import { transactions } from "../../db/schema.js";
+import { MerchantResolver } from "../dim-merchant-store.js";
 import { bankingDedupFingerprint } from "../import/fingerprint.js";
 
 export const PLAID_TXN_BATCH_SIZE = 100;
@@ -23,6 +24,10 @@ export type PlaidTransactionInsert = {
 
 type PlaidRowWithFingerprint = PlaidTransactionInsert & {
   dedupFingerprint: string;
+};
+
+type PlaidRowForInsert = PlaidRowWithFingerprint & {
+  merchantId: string | null;
 };
 
 async function filterPlaidDedupRows(
@@ -73,15 +78,28 @@ export async function upsertPlaidTransactionBatch(
     return;
   }
 
+  const merchantResolver = new MerchantResolver();
+  const withMerchants: PlaidRowForInsert[] = [];
+  for (const row of filtered) {
+    const merchantId = await merchantResolver.resolve(
+      db,
+      row.userId,
+      row.merchantName,
+      row.name,
+    );
+    withMerchants.push({ ...row, merchantId });
+  }
+
   await db
     .insert(transactions)
-    .values(filtered)
+    .values(withMerchants)
     .onConflictDoUpdate({
       target: [transactions.accountId, transactions.externalId],
       set: {
         date: sql`excluded.date`,
         name: sql`excluded.name`,
         merchantName: sql`excluded.merchant_name`,
+        merchantId: sql`excluded.merchant_id`,
         amount: sql`excluded.amount`,
         category: sql`excluded.category`,
         subCategory: sql`excluded.sub_category`,

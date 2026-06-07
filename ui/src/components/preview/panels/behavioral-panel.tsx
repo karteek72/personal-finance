@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import {
@@ -7,6 +8,8 @@ import {
 } from "@/components/preview/feature-empty-state";
 import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
 import { useBehavioral } from "@/hooks/use-features";
+import { api } from "@/lib/api-client";
+import { notifications } from "@/lib/notifications";
 
 const REASONS = [
   { id: "need", emoji: "✅", label: "Needed it", color: "#22c55e" },
@@ -32,10 +35,14 @@ function money(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 }
 
+const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === "true";
+
 export function BehavioralPanel() {
   const gate = useFeaturePanelGate("behavioral insights");
+  const queryClient = useQueryClient();
   const { data, isLoading } = useBehavioral();
   const [tags, setTags] = useState<Record<string, ReasonId>>({});
+  const [pendingTxnId, setPendingTxnId] = useState<string | null>(null);
 
   const reasonTotals: Record<string, number> = useMemo(
     () =>
@@ -56,16 +63,57 @@ export function BehavioralPanel() {
   if (!gate.ready) return gate.node;
   if (isLoading) return <FeaturePanelLoading />;
 
-  const setTag = (txnId: string, reason: ReasonId) => setTags((t) => ({ ...t, [txnId]: reason }));
-
   const tagInbox: Txn[] = (data?.taggedTransactions ?? []).map((t) => ({
     id: t.id,
     merchant: t.merchant,
     amount: Number.parseFloat(t.amount),
     date: t.date,
     emoji: "💳",
-    defaultReason: t.reasonId as ReasonId,
+    defaultReason: t.reasonId ? (t.reasonId as ReasonId) : undefined,
   }));
+
+  const activeReason = (txn: Txn): ReasonId | undefined =>
+    tags[txn.id] ?? txn.defaultReason;
+
+  async function handleTag(txn: Txn, reason: ReasonId): Promise<void> {
+    const current = activeReason(txn);
+    const clearing = current === reason;
+    setPendingTxnId(txn.id);
+    try {
+      if (USE_MOCKS) {
+        setTags((prev) => {
+          const next = { ...prev };
+          if (clearing) {
+            delete next[txn.id];
+          } else {
+            next[txn.id] = reason;
+          }
+          return next;
+        });
+      } else if (clearing) {
+        await api.clearTransactionReason(txn.id);
+        setTags((prev) => {
+          const next = { ...prev };
+          delete next[txn.id];
+          return next;
+        });
+        await queryClient.invalidateQueries({ queryKey: ["behavioral"] });
+      } else {
+        await api.setTransactionReason(txn.id, reason);
+        setTags((prev) => ({ ...prev, [txn.id]: reason }));
+        await queryClient.invalidateQueries({ queryKey: ["behavioral"] });
+      }
+    } catch (err) {
+      notifications.push(
+        "error",
+        "Could not save reason",
+        err instanceof Error ? err.message : "Try again in a moment.",
+        "system",
+      );
+    } finally {
+      setPendingTxnId(null);
+    }
+  }
 
   const archetype = data?.archetype ?? "—";
   const creepMonths = data?.creep.months ?? [];
@@ -95,7 +143,7 @@ export function BehavioralPanel() {
   const totalSpend = Object.values(reasonTotals).reduce((a, b) => a + b, 0);
   const emotionalPct = totalSpend > 0 ? Math.round((emotionalTotal / totalSpend) * 100) : 0;
   const topReasons = breakdown.filter((b) => b.total > 0).slice(0, 3);
-  const maxReason = Math.max(...breakdown.map((b) => b.total), 1);
+  const hasReasonSpend = totalSpend > 0;
 
   return (
     <div className="space-y-5">
@@ -202,13 +250,16 @@ export function BehavioralPanel() {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {REASONS.map((r) => {
-                    const active = tags[t.id] === r.id;
+                    const active = activeReason(t) === r.id;
+                    const disabled = pendingTxnId === t.id;
                     return (
                       <button
                         key={r.id}
-                        onClick={() => setTag(t.id, r.id)}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => void handleTag(t, r.id)}
                         style={active ? { background: r.color, borderColor: r.color, color: "white" } : undefined}
-                        className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-all ${
+                        className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-all disabled:opacity-60 ${
                           active ? "" : "border-border text-text-muted hover:text-text"
                         }`}
                       >
@@ -227,19 +278,32 @@ export function BehavioralPanel() {
         <div className="space-y-3">
           <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
             <p className="mb-3 text-sm font-bold text-text">Spend by reason (30 days)</p>
-            <div className="space-y-2.5">
-              {breakdown.map((b) => (
-                <div key={b.id}>
-                  <div className="mb-0.5 flex justify-between text-[11px]">
-                    <span className="flex items-center gap-1 text-text-muted">{b.emoji} {b.label}</span>
-                    <span className="font-semibold text-text tabular-nums">{money(b.total)}</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-border">
-                    <div className="h-full rounded-full" style={{ width: `${(b.total / maxReason) * 100}%`, background: b.color }} />
-                  </div>
-                </div>
-              ))}
-            </div>
+            {!hasReasonSpend ? (
+              <div className="rounded-[var(--radius-sm)] border border-dashed border-border bg-bg px-3 py-4 text-center">
+                <p className="text-sm font-semibold text-text">No tagged spend yet</p>
+                <p className="mt-1 text-xs text-text-muted">
+                  Tag purchases with why you bought them to see spend-by-reason. Bank data alone
+                  cannot infer intent.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {breakdown.filter((b) => b.total > 0).map((b) => {
+                  const maxReason = Math.max(...breakdown.map((row) => row.total), 1);
+                  return (
+                    <div key={b.id}>
+                      <div className="mb-0.5 flex justify-between text-[11px]">
+                        <span className="flex items-center gap-1 text-text-muted">{b.emoji} {b.label}</span>
+                        <span className="font-semibold text-text tabular-nums">{money(b.total)}</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-border">
+                        <div className="h-full rounded-full" style={{ width: `${(b.total / maxReason) * 100}%`, background: b.color }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -247,50 +311,64 @@ export function BehavioralPanel() {
       {/* Habit streaks */}
       <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
         <p className="mb-3 text-sm font-semibold text-text">Habit streaks</p>
-        <div className="space-y-3">
-          {streaks.length === 0 && (
-            <p className="text-xs text-text-muted">No active streaks yet.</p>
-          )}
-          {streaks.map((s) => (
-            <div key={s.label}>
-              <div className="mb-1 flex justify-between text-xs">
-                <span className="font-medium text-text">{s.label}</span>
-                <span className="font-bold" style={{ color: s.color }}>{s.days} day streak</span>
+        {streaks.length === 0 ? (
+          <div className="rounded-[var(--radius-sm)] border border-dashed border-border bg-bg px-3 py-4 text-center">
+            <p className="text-sm font-semibold text-text">No streaks yet</p>
+            <p className="mt-1 text-xs text-text-muted">
+              Link accounts and wait for transactions to sync. Streaks track no-spend days,
+              positive savings months, and time since dining spend.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {streaks.map((s) => (
+              <div key={s.label}>
+                <div className="mb-1 flex justify-between text-xs">
+                  <span className="font-medium text-text">{s.label}</span>
+                  <span className="font-bold" style={{ color: s.color }}>{s.days} day streak</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-border">
+                  <div className="h-full rounded-full" style={{ width: `${(s.days / s.max) * 100}%`, background: s.color }} />
+                </div>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-border">
-                <div className="h-full rounded-full" style={{ width: `${(s.days / s.max) * 100}%`, background: s.color }} />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 30-day challenges */}
       <div className="space-y-2">
         <p className="px-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Active challenges</p>
-        {challenges.length === 0 && (
-          <p className="px-1 text-xs text-text-muted">No challenges yet.</p>
-        )}
-        {challenges.map((c) => (
-          <div key={c.title} className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-text">{c.title}</p>
-                <p className="text-xs text-text-muted">{c.goal}</p>
-              </div>
-              {c.complete ? (
-                <span className="rounded-full bg-success/10 px-2 py-1 text-[10px] font-bold text-success">Complete!</span>
-              ) : (
-                <span className="text-[10px] text-text-muted">{c.days}d left</span>
-              )}
-            </div>
-            <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-border">
-              <div className="h-full rounded-full" style={{ width: `${c.progress}%`, background: c.color }} />
-            </div>
-            <p className="mt-1 text-right text-[11px] text-text-muted">{c.progress}% complete</p>
+        {challenges.length === 0 ? (
+          <div className="rounded-[var(--radius-md)] border border-dashed border-border bg-surface px-4 py-5 text-center">
+            <p className="text-sm font-semibold text-text">No challenges yet</p>
+            <p className="mt-1 text-xs text-text-muted">
+              Personalized challenges appear once there is enough spending history to suggest a
+              realistic goal.
+            </p>
           </div>
-        ))}
-        <button className="w-full rounded-[var(--radius-md)] border border-dashed border-border py-3 text-sm text-text-muted transition hover:border-primary hover:text-primary">
+        ) : (
+          challenges.map((c) => (
+            <div key={c.title} className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-text">{c.title}</p>
+                  <p className="text-xs text-text-muted">{c.goal}</p>
+                </div>
+                {c.complete ? (
+                  <span className="rounded-full bg-success/10 px-2 py-1 text-[10px] font-bold text-success">Complete!</span>
+                ) : (
+                  <span className="text-[10px] text-text-muted">{c.days}d left</span>
+                )}
+              </div>
+              <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-border">
+                <div className="h-full rounded-full" style={{ width: `${c.progress}%`, background: c.color }} />
+              </div>
+              <p className="mt-1 text-right text-[11px] text-text-muted">{c.progress}% complete</p>
+            </div>
+          ))
+        )}
+        <button type="button" className="w-full rounded-[var(--radius-md)] border border-dashed border-border py-3 text-sm text-text-muted transition hover:border-primary hover:text-primary">
           + Start a new challenge
         </button>
       </div>

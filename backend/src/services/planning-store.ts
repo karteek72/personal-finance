@@ -9,17 +9,40 @@ import {
   transactions,
 } from "../db/schema.js";
 import { formatMoneyAmount, roundDecimal } from "../lib/money.js";
-import { categoryMeta } from "./category-meta.js";
+import {
+  paginateInMemory,
+  type Page,
+  type ParsedListQuery,
+} from "../lib/list-query.js";
 import {
   drizzleActiveTransactionWhere,
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
 import { detectRecurringFromTransactions } from "./detect-recurring.js";
-import { deriveLifestyleHabitsFromTransactions } from "./lifestyle-habits.js";
+import {
+  auditsToLegacyHabits,
+  generateCostAudits,
+  type CostAudit,
+} from "./cost-audit-engine.js";
+import { detectHiddenFees } from "./fee-detection.js";
+import {
+  applyRecurringLifecycleFields,
+  type RecurringLifecycleStatus,
+} from "./recurring-lifecycle.js";
+import { buildSuggestedBudgets } from "./planning/budget-suggestions.js";
+import { buildSuggestedGoals } from "./planning/goal-suggestions.js";
+import type { BudgetClass, BudgetSource, GoalKind, GoalSource, GoalStatus } from "./planning/planning-crud.js";
 import {
   computeFireProfileInputs,
   refreshFireProfile,
 } from "./investment-analytics.js";
+import {
+  buildTimeMachineSummary,
+  computeFireProjection,
+  computeRequiredMonthlySavings,
+  type FireProjection,
+  type TimeMachineSummary,
+} from "./computed-fields.js";
 import { resolveHouseholdContext } from "./household-access.js";
 import {
   getAnalyticsProfile,
@@ -72,26 +95,45 @@ function monthBounds(period: string): { start: string; end: string } {
   return { start: `${period}-01`, end: `${period}-${String(lastDay).padStart(2, "0")}` };
 }
 
+export interface BudgetItem {
+  id?: string;
+  category: string;
+  emoji: string | null;
+  color: string | null;
+  spent: string;
+  limit: string;
+  source: BudgetSource;
+  class?: BudgetClass | null;
+  rationale?: string;
+  confidence?: "low" | "medium" | "high";
+}
+
+export interface GoalItem {
+  id?: string;
+  name: string;
+  emoji: string | null;
+  color: string | null;
+  target: string;
+  current: string;
+  deadline: string | null;
+  kind: GoalKind;
+  status: GoalStatus;
+  source: GoalSource;
+  rationale?: string;
+  confidence?: "low" | "medium" | "high";
+  monthlySetAside?: string;
+  accountId?: string | null;
+}
+
 export interface BudgetsResponse {
   periodMonth: string;
   safeToSpend: string;
   daysRemaining: number;
   isLive: boolean;
-  budgets: Array<{
-    category: string;
-    emoji: string | null;
-    color: string | null;
-    spent: string;
-    limit: string;
-  }>;
-  goals: Array<{
-    name: string;
-    emoji: string | null;
-    color: string | null;
-    target: string;
-    current: string;
-    deadline: string | null;
-  }>;
+  budgets: BudgetItem[];
+  suggestedBudgets: BudgetItem[];
+  goals: GoalItem[];
+  suggestedGoals: GoalItem[];
 }
 
 export async function getBudgets(userId: string): Promise<BudgetsResponse> {
@@ -133,7 +175,7 @@ export async function getBudgets(userId: string): Promise<BudgetsResponse> {
   );
 
   const hasTransactionData = spentRows.length > 0;
-  let budgetItems: BudgetsResponse["budgets"];
+  let budgetItems: BudgetItem[];
   let isLive = false;
 
   if (configured.length > 0) {
@@ -142,74 +184,32 @@ export async function getBudgets(userId: string): Promise<BudgetsResponse> {
       const limit = Number.parseFloat(b.limitAmount);
       const spent = spentByCategory.get(b.category) ?? 0;
       return {
+        id: b.id,
         category: b.category,
         emoji: b.emoji,
         color: b.color,
         spent: formatMoneyAmount(spent),
         limit: formatMoneyAmount(limit),
+        source: b.source as BudgetSource,
+        class: (b.class as BudgetClass | null) ?? null,
       };
     });
-  } else if (hasTransactionData) {
-    // Suggested limits from prior 3 months average spend (+10% buffer)
-    const [y, mo] = period.split("-").map(Number);
-    const priorMonths: string[] = [];
-    for (let i = 1; i <= 3; i++) {
-      const d = new Date(y!, mo! - 1 - i, 1);
-      priorMonths.push(
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      );
-    }
-    const avgByCategory = new Map<string, number[]>();
-    for (const pm of priorMonths) {
-      const bounds = monthBounds(pm);
-      const rows = hasActiveAccounts
-        ? await db
-            .select({
-              category: transactions.category,
-              total: sql<string>`sum(${transactions.amount})`,
-            })
-            .from(transactions)
-            .where(
-              and(
-                drizzleActiveTransactionWhere(ctx.userIds, accountIds),
-                eq(transactions.transactionType, "expense"),
-                eq(transactions.isTransfer, false),
-                eq(transactions.pending, false),
-                gte(transactions.date, bounds.start),
-                lte(transactions.date, bounds.end),
-              ),
-            )
-            .groupBy(transactions.category)
-        : [];
-      for (const r of rows) {
-        const list = avgByCategory.get(r.category) ?? [];
-        list.push(Number.parseFloat(r.total ?? "0"));
-        avgByCategory.set(r.category, list);
-      }
-    }
-
-    budgetItems = [...avgByCategory.entries()]
-      .map(([category, totals]) => {
-        const avg = totals.reduce((s, v) => s + v, 0) / totals.length;
-        const meta = categoryMeta(category);
-        const spent = spentByCategory.get(category) ?? 0;
-        const limit = Math.max(avg * 1.1, spent);
-        return {
-          category,
-          emoji: meta.emoji,
-          color: meta.color,
-          spent: formatMoneyAmount(spent),
-          limit: formatMoneyAmount(limit),
-        };
-      })
-      .sort(
-        (a, b) =>
-          Number.parseFloat(b.spent) - Number.parseFloat(a.spent),
-      )
-      .slice(0, 10);
-    isLive = budgetItems.length > 0;
   } else {
     budgetItems = [];
+  }
+
+  const budgetedCategories = new Set(configured.map((b) => b.category));
+  const suggestedBudgets = hasTransactionData
+    ? await buildSuggestedBudgets(
+        ctx.userIds,
+        period,
+        budgetedCategories,
+        spentByCategory,
+      )
+    : [];
+
+  if (!isLive && suggestedBudgets.length > 0) {
+    isLive = true;
   }
 
   let totalLimit = 0;
@@ -218,11 +218,24 @@ export async function getBudgets(userId: string): Promise<BudgetsResponse> {
     totalLimit += Number.parseFloat(b.limit);
     totalSpent += Number.parseFloat(b.spent);
   }
+  if (totalLimit === 0 && suggestedBudgets.length > 0) {
+    for (const b of suggestedBudgets) {
+      totalLimit += Number.parseFloat(b.limit);
+      totalSpent += Number.parseFloat(b.spent);
+    }
+  }
 
   const goalRows = await db
     .select()
     .from(savingsGoals)
-    .where(inArray(savingsGoals.userId, ctx.userIds));
+    .where(
+      and(
+        inArray(savingsGoals.userId, ctx.userIds),
+        eq(savingsGoals.status, "active"),
+      ),
+    );
+
+  const suggestedGoals = await buildSuggestedGoals(userId);
 
   const [y, mo] = period.split("-").map(Number);
   const lastDay = new Date(y!, mo!, 0).getDate();
@@ -241,16 +254,31 @@ export async function getBudgets(userId: string): Promise<BudgetsResponse> {
     daysRemaining,
     isLive,
     budgets: budgetItems,
+    suggestedBudgets,
     goals: goalRows.map((g) => ({
+      id: g.id,
       name: g.name,
       emoji: g.emoji,
       color: g.color,
       target: formatMoneyAmount(g.targetAmount),
       current: formatMoneyAmount(g.currentAmount),
       deadline: g.deadline,
+      kind: g.kind as GoalKind,
+      status: g.status as GoalStatus,
+      source: g.source as GoalSource,
+      accountId: g.accountId,
     })),
+    suggestedGoals,
   };
 }
+
+export const RECURRING_SORTABLE = [
+  "merchantName",
+  "amount",
+  "category",
+  "nextChargeDate",
+  "status",
+] as const;
 
 export interface RecurringResponse {
   monthlyTotal: string;
@@ -258,8 +286,8 @@ export interface RecurringResponse {
   activeCount: number;
   priceChanges: number;
   isLive: boolean;
-  subscriptions: RecurringItem[];
-  bills: RecurringItem[];
+  subscriptions: Page<RecurringItem>;
+  bills: Page<RecurringItem>;
   leaks: {
     fees: Array<{
       id: string;
@@ -270,24 +298,96 @@ export interface RecurringResponse {
       fixable: boolean;
     }>;
     habits: Array<{ id: string; emoji: string | null; label: string; monthly: string }>;
+    audits: CostAudit[];
   };
+  timeMachine: TimeMachineSummary;
 }
 
 interface RecurringItem {
   merchantName: string;
   category: string;
-  kind: string;
+  kind: "subscription" | "bill" | string;
   amount: string;
   cadence: string;
   nextChargeDate: string | null;
   lastChargeDate: string | null;
   previousAmount: string | null;
   priceChanged: boolean;
-  status: string;
+  status: RecurringLifecycleStatus;
   brandColor: string | null;
 }
 
-export async function getRecurring(userId: string): Promise<RecurringResponse> {
+function recurringSortKey(column: string): (row: RecurringItem) => number | string {
+  switch (column) {
+    case "merchantName":
+      return (r) => r.merchantName.toLowerCase();
+    case "category":
+      return (r) => r.category.toLowerCase();
+    case "nextChargeDate":
+      return (r) => r.nextChargeDate ?? "";
+    case "status":
+      return (r) => r.status;
+    default:
+      return (r) => Number.parseFloat(r.amount);
+  }
+}
+
+function paginateRecurring(
+  rows: RecurringItem[],
+  q: ParsedListQuery,
+): Page<RecurringItem> {
+  return paginateInMemory(rows, q, {
+    sortKey: recurringSortKey,
+    textFilter: (row, needle) =>
+      row.merchantName.toLowerCase().includes(needle) ||
+      row.category.toLowerCase().includes(needle),
+  });
+}
+
+function withLifecycle(r: {
+  merchantName: string;
+  category: string;
+  kind: string;
+  amount: string | number;
+  cadence: string;
+  nextChargeDate: string | null;
+  lastChargeDate: string | null;
+  previousAmount: string | number | null;
+  priceChanged: boolean;
+  status: string;
+  brandColor: string | null;
+}): RecurringItem {
+  const lifecycle = applyRecurringLifecycleFields({
+    lastChargeDate: r.lastChargeDate,
+    cadence: r.cadence,
+    priceChanged: r.priceChanged,
+    nextChargeDate: r.nextChargeDate,
+  });
+  return {
+    merchantName: r.merchantName,
+    category: r.category,
+    kind: r.kind,
+    amount: formatMoneyAmount(r.amount),
+    cadence: r.cadence,
+    nextChargeDate: lifecycle.nextChargeDate,
+    lastChargeDate: r.lastChargeDate,
+    previousAmount: r.previousAmount
+      ? formatMoneyAmount(r.previousAmount)
+      : null,
+    priceChanged: r.priceChanged,
+    status: lifecycle.status,
+    brandColor: r.brandColor,
+  };
+}
+
+function isActiveSubscription(status: RecurringLifecycleStatus): boolean {
+  return status === "active" || status === "price-changed";
+}
+
+export async function getRecurring(
+  userId: string,
+  q: ParsedListQuery,
+): Promise<RecurringResponse> {
   const ctx = await resolveHouseholdContext(userId);
   const { accountIds, hasActiveAccounts } =
     await resolveActiveAccountScope(ctx.userIds);
@@ -300,19 +400,20 @@ export async function getRecurring(userId: string): Promise<RecurringResponse> {
         .where(inArray(recurringSeries.userId, ctx.userIds))
     : [];
 
-  const toItem = (r: (typeof rows)[number]): RecurringItem => ({
-    merchantName: r.merchantName,
-    category: r.category,
-    kind: r.kind,
-    amount: formatMoneyAmount(r.amount),
-    cadence: r.cadence,
-    nextChargeDate: r.nextChargeDate,
-    lastChargeDate: r.lastChargeDate,
-    previousAmount: r.previousAmount ? formatMoneyAmount(r.previousAmount) : null,
-    priceChanged: r.priceChanged,
-    status: r.status,
-    brandColor: r.brandColor,
-  });
+  const toItem = (r: (typeof rows)[number]): RecurringItem =>
+    withLifecycle({
+      merchantName: r.merchantName,
+      category: r.category,
+      kind: r.kind,
+      amount: r.amount,
+      cadence: r.cadence,
+      nextChargeDate: r.nextChargeDate,
+      lastChargeDate: r.lastChargeDate,
+      previousAmount: r.previousAmount,
+      priceChanged: r.priceChanged,
+      status: r.status,
+      brandColor: r.brandColor,
+    });
 
   let subscriptions: RecurringItem[];
   let bills: RecurringItem[];
@@ -326,59 +427,22 @@ export async function getRecurring(userId: string): Promise<RecurringResponse> {
     const detected = await detectRecurringFromTransactions(ctx.userIds);
     subscriptions = detected
       .filter((d) => d.kind === "subscription")
-      .map((d) => ({
-        merchantName: d.merchantName,
-        category: d.category,
-        kind: d.kind,
-        amount: d.amount,
-        cadence: d.cadence,
-        nextChargeDate: d.nextChargeDate,
-        lastChargeDate: d.lastChargeDate,
-        previousAmount: d.previousAmount,
-        priceChanged: d.priceChanged,
-        status: d.status,
-        brandColor: d.brandColor,
-      }));
-    bills = detected
-      .filter((d) => d.kind === "bill")
-      .map((d) => ({
-        merchantName: d.merchantName,
-        category: d.category,
-        kind: d.kind,
-        amount: d.amount,
-        cadence: d.cadence,
-        nextChargeDate: d.nextChargeDate,
-        lastChargeDate: d.lastChargeDate,
-        previousAmount: d.previousAmount,
-        priceChanged: d.priceChanged,
-        status: d.status,
-        brandColor: d.brandColor,
-      }));
+      .map((d) => withLifecycle(d));
+    bills = detected.filter((d) => d.kind === "bill").map((d) => withLifecycle(d));
     isLive = detected.length > 0;
   }
 
-  const monthlyTotal = subscriptions.reduce(
+  const activeSubscriptions = subscriptions.filter((s) =>
+    isActiveSubscription(s.status),
+  );
+  const monthlyTotal = activeSubscriptions.reduce(
     (s, r) => s + Number.parseFloat(r.amount),
     0,
   );
 
-  const feeRows = hasActiveAccounts
-    ? await db
-        .select({
-          subCategory: transactions.subCategory,
-          total: sql<string>`sum(${transactions.amount})`,
-          count: sql<number>`count(*)::int`,
-        })
-        .from(transactions)
-        .where(
-          and(
-            drizzleActiveTransactionWhere(ctx.userIds, accountIds),
-            eq(transactions.subCategory, "Bank Fees"),
-          ),
-        )
-        .groupBy(transactions.subCategory)
+  const fees = hasActiveAccounts
+    ? await detectHiddenFees(ctx.userIds)
     : [];
-  const bankFees = feeRows[0];
 
   const habitRows = hasActiveAccounts
     ? await db
@@ -387,37 +451,51 @@ export async function getRecurring(userId: string): Promise<RecurringResponse> {
         .where(inArray(lifestyleHabits.userId, ctx.userIds))
     : [];
 
-  const habits =
-    habitRows.length > 0
-      ? habitRows.map((h) => ({
-          id: h.label.toLowerCase().replace(/\s+/g, "-"),
-          emoji: h.emoji,
-          label: h.label,
-          monthly: formatMoneyAmount(h.monthlyAmount),
-        }))
-      : await deriveLifestyleHabitsFromTransactions(ctx.userIds);
+  let habits: RecurringResponse["leaks"]["habits"];
+  let audits: CostAudit[];
+
+  if (habitRows.length > 0) {
+    habits = habitRows.map((h) => ({
+      id: h.label.toLowerCase().replace(/\s+/g, "-"),
+      emoji: h.emoji,
+      label: h.label,
+      monthly: formatMoneyAmount(h.monthlyAmount),
+    }));
+    audits = habits.map((h) => ({
+      id: h.id,
+      type: "habit" as const,
+      emoji: h.emoji ?? "💸",
+      title: h.label,
+      monthly: h.monthly,
+      annual: formatMoneyAmount(Number.parseFloat(h.monthly) * 12),
+      opportunityCost10y: formatMoneyAmount(
+        Number.parseFloat(h.monthly) * 12 * 10 * 0.07,
+      ),
+      rationale: "Seeded lifestyle habit from your profile.",
+      action: "Review whether this spend still fits your goals.",
+      savingsEstimate: formatMoneyAmount(Number.parseFloat(h.monthly) * 0.3),
+      confidence: 0.5,
+    }));
+  } else {
+    const recurringForAudits = [...subscriptions, ...bills];
+    audits = await generateCostAudits(ctx.userIds, recurringForAudits);
+    habits = auditsToLegacyHabits(audits);
+  }
 
   return {
     monthlyTotal: formatMoneyAmount(monthlyTotal),
     annualTotal: formatMoneyAmount(monthlyTotal * 12),
-    activeCount: subscriptions.filter((s) => s.status === "active").length,
-    priceChanges: subscriptions.filter((s) => s.priceChanged).length,
+    activeCount: activeSubscriptions.length,
+    priceChanges: activeSubscriptions.filter((s) => s.priceChanged).length,
     isLive,
-    subscriptions,
-    bills,
+    subscriptions: paginateRecurring(subscriptions, q),
+    bills: paginateRecurring(bills, q),
     leaks: {
-      fees: [
-        {
-          id: "atm",
-          label: "ATM & overdraft fees",
-          source: "Checking",
-          count: bankFees?.count ?? 0,
-          total: formatMoneyAmount(bankFees?.total ?? "0"),
-          fixable: true,
-        },
-      ],
+      fees,
       habits,
+      audits,
     },
+    timeMachine: buildTimeMachineSummary(habits),
   };
 }
 
@@ -426,10 +504,29 @@ export interface FireResponse {
   /** True when age is still the system default (35) — user should set their real age. */
   isDefaultAge: boolean;
   currentNetWorth: string;
+  investableAssets: string;
   monthlySpend: string;
   monthlyInvest: string;
   withdrawalRate: number;
   realReturn: number;
+  householdSize: number | null;
+  targetRetirementAge: number | null;
+  targetStatus: "on_track" | "behind" | null;
+  targetGapYears: number | null;
+  requiredMonthlySavings: string | null;
+  inputBasis: {
+    spendLookbackMonths: number;
+    investLookbackMonths: number;
+  };
+  caveats: string[];
+  projection: FireProjection;
+}
+
+export interface FireQueryOverrides {
+  monthlySpend?: number;
+  monthlyInvest?: number;
+  withdrawalRate?: number;
+  realReturn?: number;
 }
 
 export async function updateFireProfile(
@@ -446,7 +543,10 @@ export async function updateFireProfile(
   return getFire(userId);
 }
 
-export async function getFire(userId: string): Promise<FireResponse | null> {
+export async function getFire(
+  userId: string,
+  overrides?: FireQueryOverrides,
+): Promise<FireResponse | null> {
   const ctx = await resolveHouseholdContext(userId);
   const { hasActiveAccounts } = await resolveActiveAccountScope(ctx.userIds);
   if (!hasActiveAccounts) {
@@ -460,14 +560,66 @@ export async function getFire(userId: string): Promise<FireResponse | null> {
     return null;
   }
 
+  const monthlySpend =
+    overrides?.monthlySpend ??
+    Number.parseFloat(live.monthlySpend);
+  const monthlyInvest =
+    overrides?.monthlyInvest ??
+    Number.parseFloat(live.monthlyInvest);
+  const withdrawalRate = overrides?.withdrawalRate ?? live.withdrawalRate;
+  const realReturn = overrides?.realReturn ?? live.realReturn;
+  const investableAssets = Number.parseFloat(live.investableAssets);
+
+  const projection = computeFireProjection({
+    currentAge: live.currentAge,
+    currentNetWorth: investableAssets,
+    monthlySpend,
+    monthlyInvest,
+    withdrawalRate,
+    realReturn,
+  });
+
+  let targetStatus: FireResponse["targetStatus"] = null;
+  let targetGapYears: number | null = null;
+  let requiredMonthlySavings: string | null = null;
+
+  if (live.targetRetirementAge != null) {
+    const gap = roundDecimal(projection.fireAge - live.targetRetirementAge, 1);
+    targetGapYears = gap;
+    targetStatus = gap <= 0 ? "on_track" : "behind";
+    const yearsToTarget = live.targetRetirementAge - live.currentAge;
+    if (yearsToTarget > 0 && targetStatus === "behind") {
+      const fireNumber = Number.parseFloat(projection.fireNumber);
+      requiredMonthlySavings = formatMoneyAmount(
+        computeRequiredMonthlySavings({
+          start: investableAssets,
+          target: fireNumber,
+          years: yearsToTarget,
+          annualReturn: realReturn / 100,
+        }),
+      );
+    } else if (targetStatus === "on_track") {
+      requiredMonthlySavings = formatMoneyAmount(monthlyInvest);
+    }
+  }
+
   return {
     currentAge: live.currentAge,
     isDefaultAge: live.isDefaultAge,
     currentNetWorth: live.currentNetWorth,
-    monthlySpend: live.monthlySpend,
-    monthlyInvest: live.monthlyInvest,
-    withdrawalRate: live.withdrawalRate,
-    realReturn: live.realReturn,
+    investableAssets: live.investableAssets,
+    monthlySpend: formatMoneyAmount(monthlySpend),
+    monthlyInvest: formatMoneyAmount(monthlyInvest),
+    withdrawalRate,
+    realReturn,
+    householdSize: live.householdSize,
+    targetRetirementAge: live.targetRetirementAge,
+    targetStatus,
+    targetGapYears,
+    requiredMonthlySavings,
+    inputBasis: live.inputBasis,
+    caveats: live.caveats,
+    projection,
   };
 }
 

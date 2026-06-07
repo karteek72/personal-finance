@@ -1,13 +1,7 @@
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
-
-import { getDb } from "../db/client.js";
-import { transactions } from "../db/schema.js";
-import { formatMoneyAmount } from "../lib/money.js";
 import {
-  drizzleActiveTransactionWhere,
-  resolveActiveAccountScope,
-} from "./active-account-scope.js";
-import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
+  SUBCATEGORY_MAP,
+  type SpendCategory,
+} from "../config/categories.js";
 
 export interface DerivedLifestyleHabit {
   id: string;
@@ -16,12 +10,19 @@ export interface DerivedLifestyleHabit {
   monthly: string;
 }
 
+const SUBSCRIPTIONS_CATEGORY = "Subscriptions & Software" as const satisfies SpendCategory;
+const DINING_CATEGORY = "Dining & Restaurants" as const satisfies SpendCategory;
+const TRANSPORTATION_CATEGORY = "Transportation" as const satisfies SpendCategory;
+
+const COFFEE_SUBCATEGORY =
+  SUBCATEGORY_MAP["Dining & Restaurants"].find((s) => s === "Cafes & Coffee")!;
+
 const HABIT_DEFS: Array<{
   id: string;
   emoji: string;
   label: string;
-  subCategories?: string[];
-  categories?: string[];
+  subCategories?: readonly string[];
+  categories?: readonly string[];
   merchantPattern?: RegExp;
   minMonthly: number;
 }> = [
@@ -29,7 +30,7 @@ const HABIT_DEFS: Array<{
     id: "coffee-runs",
     emoji: "☕",
     label: "Coffee runs",
-    subCategories: ["Cafes & Coffee", "Coffee Shops"],
+    subCategories: [COFFEE_SUBCATEGORY],
     merchantPattern: /starbucks|coffee|blue bottle|philz|dunkin|peet/i,
     minMonthly: 15,
   },
@@ -37,20 +38,20 @@ const HABIT_DEFS: Array<{
     id: "dining-out",
     emoji: "🍔",
     label: "Dining out & delivery",
-    categories: ["Dining & Restaurants"],
+    categories: [DINING_CATEGORY],
     subCategories: [
       "Sit-down Restaurants",
       "Fast Food & Takeout",
       "Food Delivery",
       "Bars & Nightlife",
-    ],
+    ] as const,
     minMonthly: 40,
   },
   {
     id: "rideshare",
     emoji: "🚗",
     label: "Rideshare",
-    categories: ["Transportation"],
+    categories: [TRANSPORTATION_CATEGORY],
     merchantPattern: /uber(?!\s*eats)|lyft|taxi|cab\b/i,
     minMonthly: 20,
   },
@@ -58,15 +59,22 @@ const HABIT_DEFS: Array<{
     id: "subscriptions",
     emoji: "📺",
     label: "Subscriptions",
-    categories: ["Subscriptions & Digital"],
+    categories: [SUBSCRIPTIONS_CATEGORY],
     minMonthly: 10,
   },
 ];
 
-function monthsAgo(months: number): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() - months);
-  return d.toISOString().slice(0, 10);
+/** Every category/subcategory referenced by habit matchers. Exported for taxonomy tests. */
+export function habitMatcherTaxonomyRefs(): Array<{
+  habitId: string;
+  categories: readonly string[];
+  subCategories: readonly string[];
+}> {
+  return HABIT_DEFS.map((def) => ({
+    habitId: def.id,
+    categories: def.categories ?? [],
+    subCategories: def.subCategories ?? [],
+  }));
 }
 
 /** Spending habits for Time Machine when lifestyle_habits rows are not seeded. */
@@ -74,85 +82,13 @@ export async function deriveLifestyleHabitsFromTransactions(
   userIds: string[],
   lookbackMonths = 3,
 ): Promise<DerivedLifestyleHabit[]> {
-  const { accountIds, hasActiveAccounts } =
-    await resolveActiveAccountScope(userIds);
-  if (!hasActiveAccounts) return [];
-
-  const since = monthsAgo(lookbackMonths);
-  const db = getDb();
-  const rows = await db
-    .select({
-      category: transactions.category,
-      subCategory: transactions.subCategory,
-      merchantName: transactions.merchantName,
-      name: transactions.name,
-      amount: transactions.amount,
-    })
-    .from(transactions)
-    .where(
-      and(
-        drizzleActiveTransactionWhere(userIds, accountIds),
-        eq(transactions.transactionType, "expense"),
-        eq(transactions.isTransfer, false),
-        eq(transactions.pending, false),
-        sql`${transactions.category} != ${INTERNAL_TRANSFER_CATEGORY}`,
-        gte(transactions.date, since),
-      ),
-    );
-
-  const totals = new Map<string, number>();
-  for (const def of HABIT_DEFS) {
-    totals.set(def.id, 0);
-  }
-
-  for (const row of rows) {
-    const spend = Math.abs(Number.parseFloat(row.amount));
-    if (!Number.isFinite(spend) || spend <= 0) continue;
-    const merchantText = `${row.merchantName ?? ""} ${row.name ?? ""}`;
-
-    for (const def of HABIT_DEFS) {
-      let match = false;
-      if (def.merchantPattern?.test(merchantText)) {
-        match = true;
-      } else if (def.subCategories?.includes(row.subCategory ?? "")) {
-        match = true;
-      } else if (
-        def.categories?.includes(row.category) &&
-        !def.subCategories
-      ) {
-        match = true;
-      } else if (
-        def.categories?.includes(row.category) &&
-        def.subCategories &&
-        row.subCategory &&
-        !HABIT_DEFS.some(
-          (other) =>
-            other.id !== def.id &&
-            other.subCategories?.includes(row.subCategory ?? ""),
-        )
-      ) {
-        match = true;
-      }
-      if (match) {
-        totals.set(def.id, (totals.get(def.id) ?? 0) + spend);
-      }
-    }
-  }
-
-  const habits: DerivedLifestyleHabit[] = [];
-  for (const def of HABIT_DEFS) {
-    const total = totals.get(def.id) ?? 0;
-    const monthly = total / Math.max(lookbackMonths, 1);
-    if (monthly < def.minMonthly) continue;
-    habits.push({
-      id: def.id,
-      emoji: def.emoji,
-      label: def.label,
-      monthly: formatMoneyAmount(monthly),
-    });
-  }
-
-  return habits.sort(
-    (a, b) => Number.parseFloat(b.monthly) - Number.parseFloat(a.monthly),
+  const { detectRecurringFromTransactions } = await import(
+    "./detect-recurring.js"
   );
+  const { auditsToLegacyHabits, generateCostAudits } = await import(
+    "./cost-audit-engine.js"
+  );
+  const recurring = await detectRecurringFromTransactions(userIds);
+  const audits = await generateCostAudits(userIds, recurring, lookbackMonths);
+  return auditsToLegacyHabits(audits);
 }

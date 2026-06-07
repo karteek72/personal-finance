@@ -7,6 +7,7 @@ import {
   resolveSubCategories,
   SPEND_CATEGORIES,
 } from "@/lib/categories";
+import { parseLocalDate } from "@/lib/local-date";
 import { getCategoryColor } from "@/lib/category-colors";
 
 interface TransactionRowProps {
@@ -44,7 +45,7 @@ function formatAmount(amount: string, currencyCode: string): string {
 }
 
 function formatDate(date: string): string {
-  const parsed = new Date(date);
+  const parsed = parseLocalDate(date);
   if (Number.isNaN(parsed.getTime())) {
     return date;
   }

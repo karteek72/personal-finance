@@ -2,7 +2,7 @@
 
 **Product:** SpendFlow  
 **Version:** 1.0  
-**Status:** In Development (Phase 2 largely complete; Phase 3 in progress)  
+**Status:** In Development (Phase 3.6 complete; **Phase 3.7–3.9 analytics redesign active**)  
 **Last Updated:** June 2026
 
 > **Active backlog:** in-flight work and agent task claims are tracked in [`docs/development/TASK_BOARD.md`](../development/TASK_BOARD.md).
@@ -35,6 +35,28 @@ See [user-personas-and-scenarios.md](user-personas-and-scenarios.md) for target 
 2. **True money flow** — reconcile CC payments and savings transfers so net spending is accurate
 3. **Actionable insights** — highlight overspending categories with month-over-month deltas
 4. **Timely data** — transaction refresh daily (or on-demand) via webhooks
+5. **Honest analytics** — every KPI tagged factual/heuristic/external with confidence; no fabricated metrics
+
+### Analytics KPI domains (Phase 3.7–3.9)
+
+Ten intelligence domains, each with defined formulas and API envelopes — see [analytics-architecture.md](../architecture/analytics-architecture.md):
+
+| # | Domain | Example KPIs |
+|---|--------|--------------|
+| 1 | Cash flow | Net cash flow, burn rate, free cash flow, income stability |
+| 2 | Spending behavior | Fixed/variable/discretionary split, volatility, merchant HHI, category trends |
+| 3 | Budgeting & variance | Budget vs actual, safe-to-spend, suggested budgets |
+| 4 | Savings & liquidity | Cash savings rate (canonical 0–1), net-investment rate, emergency-fund months |
+| 5 | Debt health | Credit utilization (real limit only), DTI, payoff ETA |
+| 6 | Investment performance & behavior | Unrealized/realized P/L, XIRR, TWR, fee drag, behavioral flags |
+| 7 | Inflation & cost-of-living | Personal CPI, nominal vs real spend, BLS compare |
+| 8 | Resilience | Composite score + liquidity, income stability, expense flexibility |
+| 9 | Goals & planning | Runway, goal pace, surplus allocation, scenarios |
+| 10 | Data quality | Categorization coverage, sync freshness, transfer-pair coverage, reconciliation gap |
+
+**Composite scores:** Financial Health (7 sub-scores) and Resilience (5 sub-scores) replace the first-gen wellness model. Heuristic brokerage-behavior signals require confidence + evidence.
+
+**API surface:** consolidated under `GET /analytics/*` with metric envelopes and paginated tabular sub-resources — see [api-contract.md](api-contract.md).
 
 ### Success metrics (KPIs)
 
@@ -105,19 +127,41 @@ Native SwiftUI app sharing the same backend API — see [mobile-ios.md](../archi
 
 ## Development Phases
 
-**Current state:** Phase 1–2 complete. Phase 3 polish largely complete. **Phase 3.6 statement import** is the active track (UI upload shipped; parsers + worker next). Phase 4 iPhone **deferred**.
+**Current state:** Phase 1–2 complete. Phase 3 polish largely complete. Phase 3.6 statement import complete. **Phase 3.7–3.9 analytics intelligence redesign is the active track.**
 
-### Phase 3.6 — Statement import (active)
+### Phase 3.7 — Analytics foundation (P1, active)
+
+Must-have correctness and infrastructure:
+
+- [ ] Canonical `signed_amount` on transactions; single metric layer (`services/metrics/*`)
+- [ ] Real credit limits (Plaid liabilities); remove fabricated utilization
+- [ ] Balance + holdings + security price snapshots on every sync; net-worth pipeline
+- [ ] `dim_category` spend-class split; rebuild Financial Health composite
+- [ ] `GET /analytics/overview`, `/cashflow`, `/data-quality`; paginated `/analytics/merchants`
+- [ ] Frontend: savingsRate 0–1 convention, UTC date fixes, loading/empty guards, confidence badges
+
+### Phase 3.8 — Analytics depth (P2)
+
+- [ ] Merchant normalization (`dim_merchant`); recurring engine v2; transfer pairing + refund netting
+- [ ] Resilience composite + alert engine; materialized marts + seasonal category deltas
+- [ ] Investment snapshots + FIFO tax lots; realized/unrealized P/L, XIRR, dividend/fee/cash drag
+- [ ] Personal CPI; paginated list endpoints (money-flow, inflation categories, subscriptions, holdings)
+- [ ] Reusable `DataTable` component with URL-mirrored sort/filter/page state
+
+### Phase 3.9 — Advanced analytics (P3)
+
+- [ ] TWR, benchmark delta, max drawdown; investment behavior heuristics with evidence
+- [ ] Planning engine (runway, payoff sim, scenarios, surplus allocation)
+- [ ] Honest Spending DNA; lifestyle cost-audit engine; subscription lifecycle (lapsed/cancelled)
+
+See [analytics-architecture.md](../architecture/analytics-architecture.md) and [TASK_BOARD.md](../development/TASK_BOARD.md).
+
+### Phase 3.6 — Statement import ✅
 
 - [x] Import UI + encrypted upload API (`/accounts/import`, `/imports/*`)
 - [x] CSV parsers: E*TRADE, Fidelity, Webull (day-trade Wave 1) + worker job
-- [ ] OFX/QFX multi-account parser
-- [ ] Import review UI (detected accounts)
-- [ ] Plaid ↔ import merge + transaction dedup
-- [ ] Blob retention, consent records, audit events
-- [ ] Secondary brokers + PDF plugins
-
-See [TASK_BOARD.md](../development/TASK_BOARD.md).
+- [x] OFX/QFX multi-account parser (where shipped)
+- [x] GDPR export (`GET /auth/export`)
 
 ### Phase 3 — Polish & Launch — largely complete
 
@@ -179,6 +223,7 @@ Partial shell in `ios/`. **Not scheduled** until Phase 3.6 statement import is u
 - [Design system](design-system.md)
 - [Design tokens (JSON)](design-tokens.json)
 - [Mobile patterns](mobile-patterns.md)
+- [Analytics architecture](../architecture/analytics-architecture.md)
 - [API contract](api-contract.md)
 - [System overview](../architecture/system-overview.md)
 - [Mobile iOS](../architecture/mobile-ios.md)

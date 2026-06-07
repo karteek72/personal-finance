@@ -15,12 +15,65 @@ Shared contract between `ui/` and `backend/`. Backend implements; UI consumes vi
 | Format | JSON request/response bodies |
 | Auth | `Authorization: Bearer <jwt>` on protected routes |
 | Errors | `{ "error": { "code": string, "message": string, "details"?: unknown } }` |
-| Pagination | Cursor-based: `?limit=50&cursor=<opaque>` → `{ items, nextCursor }` |
+| Pagination | **Two patterns:** (1) cursor for high-volume feeds — `?limit=50&cursor=<opaque>` → `{ items, nextCursor }` (transactions list); (2) offset for tabular reports — `ListQuery` → `Page<T>` (see [List & pagination](#list--pagination)) |
 | Dates | ISO 8601 (`YYYY-MM-DD` for transaction dates) |
 | Money | Decimal strings with 2 places in JSON (e.g. `"127.43"`) — avoid float |
 | IDs | UUID v4 |
 
 HTTP status codes: `200` success, `201` created, `204` no content, `400` validation, `401` unauthenticated, `403` forbidden, `404` not found, `429` rate limit, `500` server error.
+
+---
+
+## List & pagination
+
+Tabular report endpoints (merchants, category breakdowns, holdings, subscriptions, money-flow sources, etc.) use a **uniform offset contract** with a total count. High-volume append-only feeds (the transactions list) keep **cursor/infinite-scroll** pagination.
+
+**Thin-client rule:** sort, filter, rank, truncate, and row-level math happen server-side. Clients render `rows` as received — no recomputing totals, percentages, P/L, or trends in the UI.
+
+### Request — `ListQuery`
+
+Query params (all optional unless noted):
+
+| Param | Type | Default | Rule |
+|-------|------|---------|------|
+| `page` | int | `1` | 1-based page index |
+| `pageSize` | int | `25` | Range `[1, 200]` |
+| `sort` | string | endpoint default | **Server-whitelisted column** — any other value → `400` |
+| `dir` | `asc` \| `desc` | endpoint default | Sort direction |
+| `q` | string | — | Free-text filter (fields defined per endpoint) |
+| `from` | `YYYY-MM-DD` | — | Inclusive date window start |
+| `to` | `YYYY-MM-DD` | — | Inclusive date window end |
+| *facets* | varies | — | Endpoint-specific filters (`category`, `accountId`, …) |
+
+Example: `GET /analytics/merchants?page=2&pageSize=25&sort=total&dir=desc&q=starbucks&from=2026-01-01&to=2026-06-30`
+
+### Response — `Page<T>`
+
+```jsonc
+{
+  "rows": [ /* fully-computed row objects; money as 2-dp strings */ ],
+  "page": 2,
+  "pageSize": 25,
+  "total": 184,
+  "totalPages": 8,
+  "sort": "total",
+  "dir": "desc",
+  "appliedFilters": { "q": "starbucks", "from": "2026-01-01", "to": "2026-06-30" }
+}
+```
+
+- `total` = row count **after** facet/`q` filters, before paging — drives page controls.
+- Each row includes server-computed totals, shares, trends, and rank metadata.
+- Invalid `sort` → `400` with allowed values in `details`. Query validated with Zod on the backend.
+
+### Shared type locations
+
+| Location | Purpose |
+|----------|---------|
+| `backend/src/lib/list-query.ts` | Zod schema (`parseListQuery`), `Page<T>`, `ParsedListQuery`, `buildPage()` |
+| `ui/src/types/api.ts` | `ListQuery`, `Page<TRow>` — mirror for the typed API client |
+
+Per-endpoint sort whitelists are exported next to each service (e.g. `MERCHANT_SORTABLE` in `analytics-merchants.ts`).
 
 ---
 
@@ -148,7 +201,114 @@ Multipart upload for QFX/OFX/CSV/PDF statement files. Files encrypted at rest (A
 
 ---
 
-## Insights
+## Analytics (Phase 3.7–3.9)
+
+Consolidated intelligence layer replacing fragmented `/insights/*`, `/protect/*`, and ad-hoc wealth rollups. Source of truth: [`analytics-architecture.md`](../architecture/analytics-architecture.md).
+
+**Honesty rule:** every metric uses the [metric envelope](#metric-envelope). Heuristic and external metrics MUST include `confidence` and `caveats`. Savings/return rates are **0–1 fractions** with `unit: "percent"`; the client multiplies by 100 exactly once for display.
+
+Legacy routes remain during migration; new UI work targets `/analytics/*`.
+
+### Metric envelope
+
+Every analytics scalar, score, and KPI field is wrapped:
+
+```jsonc
+{
+  "value": "1234.56",
+  "unit": "USD",            // USD | percent | months | ratio | score
+  "grain": "monthly",
+  "asOf": "2026-06-01",
+  "class": "diagnostic",    // descriptive | diagnostic | predictive | prescriptive
+  "basis": "heuristic",     // factual | heuristic | external
+  "confidence": 0.62,       // 0..1 from data quality
+  "trend": {
+    "delta": "-3.10",
+    "deltaPct": -4.2,
+    "direction": "down",    // up | down | flat
+    "comparison": "vs trailing-6mo median"
+  },
+  "caveats": ["Credit limit unknown; utilization excluded"]
+}
+```
+
+TypeScript: `MetricEnvelope`, `MetricTrend` in `ui/src/types/api.ts`; `MetricEnvelope` in `backend/src/services/metrics/types.ts` (Phase 3.7).
+
+### Endpoints
+
+Common query params: `from`, `to` (`YYYY-MM-DD`), `month` (some overview panels). Tabular sub-resources accept [`ListQuery`](#list--pagination).
+
+| Method | Path | Query | Response |
+|--------|------|-------|----------|
+| GET | `/analytics/overview` | `from`, `to` | `AnalyticsOverviewResponse` — health composite, savings rate, net cash flow, top alerts, data-quality summary (all envelope-wrapped) |
+| GET | `/analytics/cashflow` | `from`, `to` | `CashflowAnalyticsResponse` — net cash flow, burn rate, free cash flow, income stability, monthly series |
+| GET | `/analytics/spending` | `from`, `to`, `ListQuery` | `SpendingAnalyticsResponse` — fixed/variable/discretionary split, essential vs non-essential, volatility, HHI, `categories: Page<CategorySpendRow>` |
+| GET | `/analytics/merchants` | `ListQuery` | `MerchantsTableResponse` — `Page<MerchantRow>` + `summary` (top/most-visited/fastest-growing computed server-side). Sort whitelist: `total`, `visits`, `trend`, `name`, `avgTransaction`, `lastSeen` |
+| GET | `/analytics/recurring` | `ListQuery` | `RecurringAnalyticsResponse` — subscriptions/bills with lifecycle (`active` \| `lapsed` \| `price-changed`), `subscriptions: Page<SubscriptionRow>`, lifestyle cost audits |
+| GET | `/analytics/investments/performance` | `from`, `to`, `accountId?` | `InvestmentPerformanceResponse` — unrealized/realized P/L, XIRR, TWR (post-snapshots), fee drag, max drawdown, benchmark delta |
+| GET | `/analytics/investments/behavior` | `from`, `to` | `InvestmentBehaviorResponse` — heuristic flags (overtrading, panic selling, …) each with `confidence` + evidence trades |
+| GET | `/analytics/inflation` | `from`, `to`, `ListQuery` | `InflationAnalyticsResponse` — personal CPI (Laspeyres), nominal vs real spend, BLS compare (external), `categories: Page<InflationCategoryRow>` |
+| GET | `/analytics/resilience` | — | `ResilienceAnalyticsResponse` — composite score + sub-scores (liquidity, income stability, expense flexibility, debt burden, investment liquidity), shock scenarios |
+| GET | `/analytics/planning/runway` | — | `RunwayResponse` — runway months, essential burn, liquid reserves |
+| GET | `/analytics/planning/payoff` | — | `PayoffResponse` — avalanche/snowball ETA per debt |
+| GET | `/analytics/planning/goals` | — | `GoalsAnalyticsResponse` — goal pace vs deadline, suggested goals |
+| GET | `/analytics/planning/scenarios` | — | `ScenariosResponse` — surplus allocation recommendation |
+| GET | `/analytics/planning/calendar` | `month` | `PlanningCalendarResponse` — bills, subscriptions, income events, safe-to-spend |
+| GET | `/analytics/data-quality` | — | `DataQualityResponse` — categorization coverage, sync freshness, transfer-pair coverage, reconciliation gap |
+
+**Implementation status:** `GET /analytics/merchants`, `/analytics/data-quality`, `/analytics/investments/performance`, `/analytics/recurring`, and `/analytics/resilience` are live. Remaining endpoints are Phase 3.7–3.9 (`TASK-ANALYTICS-*`).
+
+### `InvestmentPerformanceResponse`
+
+`GET /analytics/investments/performance?from=YYYY-MM-DD&to=YYYY-MM-DD&accountId?`
+
+All money KPIs use the [metric envelope](#metric-envelope). Return rates (`xirr`, `twr`, `maxDrawdown`, `dividendTtmYield`, `feeDrag`, `cashDrag`, `benchmarkDelta`) are **0–1 fractions** with `unit: "percent"`.
+
+```jsonc
+{
+  "from": "2025-06-01",
+  "to": "2026-06-01",
+  "asOf": "2026-06-01",
+  "portfolioValue": "125430.50",
+  "unrealizedGain": { "value": "8430.50", "unit": "USD", "basis": "factual", /* … */ },
+  "realizedGain": { "value": "2150.00", "unit": "USD", "basis": "factual", /* … */ },
+  "shortTermGain": { "value": "450.00", "unit": "USD", /* … */ },
+  "longTermGain": { "value": "1700.00", "unit": "USD", /* … */ },
+  "xirr": { "value": "0.1245", "unit": "percent", "class": "diagnostic", "basis": "factual", /* … */ },
+  "twr": { "value": "0.1180", "unit": "percent", "basis": "factual", /* … */ },
+  "maxDrawdown": { "value": "-0.0820", "unit": "percent", "basis": "factual", /* … */ },
+  "benchmarkDelta": { "value": "0.0230", "unit": "percent", "basis": "external",
+    "caveats": ["Benchmark: SPY buy-and-hold return"] },
+  "dividendTtmYield": { "value": "0.0180", "unit": "percent", /* … */ },
+  "feeDrag": { "value": "0.0045", "unit": "percent", /* … */ },
+  "cashDrag": { "value": "0.0020", "unit": "percent", "basis": "heuristic",
+    "caveats": ["Cash drag assumes idle brokerage cash earns 0% vs benchmark"] },
+  "washSaleCount": 1,
+  "dividendTrend": [{ "month": "2026-05", "amount": "142.30" }],
+  "confidence": 0.85,
+  "caveats": []
+}
+```
+
+**Computation notes (server-side only):**
+- **Realized/unrealized P/L** — FIFO `tax_lots` rebuilt from `investment_transactions`; sells consume oldest lots; short/long-term split at 366 days; wash-sale flagged when a loss sale is followed by a repurchase within 30 days.
+- **XIRR** — money-weighted return over dated cashflows (contributions/buys negative, dividends/sells/fees positive) plus terminal portfolio value at `to`.
+- **TWR / max drawdown** — from daily `holdings_snapshots` (via `mart_portfolio_daily` aggregation), geometrically linked sub-period returns with external cash-flow adjustment.
+- **Benchmark delta** — portfolio TWR minus buy-and-hold return of SPY (or VT) from `security_prices`; `basis: "external"`.
+- **Fee drag** — total fees / average portfolio value, annualized over the period.
+- **Cash drag** — `(idle_cash / total_investable) × benchmark_return`; heuristic when brokerage cash exceeds invested holdings value.
+
+Returns `404` when no investment transaction history exists for the scoped user/household.
+
+### Composite scores
+
+**Financial Health** (replaces 7-dimension wellness): weighted blend of savings rate (22), free cash flow (16), emergency fund (16), debt health (16), investing (14), spending discipline (10), goal pace (6) — each sub-score 0–100 with per-dimension `confidence`, composite `confidence` on `WellnessResponse`. Essential burn uses `dim_category.is_essential`. Goal pace is deadline-aware. No fabricated dimensions (Inflation Beat, Investment Growth, Income-to-Expense removed).
+
+**Resilience:** `0.30·Liquidity + 0.20·IncomeStability + 0.20·ExpenseFlexibility + 0.20·DebtBurden + 0.10·InvestmentLiquidity`. Bands: 0–39 critical · 40–59 vulnerable · 60–74 stable · 75–89 resilient · 90–100 fortified.
+
+---
+
+## Insights (legacy — migrating to `/analytics/*`)
 
 | Method | Path | Query | Response |
 |--------|------|-------|----------|
@@ -156,17 +316,15 @@ Multipart upload for QFX/OFX/CSV/PDF statement files. Files encrypted at rest (A
 | GET | `/insights/trends` | `from`, `to` | `{ trends: CategoryTrend[] }` |
 | GET | `/insights/subscriptions` | — | `{ subscriptions: Subscription[] }` (V2) |
 
-### Insights — advanced (V2)
-
-Backed by the demo dataset (Drizzle tables + derived rollups). All scoped to the household.
+### Insights — advanced (V2, legacy)
 
 | Method | Path | Response |
 |--------|------|----------|
-| GET | `/insights/wellness` | `WellnessResponse` — composite score, dimensions, history |
-| GET | `/insights/dna` | `DnaResponse` — archetype, narrative, axes, peer rarity (`404` if none) |
-| GET | `/insights/patterns` | `PatternsResponse` — day-of-week averages + detected patterns |
-| GET | `/insights/behavioral` | `BehavioralResponse` — challenges, streaks, spending/income creep, reasons |
-| GET | `/insights/merchants` | `MerchantsResponse` — top/most-visited/fastest-growing merchants, income insights (`isLive` when computed from synced transactions) |
+| GET | `/insights/wellness` | `WellnessResponse` — superseded by `/analytics/overview` health composite |
+| GET | `/insights/dna` | `DnaResponse` — Phase 3.9 Spending DNA |
+| GET | `/insights/patterns` | `PatternsResponse` — superseded by `/analytics/spending` |
+| GET | `/insights/behavioral` | `BehavioralResponse` |
+| GET | `/insights/merchants` | `MerchantsResponse` — superseded by `/analytics/merchants` |
 
 ---
 
@@ -174,9 +332,9 @@ Backed by the demo dataset (Drizzle tables + derived rollups). All scoped to the
 
 | Method | Path | Response |
 |--------|------|----------|
-| GET | `/wealth/net-worth` | `NetWorthResponse` — current totals + monthly snapshot trend + asset/liability breakdown |
-| GET | `/wealth/investments` | `InvestmentsResponse` — `positions`, `stockAggregates`, `optionPositions`, `portfolioBreakdown`, `behavioralAlerts` (portfolio health + trading-style), `investmentHistory`, `monthlyActivity` (cash deployed this month) |
-| GET | `/wealth/fire` | `FireResponse` — age (`isDefaultAge` true until user saves age; default 35), net worth, monthly spend/invest, withdrawal rate, real return (computed live from accounts + investment activity; `404` only when no accounts) |
+| GET | `/wealth/net-worth` | `NetWorthResponse` — `current` totals, `breakdown` by account type (depository/investment/credit), monthly `trend` |
+| GET | `/wealth/investments` | `InvestmentsResponse` — optional `accountId` query filters portfolio totals and rows server-side |
+| GET | `/wealth/fire` | `FireResponse` — live inputs plus `projection` (`fireNumber`, `yearsToFire`, `fireAge`, `investingRate`, `curve`). Optional query overrides: `monthlySpend`, `monthlyInvest`, `withdrawalRate`, `realReturn` |
 | PATCH | `/wealth/fire` | `FireProfilePatch` body (`currentAge`, `withdrawalRate`, `realReturn` — at least one) → `FireResponse` |
 
 ---
@@ -196,21 +354,74 @@ Backed by the demo dataset (Drizzle tables + derived rollups). All scoped to the
 
 ## Planning
 
-| Method | Path | Response |
-|--------|------|----------|
-| GET | `/planning/budgets` | `BudgetsResponse` — per-category budget vs spend, savings goals, safe-to-spend |
-| GET | `/planning/recurring` | `RecurringResponse` — subscriptions, bills, price changes, leak fees + lifestyle habits |
-| GET | `/planning/calendar` | `CalendarResponse` — month events (bills/subscriptions/income), spend heatmap, safe-to-spend today (derived) |
-| GET | `/planning/forecast` | `ForecastResponse` — 14-day cash-flow projection with weather, comfort floor, recommendation (derived) |
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| GET | `/planning/budgets` | — | `BudgetsResponse` — persisted budgets, `suggestedBudgets[]`, active goals, `suggestedGoals[]`, safe-to-spend |
+| POST | `/planning/budgets` | `{ category, periodMonth, limit, emoji?, color?, source?, class? }` | `BudgetRow` — upsert on `(user, category, periodMonth)` |
+| PATCH | `/planning/budgets/:budgetId` | `{ limit?, emoji?, color?, class? }` (≥1 field) | `BudgetRow` |
+| DELETE | `/planning/budgets/:budgetId` | — | `{ id }` |
+| POST | `/planning/goals` | `{ name, target, current?, deadline?, emoji?, color?, kind?, status?, source?, accountId? }` | `GoalRow` |
+| PATCH | `/planning/goals/:goalId` | `{ name?, target?, current?, deadline?, emoji?, color?, kind?, status?, accountId? }` (≥1 field) | `GoalRow` |
+| DELETE | `/planning/goals/:goalId` | — | `{ id }` |
+| GET | `/planning/recurring` | — | `RecurringResponse` — subscriptions, bills, price changes, leak fees + lifestyle habits |
+| GET | `/planning/calendar` | — | `CalendarResponse` — month events (bills/subscriptions/income), spend heatmap, safe-to-spend today (derived) |
+| GET | `/planning/forecast` | — | `ForecastResponse` — 14-day cash-flow projection with weather, comfort floor, recommendation (derived) |
+
+### `BudgetsResponse`
+
+```typescript
+interface BudgetItem {
+  id?: string; // persisted budgets only
+  category: string;
+  emoji: string | null;
+  color: string | null;
+  spent: string;
+  limit: string;
+  source: "user" | "suggested";
+  class?: "essential" | "discretionary" | null;
+  rationale?: string;
+  confidence?: "low" | "medium" | "high";
+}
+
+interface GoalItem {
+  id?: string; // persisted goals only
+  name: string;
+  emoji: string | null;
+  color: string | null;
+  target: string;
+  current: string;
+  deadline: string | null;
+  kind: "emergency" | "debt" | "sinking" | "surplus" | "custom";
+  status: "active" | "achieved" | "dismissed";
+  source: "user" | "suggested";
+  rationale?: string;
+  confidence?: "low" | "medium" | "high";
+  monthlySetAside?: string;
+  accountId?: string | null;
+}
+
+interface BudgetsResponse {
+  periodMonth: string; // YYYY-MM
+  safeToSpend: string;
+  daysRemaining: number;
+  isLive: boolean;
+  budgets: BudgetItem[];
+  suggestedBudgets: BudgetItem[];
+  goals: GoalItem[];
+  suggestedGoals: GoalItem[];
+}
+```
+
+Suggestions (`suggestedBudgets`, `suggestedGoals`) are computed server-side and not persisted until accepted via POST. Dismiss a suggested goal with `POST /planning/goals` `{ ..., status: "dismissed", source: "suggested" }` so it does not reappear.
 
 ---
 
-## Protect
+## Protect (legacy — migrating to `/analytics/*`)
 
 | Method | Path | Response |
 |--------|------|----------|
-| GET | `/protect/inflation` | `InflationResponse` — personal vs national rate, power loss, category basket |
-| GET | `/protect/resilience` | `ResilienceResponse` — liquid cash, monthly burn, shock scenarios + runway scores |
+| GET | `/protect/inflation` | `InflationResponse` — superseded by `/analytics/inflation` |
+| GET | `/protect/resilience` | `ResilienceResponse` — superseded by `/analytics/resilience` |
 
 ---
 
@@ -243,7 +454,64 @@ Backed by the demo dataset (Drizzle tables + derived rollups). All scoped to the
 
 ## Core types (TypeScript reference)
 
-These types will live in `backend/src/types/` and be mirrored or imported in `ui/src/types/api.ts`.
+Shared types live in `backend/src/lib/` and `backend/src/services/` and are mirrored in `ui/src/types/api.ts`.
+
+### List & pagination
+
+```typescript
+interface ListQuery {
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+  dir?: "asc" | "desc";
+  q?: string;
+  from?: string;
+  to?: string;
+}
+
+interface Page<TRow> {
+  rows: TRow[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  sort: string;
+  dir: "asc" | "desc";
+  appliedFilters: Record<string, string>;
+}
+```
+
+Backend: `parseListQuery()` + `buildPage()` in `backend/src/lib/list-query.ts`.
+
+### Metric envelope
+
+```typescript
+type MetricUnit = "USD" | "percent" | "months" | "ratio" | "score";
+type MetricClass = "descriptive" | "diagnostic" | "predictive" | "prescriptive";
+type MetricBasis = "factual" | "heuristic" | "external";
+type TrendDirection = "up" | "down" | "flat";
+
+interface MetricTrend {
+  delta: string;
+  deltaPct: number;
+  direction: TrendDirection;
+  comparison: string;
+}
+
+interface MetricEnvelope {
+  value: string;
+  unit: MetricUnit;
+  grain: string;
+  asOf: string;
+  class: MetricClass;
+  basis: MetricBasis;
+  confidence: number;
+  trend?: MetricTrend;
+  caveats?: string[];
+}
+```
+
+### Domain types
 
 ```typescript
 interface User {
@@ -288,7 +556,7 @@ interface TransactionSummary {
   avgMonthlySpend: string;
   topCategory: { name: string; amount: string };
   ccPaymentsExcluded: string;
-  savingsRate: number;
+  savingsRate: number; // 0–1 fraction (unit=percent; multiply by 100 once in UI)
 }
 
 interface MoneyFlowResponse {

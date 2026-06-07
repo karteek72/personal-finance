@@ -8,6 +8,11 @@ import {
 } from "../db/schema.js";
 import { formatMoneyAmount, roundPercent } from "../lib/money.js";
 import {
+  paginateInMemory,
+  type Page,
+  type ParsedListQuery,
+} from "../lib/list-query.js";
+import {
   buildInvestmentBehavioralAlerts,
   buildInvestmentHistorySummary,
   buildInvestmentMonthlyActivity,
@@ -21,6 +26,8 @@ import {
   type StockAggregate,
 } from "./holdings-mapper.js";
 import { resolveHouseholdContext } from "./household-access.js";
+import { getNetWorthTrendFromBalanceSnapshots } from "./balance-snapshots.js";
+import { splitBalanceForNetWorth } from "../config/account-types.js";
 
 export type {
   InvestmentPosition,
@@ -46,6 +53,15 @@ export interface InvestmentHolding {
   expirationLabel?: string | null;
 }
 
+export const HOLDING_SORTABLE = [
+  "ticker",
+  "name",
+  "value",
+  "gainLoss",
+  "gainLossPercent",
+  "costBasis",
+] as const;
+
 export interface InvestmentsResponse {
   portfolioValue: string;
   totalCostBasis: string;
@@ -59,20 +75,21 @@ export interface InvestmentsResponse {
     value: string;
   }>;
   /** Per-account positions (stocks and options) */
-  positions: InvestmentPosition[];
+  positions: Page<InvestmentPosition>;
   /** Stocks/ETFs/mutual funds rolled up by ticker across accounts */
   stockAggregates: StockAggregate[];
   /** All option positions (each contract series is its own row) */
   optionPositions: InvestmentPosition[];
   portfolioBreakdown: PortfolioBreakdown;
   /** Flat list without account context — same as positions minus account fields */
-  holdings: InvestmentHolding[];
+  holdings: Page<InvestmentHolding>;
   behavioralAlerts: Array<{ type: string; title: string; desc: string }>;
   investmentHistory: {
     lookbackYears: number;
     totalContributed: string;
-    estimatedValueToday: string;
     currentPortfolioValue: string;
+    totalCostBasis: string;
+    unrealizedGain: string;
     monthlyAverageInvest: string;
     transactionCount: number;
     buyTransactionCount: number;
@@ -102,8 +119,29 @@ function toLegacyHolding(position: InvestmentPosition): InvestmentHolding {
   };
 }
 
+function holdingSortKey(
+  column: string,
+): (row: InvestmentPosition) => number | string {
+  switch (column) {
+    case "ticker":
+      return (r) => r.ticker.toLowerCase();
+    case "name":
+      return (r) => r.name.toLowerCase();
+    case "gainLoss":
+      return (r) => Number.parseFloat(r.gainLoss);
+    case "gainLossPercent":
+      return (r) => r.gainLossPercent;
+    case "costBasis":
+      return (r) => Number.parseFloat(r.costBasis);
+    default:
+      return (r) => Number.parseFloat(r.value);
+  }
+}
+
 export async function getInvestments(
   userId: string,
+  q: ParsedListQuery,
+  accountId?: string,
 ): Promise<InvestmentsResponse> {
   const ctx = await resolveHouseholdContext(userId);
   const db = getDb();
@@ -170,15 +208,30 @@ export async function getInvestments(
     (a, b) => Number.parseFloat(b.value) - Number.parseFloat(a.value),
   );
 
-  const optionPositions = positions.filter((p) => p.assetType === "option");
-  const stockAggregates = aggregateStockPositions(positions);
-  const portfolioBreakdown = buildPortfolioBreakdown(positions);
+  const scopedPositions = accountId
+    ? positions.filter((p) => p.accountId === accountId)
+    : positions;
 
-  let portfolioValue = positions.reduce(
+  const positionsPage = paginateInMemory(scopedPositions, q, {
+    sortKey: holdingSortKey,
+    textFilter: (row, needle) =>
+      row.ticker.toLowerCase().includes(needle) ||
+      row.name.toLowerCase().includes(needle),
+  });
+  const holdingsPage: Page<InvestmentHolding> = {
+    ...positionsPage,
+    rows: positionsPage.rows.map(toLegacyHolding),
+  };
+
+  const optionPositions = scopedPositions.filter((p) => p.assetType === "option");
+  const stockAggregates = aggregateStockPositions(scopedPositions);
+  const portfolioBreakdown = buildPortfolioBreakdown(scopedPositions);
+
+  let portfolioValue = scopedPositions.reduce(
     (sum, p) => sum + Number.parseFloat(p.value),
     0,
   );
-  let totalCostBasis = positions.reduce(
+  let totalCostBasis = scopedPositions.reduce(
     (sum, p) => sum + p.quantity * Number.parseFloat(p.costBasis),
     0,
   );
@@ -210,11 +263,11 @@ export async function getInvestments(
       subtype: a.subtype,
       value: formatMoneyAmount(a.balanceCurrent ?? "0"),
     })),
-    positions,
+    positions: positionsPage,
     stockAggregates,
     optionPositions,
     portfolioBreakdown,
-    holdings: positions.map(toLegacyHolding),
+    holdings: holdingsPage,
     behavioralAlerts,
     investmentHistory,
     monthlyActivity,
@@ -226,6 +279,12 @@ export interface NetWorthResponse {
     netWorth: string;
     totalAssets: string;
     totalLiabilities: string;
+    accountCount: number;
+  };
+  breakdown: {
+    depository: { total: string; accountCount: number };
+    investment: { total: string; accountCount: number };
+    credit: { total: string; accountCount: number };
   };
   trend: Array<{ month: string; netWorth: string }>;
 }
@@ -246,33 +305,74 @@ export async function getNetWorth(userId: string): Promise<NetWorthResponse> {
 
   let assets = 0;
   let liabilities = 0;
+  let depositoryTotal = 0;
+  let investmentTotal = 0;
+  let creditTotal = 0;
+  let depositoryCount = 0;
+  let investmentCount = 0;
+  let creditCount = 0;
+
   for (const a of accountRows) {
     const bal = Number.parseFloat(a.balanceCurrent ?? "0");
     if (a.type === "credit") {
       liabilities += bal;
+      creditTotal += bal;
+      creditCount += 1;
     } else {
-      assets += bal;
+      const split = splitBalanceForNetWorth(a.type, bal);
+      assets += split.assets;
+      liabilities += split.liabilities;
+      if (a.type === "depository") {
+        depositoryTotal += bal;
+        depositoryCount += 1;
+      } else if (a.type === "investment") {
+        investmentTotal += bal;
+        investmentCount += 1;
+      }
     }
   }
 
-  const snapshots = await db
-    .select({
-      month: netWorthSnapshots.month,
-      netWorth: netWorthSnapshots.netWorth,
-    })
-    .from(netWorthSnapshots)
-    .where(inArray(netWorthSnapshots.userId, ctx.userIds));
-  snapshots.sort((a, b) => (a.month < b.month ? -1 : 1));
+  const trendFromSnapshots = await getNetWorthTrendFromBalanceSnapshots(
+    ctx.userIds,
+  );
+
+  let trend = trendFromSnapshots;
+  if (trend.length === 0) {
+    const snapshots = await db
+      .select({
+        month: netWorthSnapshots.month,
+        netWorth: netWorthSnapshots.netWorth,
+      })
+      .from(netWorthSnapshots)
+      .where(inArray(netWorthSnapshots.userId, ctx.userIds));
+    snapshots.sort((a, b) => (a.month < b.month ? -1 : 1));
+    trend = snapshots.map((s) => ({
+      month: s.month,
+      netWorth: formatMoneyAmount(s.netWorth),
+    }));
+  }
 
   return {
     current: {
       netWorth: formatMoneyAmount(assets - liabilities),
       totalAssets: formatMoneyAmount(assets),
       totalLiabilities: formatMoneyAmount(liabilities),
+      accountCount: accountRows.length,
     },
-    trend: snapshots.map((s) => ({
-      month: s.month,
-      netWorth: formatMoneyAmount(s.netWorth),
-    })),
+    breakdown: {
+      depository: {
+        total: formatMoneyAmount(depositoryTotal),
+        accountCount: depositoryCount,
+      },
+      investment: {
+        total: formatMoneyAmount(investmentTotal),
+        accountCount: investmentCount,
+      },
+      credit: {
+        total: formatMoneyAmount(creditTotal),
+        accountCount: creditCount,
+      },
+    },
+    trend,
   };
 }

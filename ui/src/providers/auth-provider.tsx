@@ -59,7 +59,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, [router, status, hydrated]);
 
   if (!requiresSignIn()) {
-    return children;
+    return <>{children}</>;
   }
 
   // Until client hydrate() runs, match server HTML (always loading).
@@ -72,7 +72,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (status === "authenticated") {
-    return children;
+    return <>{children}</>;
   }
 
   return <AuthLoadingScreen message="Loading…" />;

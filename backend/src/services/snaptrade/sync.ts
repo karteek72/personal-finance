@@ -12,7 +12,9 @@ import { AppError } from "../../lib/errors.js";
 import { formatMoneyAmount, formatOptionPremium } from "../../lib/money.js";
 import { createLogger } from "../../lib/logger.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
-import { refreshFireProfile, repairNonContributionInvestmentTxns } from "../investment-analytics.js";
+import { writeInvestmentSnapshotsForAccounts } from "../investment-snapshots.js";
+import { repairNonContributionInvestmentTxns } from "../investment-analytics.js";
+import { recomputeAllAnalytics } from "../recompute-all-analytics.js";
 import {
   effectiveAssetType,
   isOccOptionTicker,
@@ -438,6 +440,7 @@ export async function syncSnaptradeForUser(
   let accountsSynced = 0;
   let holdingsUpdated = 0;
   let activitiesAdded = 0;
+  const syncedAccountIds: string[] = [];
 
   for (const auth of authorizations) {
     const authorizationId = auth.id;
@@ -540,6 +543,7 @@ export async function syncSnaptradeForUser(
       }
 
       accountIds.push(accountDbId);
+      syncedAccountIds.push(accountDbId);
       accountsSynced += 1;
 
       try {
@@ -702,7 +706,9 @@ export async function syncSnaptradeForUser(
   const repairedHoldings = await repairOptionHoldingsCostBasis(db, userId);
   const repairedTxns = await repairNonContributionInvestmentTxns([userId]);
 
-  await refreshFireProfile(userId);
+  await writeInvestmentSnapshotsForAccounts(userId, syncedAccountIds);
+
+  await recomputeAllAnalytics(userId);
 
   log.info(
     {

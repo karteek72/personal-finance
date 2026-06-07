@@ -148,16 +148,16 @@ spendflow_load_env() {
   fi
 
   : "${SPENDFLOW_HOST:=0.0.0.0}"
-  : "${SPENDFLOW_UI_PORT:=3000}"
+  : "${SPENDFLOW_UI_PORT:=3005}"
   : "${SPENDFLOW_API_PORT:=4000}"
+  : "${SPENDFLOW_IMAGE_TAG:=latest}"
+  export SPENDFLOW_IMAGE_TAG
 
   export NEXT_PUBLIC_GOOGLE_CLIENT_ID="${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-${GOOGLE_CLIENT_ID:-}}"
-  export CORS_ORIGINS="${CORS_ORIGINS:-${SPENDFLOW_UI_PUBLIC_URL:-http://localhost:3000},${SPENDFLOW_UI_LAN_URL:-http://127.0.0.1:3000}}"
-  export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-${SPENDFLOW_API_PUBLIC_URL:-http://localhost:4000}/api/v1}"
-  export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-${SPENDFLOW_UI_PUBLIC_URL:-http://localhost:3000}}"
   export NEXT_PUBLIC_USE_MOCKS="${NEXT_PUBLIC_USE_MOCKS:-false}"
 
   spendflow_validate_host
+  spendflow_resolve_runtime_cors
 }
 
 spendflow_compose() {
@@ -178,6 +178,42 @@ spendflow_require_cmd() {
     echo "error: '$1' not found. Install Podman and podman-compose." >&2
     exit 1
   fi
+}
+
+# Remaining CLI args after stripping -v/--version (see spendflow_parse_image_version_args).
+SPENDFLOW_REMAINING_ARGS=()
+
+spendflow_validate_image_tag() {
+  if [[ ! "${SPENDFLOW_IMAGE_TAG}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$ ]]; then
+    echo "error: invalid image tag '${SPENDFLOW_IMAGE_TAG}' (use letters, digits, ., _, -)" >&2
+    exit 1
+  fi
+}
+
+# Parse -v/--version from script args; CLI overrides SPENDFLOW_IMAGE_TAG from deploy.env.
+spendflow_parse_image_version_args() {
+  SPENDFLOW_REMAINING_ARGS=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -v|--version)
+        if [[ $# -lt 2 ]]; then
+          echo "error: --version requires a value" >&2
+          exit 1
+        fi
+        export SPENDFLOW_IMAGE_TAG="$2"
+        shift 2
+        ;;
+      --version=*)
+        export SPENDFLOW_IMAGE_TAG="${1#*=}"
+        shift
+        ;;
+      *)
+        SPENDFLOW_REMAINING_ARGS+=("$1")
+        shift
+        ;;
+    esac
+  done
+  spendflow_validate_image_tag
 }
 
 spendflow_ensure_jwt_secret() {
@@ -221,15 +257,129 @@ spendflow_ensure_encryption_key() {
   echo "warn: generated ENCRYPTION_KEY in ${env_file} (required for Plaid in production containers)" >&2
 }
 
-spendflow_use_lan_build_urls() {
-  [[ "${SPENDFLOW_BUILD_TARGET:-lan}" != "public" ]]
+spendflow_strip_trailing_slash() {
+  local url="$1"
+  while [[ "${url}" == */ ]]; do
+    url="${url%/}"
+  done
+  printf '%s' "${url}"
 }
 
+# public = bake HTTPS hostnames (Cloudflare tunnel). lan = bake LAN IP + published ports.
+spendflow_infer_build_target() {
+  if [[ -n "${SPENDFLOW_BUILD_TARGET:-}" ]]; then
+    printf '%s' "${SPENDFLOW_BUILD_TARGET}"
+    return 0
+  fi
+  if [[ "${SPENDFLOW_UI_PUBLIC_URL:-}" =~ ^https:// ]]; then
+    printf 'public'
+    return 0
+  fi
+  printf 'lan'
+}
+
+spendflow_lan_base_url() {
+  local scheme="http"
+  local host="${1:-}"
+  local port="$2"
+  if [[ -z "${host}" || "${host}" == "0.0.0.0" ]]; then
+    host="$(spendflow_detect_lan_ip)"
+  fi
+  if [[ -z "${host}" ]]; then
+    host="127.0.0.1"
+  fi
+  printf '%s://%s:%s' "${scheme}" "${host}" "${port}"
+}
+
+# Merge CORS origins for the API container (browser + tunnel + LAN).
+spendflow_resolve_runtime_cors() {
+  local -a origins=()
+  local item origin
+
+  if [[ -n "${CORS_ORIGINS:-}" ]]; then
+    IFS=',' read -ra origins <<<"${CORS_ORIGINS}"
+  fi
+
+  spendflow_append_cors_origin() {
+    local candidate
+    candidate="$(spendflow_strip_trailing_slash "$1")"
+    [[ -z "${candidate}" ]] && return 0
+    for item in "${origins[@]}"; do
+      item="$(spendflow_strip_trailing_slash "${item}")"
+      if [[ "${item}" == "${candidate}" ]]; then
+        return 0
+      fi
+    done
+    origins+=("${candidate}")
+  }
+
+  spendflow_append_cors_origin "${SPENDFLOW_UI_PUBLIC_URL:-}"
+  spendflow_append_cors_origin "${SPENDFLOW_UI_LAN_URL:-}"
+  spendflow_append_cors_origin "$(spendflow_lan_base_url "${SPENDFLOW_HOST}" "${SPENDFLOW_UI_PORT}")"
+  spendflow_append_cors_origin "http://localhost:${SPENDFLOW_UI_PORT}"
+  spendflow_append_cors_origin "http://127.0.0.1:${SPENDFLOW_UI_PORT}"
+
+  CORS_ORIGINS="$(IFS=,; printf '%s' "${origins[*]}")"
+  export CORS_ORIGINS
+}
+
+# Set NEXT_PUBLIC_* baked into the static UI image. Only call from build.sh.
 spendflow_apply_build_urls() {
-  if spendflow_use_lan_build_urls; then
-    export NEXT_PUBLIC_API_URL="${SPENDFLOW_API_LAN_URL:-http://127.0.0.1:4000}/api/v1"
-    export NEXT_PUBLIC_APP_URL="${SPENDFLOW_UI_LAN_URL:-http://127.0.0.1:3000}"
-    echo "info: building UI for LAN (${NEXT_PUBLIC_APP_URL})" >&2
+  local target api_base app_base
+  target="$(spendflow_infer_build_target)"
+
+  case "${target}" in
+    public)
+      if [[ -z "${SPENDFLOW_API_PUBLIC_URL:-}" || -z "${SPENDFLOW_UI_PUBLIC_URL:-}" ]]; then
+        echo "error: SPENDFLOW_BUILD_TARGET=public requires SPENDFLOW_API_PUBLIC_URL and SPENDFLOW_UI_PUBLIC_URL in containers/deploy.env" >&2
+        exit 1
+      fi
+      api_base="$(spendflow_strip_trailing_slash "${SPENDFLOW_API_PUBLIC_URL}")"
+      app_base="$(spendflow_strip_trailing_slash "${SPENDFLOW_UI_PUBLIC_URL}")"
+      export NEXT_PUBLIC_API_URL="${api_base}/api/v1"
+      export NEXT_PUBLIC_APP_URL="${app_base}"
+      ;;
+    lan)
+      api_base="${SPENDFLOW_API_LAN_URL:-$(spendflow_lan_base_url "${SPENDFLOW_HOST}" "${SPENDFLOW_API_PORT}")}"
+      app_base="${SPENDFLOW_UI_LAN_URL:-$(spendflow_lan_base_url "${SPENDFLOW_HOST}" "${SPENDFLOW_UI_PORT}")}"
+      export NEXT_PUBLIC_API_URL="$(spendflow_strip_trailing_slash "${api_base}")/api/v1"
+      export NEXT_PUBLIC_APP_URL="$(spendflow_strip_trailing_slash "${app_base}")"
+      ;;
+    *)
+      echo "error: SPENDFLOW_BUILD_TARGET must be 'public' or 'lan' (got '${target}')" >&2
+      exit 1
+      ;;
+  esac
+
+  echo "info: UI build target=${target}" >&2
+  echo "info:   NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}" >&2
+  echo "info:   NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}" >&2
+
+  if [[ "${target}" == "public" && "${NEXT_PUBLIC_API_URL}" != https://* ]]; then
+    echo "warn: public build but NEXT_PUBLIC_API_URL is not HTTPS — browsers on ${NEXT_PUBLIC_APP_URL} may block API calls" >&2
+  fi
+}
+
+spendflow_tunnel_upstream_host() {
+  if [[ "${SPENDFLOW_HOST}" == "0.0.0.0" ]]; then
+    spendflow_detect_lan_ip
+  else
+    printf '%s' "${SPENDFLOW_HOST}"
+  fi
+}
+
+spendflow_print_deploy_urls() {
+  local tunnel_host
+  tunnel_host="$(spendflow_tunnel_upstream_host)"
+  echo "    CORS_ORIGINS:          ${CORS_ORIGINS}"
+  echo "    API APP_URL:           ${SPENDFLOW_API_PUBLIC_URL:-http://localhost:${SPENDFLOW_API_PORT}}"
+  if [[ -n "${tunnel_host}" ]]; then
+    echo "    Cloudflare upstream:   UI http://${tunnel_host}:${SPENDFLOW_UI_PORT}  API http://${tunnel_host}:${SPENDFLOW_API_PORT}"
+  fi
+  if [[ -n "${SPENDFLOW_UI_PUBLIC_URL:-}" ]]; then
+    echo "    Public UI:             ${SPENDFLOW_UI_PUBLIC_URL}"
+    echo "    Public API:            ${SPENDFLOW_API_PUBLIC_URL:-}/api/v1"
+    echo "    Rebuild UI after URL changes: ./scripts/podman/build.sh && ./scripts/podman/deploy.sh"
   fi
 }
 
@@ -281,8 +431,9 @@ spendflow_export_compose_runtime_env() {
   spendflow_prepare_redis
   export DATABASE_URL REDIS_URL JWT_SECRET ENCRYPTION_KEY
   export CORS_ORIGINS NEXT_PUBLIC_API_URL NEXT_PUBLIC_APP_URL NEXT_PUBLIC_GOOGLE_CLIENT_ID
-  export SPENDFLOW_HOST SPENDFLOW_UI_PORT SPENDFLOW_API_PORT
+  export SPENDFLOW_HOST SPENDFLOW_UI_PORT SPENDFLOW_API_PORT SPENDFLOW_IMAGE_TAG
   export SPENDFLOW_UI_PUBLIC_URL SPENDFLOW_API_PUBLIC_URL
+  spendflow_resolve_runtime_cors
   export PLAID_CLIENT_ID PLAID_SECRET PLAID_ENV PLAID_PRODUCTS PLAID_COUNTRY_CODES PLAID_REDIRECT_URI
   export GOOGLE_CLIENT_ID GOOGLE_CLIENT_IDS GOOGLE_SECRET_KEY AUTH_ALLOW_DEV_USER
   export TELLER_APPLICATION_ID TELLER_ENV TELLER_CERT_PATH TELLER_KEY_PATH
@@ -374,7 +525,9 @@ spendflow_load_dev_env() {
 
 spendflow_dev_start_infra() {
   export SPENDFLOW_COMPOSE_PROFILE=bundled-db
-  spendflow_prepare_postgres
+  # Host API/UI use 127.0.0.1 — do not call spendflow_prepare_postgres (container DNS + .env rewrite).
+  export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@127.0.0.1:${POSTGRES_HOST_PORT}/${POSTGRES_DB:-spendflow}"
+  export REDIS_URL="redis://127.0.0.1:${REDIS_HOST_PORT}"
   echo "==> Starting Postgres + Redis (containers on spendflow-net)"
   echo "    Postgres: 127.0.0.1:${POSTGRES_HOST_PORT} (volume spendflow-pgdata)"
   echo "    Redis:    127.0.0.1:${REDIS_HOST_PORT} (volume spendflow-redisdata)"

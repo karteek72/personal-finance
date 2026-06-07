@@ -12,6 +12,7 @@ import {
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
 import { resolveHouseholdContext } from "./household-access.js";
+import { computeIncomeSummary } from "./computed-fields.js";
 import { computeWrappedFromTransactions } from "./compute-wrapped.js";
 
 export interface CoachResponse {
@@ -121,6 +122,13 @@ export interface MerchantsResponse {
     trail: number[];
   }>;
   income: { months: string[]; primary: number[]; side: number[] };
+  incomeSummary: {
+    avgMonthlyIncome: string;
+    incomeStability: number;
+    sideIncomeTotal: string;
+    chartYTicks: number[];
+    maxBarTotal: number;
+  };
   merchantCount: number;
   incomeSources: number;
   isLive: boolean;
@@ -136,6 +144,13 @@ export async function getMerchants(
     return {
       merchants: [],
       income: { months: [], primary: [], side: [] },
+      incomeSummary: {
+        avgMonthlyIncome: "0.00",
+        incomeStability: 0,
+        sideIncomeTotal: "0.00",
+        chartYTicks: [0, 0, 0],
+        maxBarTotal: 0,
+      },
       merchantCount: 0,
       incomeSources: 0,
       isLive: false,
@@ -212,15 +227,18 @@ export async function getMerchants(
     }
   }
 
+  const income = {
+    months: last6.map((mk) => mk.slice(5)),
+    primary: last6.map((mk) =>
+      Math.round((incomeByMonth.get(mk) ?? 0) - (sideByMonth.get(mk) ?? 0)),
+    ),
+    side: last6.map((mk) => Math.round(sideByMonth.get(mk) ?? 0)),
+  };
+
   return {
     merchants,
-    income: {
-      months: last6.map((mk) => mk.slice(5)),
-      primary: last6.map((mk) =>
-        Math.round((incomeByMonth.get(mk) ?? 0) - (sideByMonth.get(mk) ?? 0)),
-      ),
-      side: last6.map((mk) => Math.round(sideByMonth.get(mk) ?? 0)),
-    },
+    income,
+    incomeSummary: computeIncomeSummary(income),
     merchantCount: agg.size,
     incomeSources: incomeByMonth.size > 0 ? (sideByMonth.size > 0 ? 2 : 1) : 0,
     isLive: agg.size > 0 || incomeByMonth.size > 0,

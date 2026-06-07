@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Start the SpendFlow Podman stack (images must exist — run build.sh first, or pass --build).
+# Usage: ./scripts/podman/deploy.sh [--version TAG] [--build] [compose up args...]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,6 +11,7 @@ spendflow_require_cmd podman
 
 BUILD=0
 EXTRA_ARGS=()
+VERSION_ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --build) BUILD=1; shift ;;
@@ -17,11 +19,24 @@ while [[ $# -gt 0 ]]; do
       echo "warn: --no-build is the default; use --build to rebuild images" >&2
       shift
       ;;
+    -v|--version|--version=*)
+      VERSION_ARGS+=("$1")
+      if [[ "$1" == "-v" || "$1" == "--version" ]]; then
+        VERSION_ARGS+=("${2:?error: --version requires a value}")
+        shift
+      fi
+      shift
+      ;;
     *) EXTRA_ARGS+=("$1"); shift ;;
   esac
 done
 
 spendflow_load_env
+if ((${#VERSION_ARGS[@]})); then
+  spendflow_parse_image_version_args "${VERSION_ARGS[@]}"
+else
+  spendflow_validate_image_tag
+fi
 
 if [[ ! -f "$(spendflow_root_env_file)" ]]; then
   echo "error: create $(spendflow_root_env_file) from .env.example" >&2
@@ -30,16 +45,22 @@ fi
 spendflow_ensure_jwt_secret
 spendflow_ensure_encryption_key
 spendflow_export_compose_runtime_env
-spendflow_apply_build_urls
 spendflow_stop_dev_servers
 
 if [[ "${BUILD}" -eq 1 ]]; then
-  "${SCRIPT_DIR}/build.sh"
+  "${SCRIPT_DIR}/build.sh" --version "${SPENDFLOW_IMAGE_TAG}"
 fi
 
-spendflow_ensure_podman
+for img in "localhost/spendflow-api:${SPENDFLOW_IMAGE_TAG}" "localhost/spendflow-ui:${SPENDFLOW_IMAGE_TAG}"; do
+  if ! podman image exists "${img}" 2>/dev/null; then
+    echo "error: missing ${img} — run: ./scripts/podman/build.sh --version ${SPENDFLOW_IMAGE_TAG}" >&2
+    exit 1
+  fi
+done
 
 echo "==> Starting stack on ${SPENDFLOW_HOST}:${SPENDFLOW_UI_PORT} (UI) and :${SPENDFLOW_API_PORT} (API)"
+echo "    Image tag: ${SPENDFLOW_IMAGE_TAG}"
+spendflow_print_deploy_urls
 
 UP_ARGS=(up -d --remove-orphans --no-build)
 if ((${#EXTRA_ARGS[@]})); then
@@ -55,10 +76,13 @@ echo "LAN:"
 echo "  UI:  http://${SPENDFLOW_HOST}:${SPENDFLOW_UI_PORT}"
 echo "  API: http://${SPENDFLOW_HOST}:${SPENDFLOW_API_PORT}/api/v1/health"
 if [[ -n "${SPENDFLOW_UI_PUBLIC_URL:-}" ]]; then
-  echo "Public (host systemd cloudflared → same ports):"
+  tunnel_host="$(spendflow_tunnel_upstream_host)"
+  echo "Public (Cloudflare tunnel → host ports):"
   echo "  UI:  ${SPENDFLOW_UI_PUBLIC_URL}"
   echo "  API: ${SPENDFLOW_API_PUBLIC_URL}/api/v1"
-  echo "  Tunnel upstream: http://${SPENDFLOW_HOST}:${SPENDFLOW_UI_PORT} and :${SPENDFLOW_API_PORT}"
+  if [[ -n "${tunnel_host}" ]]; then
+    echo "  Tunnel upstream: http://${tunnel_host}:${SPENDFLOW_UI_PORT} and http://${tunnel_host}:${SPENDFLOW_API_PORT}"
+  fi
 fi
 echo ""
 spendflow_compose ps
