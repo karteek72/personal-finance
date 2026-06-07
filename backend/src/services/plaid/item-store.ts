@@ -3,17 +3,20 @@ import { and, desc, eq } from "drizzle-orm";
 import type { Env } from "../../config/env.js";
 import { getDb } from "../../db/client.js";
 import { AppError } from "../../lib/errors.js";
-import { plaidItems, users } from "../../db/schema.js";
+import { accounts, plaidItems, users } from "../../db/schema.js";
 import {
   createOperationTimer,
   logOperation,
   logOperationError,
 } from "../../lib/operation-log.js";
 import { createLogger } from "../../lib/logger.js";
-import { encryptPlaidToken } from "./crypto.js";
+import { decryptPlaidToken, encryptPlaidToken } from "./crypto.js";
+import { disconnectPlaidItem } from "./disconnect-item.js";
 import { syncPlaidItem, type PlaidSyncOptions } from "./sync.js";
 
 const log = createLogger("plaid.item-store");
+
+export type PlaidConnectionStatus = "active" | "error" | "reauth_required";
 
 export interface SyncAllPlaidOptions extends PlaidSyncOptions {
   userEmail?: string | null;
@@ -43,6 +46,10 @@ export async function createPlaidItemFromExchange(
       })
       .where(eq(plaidItems.id, existing[0].id))
       .returning();
+    await db
+      .update(accounts)
+      .set({ status: "active" })
+      .where(eq(accounts.plaidItemId, existing[0].id));
     return updated!;
   }
 
@@ -57,6 +64,54 @@ export async function createPlaidItemFromExchange(
     .returning();
 
   return created!;
+}
+
+export async function setPlaidItemStatusByPlaidId(
+  plaidItemId: string,
+  status: PlaidConnectionStatus,
+): Promise<boolean> {
+  const db = getDb();
+  const [item] = await db
+    .select({ id: plaidItems.id })
+    .from(plaidItems)
+    .where(eq(plaidItems.plaidItemId, plaidItemId))
+    .limit(1);
+
+  if (!item) {
+    return false;
+  }
+
+  await db
+    .update(plaidItems)
+    .set({ status })
+    .where(eq(plaidItems.id, item.id));
+  await db
+    .update(accounts)
+    .set({ status })
+    .where(eq(accounts.plaidItemId, item.id));
+
+  return true;
+}
+
+export async function getPlaidItemAccessToken(
+  itemDbId: string,
+  userId: string,
+  env: Env,
+): Promise<string> {
+  const db = getDb();
+  const [item] = await db
+    .select({
+      accessTokenEncrypted: plaidItems.accessTokenEncrypted,
+    })
+    .from(plaidItems)
+    .where(and(eq(plaidItems.id, itemDbId), eq(plaidItems.userId, userId)))
+    .limit(1);
+
+  if (!item) {
+    throw AppError.notFound("Plaid item not found");
+  }
+
+  return decryptPlaidToken(item.accessTokenEncrypted, env);
 }
 
 export async function listPlaidItems(userId: string) {
@@ -75,13 +130,12 @@ export async function listPlaidItems(userId: string) {
     .orderBy(desc(plaidItems.createdAt));
 }
 
-export async function deletePlaidItem(itemDbId: string, userId: string) {
-  const db = getDb();
-  await db
-    .delete(plaidItems)
-    .where(
-      and(eq(plaidItems.id, itemDbId), eq(plaidItems.userId, userId)),
-    );
+export async function deletePlaidItem(
+  itemDbId: string,
+  userId: string,
+  env: Env,
+): Promise<boolean> {
+  return disconnectPlaidItem(itemDbId, userId, env);
 }
 
 export async function syncAllPlaidItems(

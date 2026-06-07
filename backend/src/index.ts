@@ -7,18 +7,29 @@ import { backfillSubCategories } from "./services/backfill-subcategories.js";
 import { backfillInternalTransfers } from "./services/backfill-transfers.js";
 import { createRootLogger, getRootLogger } from "./lib/logger.js";
 import { errorHandlerPlugin } from "./plugins/error-handler.js";
+import { rateLimitPlugin } from "./plugins/rate-limit.js";
 import { REQUEST_ID_HEADER, requestContextPlugin } from "./plugins/request-context.js";
 import { authRoutes } from "./routes/auth.js";
 import { householdRoutes } from "./routes/households.js";
 import { healthRoutes } from "./routes/health.js";
 import { accountRoutes } from "./routes/accounts.js";
 import { liabilityRoutes } from "./routes/liabilities.js";
+import { connectionRoutes } from "./routes/connections.js";
 import { plaidRoutes } from "./routes/plaid.js";
+import { snaptradeRoutes } from "./routes/snaptrade.js";
+import { tellerRoutes } from "./routes/teller.js";
 import { plaidWebhookRoutes } from "./routes/webhooks-plaid.js";
 import {
   transactionRoutes,
   insightRoutes,
 } from "./routes/transactions.js";
+import { wealthRoutes } from "./routes/wealth.js";
+import { userRoutes } from "./routes/user.js";
+import { planningRoutes } from "./routes/planning.js";
+import { insightRoutesV2 } from "./routes/insights.js";
+import { protectRoutes } from "./routes/protect.js";
+import { coachRoutes } from "./routes/coach.js";
+import { importRoutes } from "./routes/imports.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -53,6 +64,7 @@ async function main(): Promise<void> {
 
   await app.register(errorHandlerPlugin);
   await app.register(requestContextPlugin);
+  await app.register(rateLimitPlugin);
 
   const migrationLog = getRootLogger().child({ module: "db.migrate" });
   migrationLog.info("running database migrations");
@@ -88,10 +100,20 @@ async function main(): Promise<void> {
   await app.register(healthRoutes, { prefix: "/api/v1" });
   await app.register(accountRoutes, { prefix: "/api/v1" });
   await app.register(liabilityRoutes, { prefix: "/api/v1" });
+  await app.register(connectionRoutes, { prefix: "/api/v1" });
   await app.register(plaidRoutes, { prefix: "/api/v1" });
+  await app.register(tellerRoutes, { prefix: "/api/v1" });
+  await app.register(snaptradeRoutes, { prefix: "/api/v1" });
   await app.register(plaidWebhookRoutes, { prefix: "/api/v1" });
   await app.register(transactionRoutes, { prefix: "/api/v1" });
   await app.register(insightRoutes, { prefix: "/api/v1" });
+  await app.register(wealthRoutes, { prefix: "/api/v1" });
+  await app.register(userRoutes, { prefix: "/api/v1" });
+  await app.register(planningRoutes, { prefix: "/api/v1" });
+  await app.register(insightRoutesV2, { prefix: "/api/v1" });
+  await app.register(protectRoutes, { prefix: "/api/v1" });
+  await app.register(coachRoutes, { prefix: "/api/v1" });
+  await app.register(importRoutes, { prefix: "/api/v1" });
 
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
   app.log.info({ port: env.PORT }, "SpendFlow API listening");

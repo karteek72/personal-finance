@@ -1,0 +1,182 @@
+{
+  "archetype": "The Foodie",
+  "archetypeStat": "$14,200/yr on dining — 11% above median",
+  "creep": {
+    "months": [
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May"
+    ],
+    "income": [
+      "7200",
+      "7200",
+      "7600",
+      "7200",
+      "7200",
+      "7400",
+      "7400",
+      "7400",
+      "7400",
+      "7600"
+    ],
+    "spending": [
+      "4800",
+      "4900",
+      "5200",
+      "5100",
+      "5500",
+      "5200",
+      "5300",
+      "5600",
+      "5400",
+      "5500"
+    ]
+  },
+  "reasons": [
+    {
+      "id": "need",
+      "emoji": "✅",
+      "label": "Need",
+      "color": "#22C55E",
+      "total": "1840.00"
+    },
+    {
+      "id": "treat",
+      "emoji": "🍰",
+      "label": "Treat",
+      "color": "#F97316",
+      "total": "420.00"
+    },
+    {
+      "id": "social",
+      "emoji": "🥂",
+      "label": "Social",
+      "color": "#3B82F6",
+      "total": "610.00"
+    },
+    {
+      "id": "bored",
+      "emoji": "😪",
+      "label": "Bored",
+      "color": "#A855F7",
+      "total": "290.00"
+    },
+    {
+      "id": "stress",
+      "emoji": "😫",
+      "label": "Stress",
+      "color": "#EF4444",
+      "total": "540.00"
+    },
+    {
+      "id": "impulse",
+      "emoji": "⚡",
+      "label": "Impulse",
+      "color": "#EAB308",
+      "total": "480.00"
+    }
+  ],
+  "taggedTransactions": [
+    {
+      "id": "b0000000-0000-4000-8000-0000000003ea",
+      "merchant": "Uber Eats",
+      "amount": "45.82",
+      "date": "2026-05-31",
+      "emoji": "💳",
+      "reasonId": "need"
+    },
+    {
+      "id": "b0000000-0000-4000-8000-0000000003f5",
+      "merchant": "Blue Bottle Coffee",
+      "amount": "8.37",
+      "date": "2026-05-31",
+      "emoji": "💳",
+      "reasonId": "treat"
+    },
+    {
+      "id": "b0000000-0000-4000-8000-00000000040a",
+      "merchant": "Steam",
+      "amount": "20.83",
+      "date": "2026-05-31",
+      "emoji": "💳",
+      "reasonId": "social"
+    },
+    {
+      "id": "b0000000-0000-4000-8000-0000000003e1",
+      "merchant": "Olive Garden",
+      "amount": "69.54",
+      "date": "2026-05-30",
+      "emoji": "💳",
+      "reasonId": "bored"
+    },
+    {
+      "id": "b0000000-0000-4000-8000-0000000003f1",
+      "merchant": "Starbucks",
+      "amount": "4.74",
+      "date": "2026-05-30",
+      "emoji": "💳",
+      "reasonId": "stress"
+    },
+    {
+      "id": "b0000000-0000-4000-8000-0000000003f4",
+      "merchant": "Philz Coffee",
+      "amount": "8.16",
+      "date": "2026-05-30",
+      "emoji": "💳",
+      "reasonId": "impulse"
+    }
+  ],
+  "challenges": [
+    {
+      "title": "Dining budget cut",
+      "goal": "Reduce dining by 20% this month",
+      "progressPercent": 62,
+      "daysRemaining": 18,
+      "complete": false,
+      "color": "#F97316"
+    },
+    {
+      "title": "No impulse over $50",
+      "goal": "Wait 24h before any purchase >$50",
+      "progressPercent": 85,
+      "daysRemaining": 6,
+      "complete": false,
+      "color": "#22C55E"
+    },
+    {
+      "title": "Cook 5 nights/week",
+      "goal": "Five home-cooked dinners weekly",
+      "progressPercent": 100,
+      "daysRemaining": 0,
+      "complete": true,
+      "color": "#3B82F6"
+    }
+  ],
+  "streaks": [
+    {
+      "label": "Under dining budget",
+      "currentDays": 12,
+      "maxDays": 21,
+      "color": "#F97316"
+    },
+    {
+      "label": "No overdrafts",
+      "currentDays": 34,
+      "maxDays": 60,
+      "color": "#22C55E"
+    },
+    {
+      "label": "Daily check-in",
+      "currentDays": 8,
+      "maxDays": 14,
+      "color": "#3B82F6"
+    }
+  ]
+}

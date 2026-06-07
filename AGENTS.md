@@ -14,11 +14,12 @@ Do not colocate business logic in Next.js API routes. All clients are thin.
 
 ## Before writing code
 
-1. Read the relevant doc under `docs/design/` or `docs/architecture/`.
-2. Follow `.cursor/rules/` — project rules always apply; UI/backend rules apply per folder.
-3. Match planned structure in `ui/STRUCTURE.md`, `backend/STRUCTURE.md`, or `ios/STRUCTURE.md`.
-4. Update `design-tokens.json` when changing shared colors, categories, or navigation.
-5. Prefer minimal, focused diffs.
+1. Check **`docs/development/TASK_BOARD.md`** — claim a task via `npm run task -- claim TASK-ID your-agent-name` before implementing.
+2. Read the relevant doc under `docs/design/` or `docs/architecture/` (listed in each task's `source_docs`).
+3. Follow `.cursor/rules/` — project rules always apply; UI/backend rules apply per folder.
+4. Match planned structure in `ui/STRUCTURE.md`, `backend/STRUCTURE.md`, or `ios/STRUCTURE.md`.
+5. Update `design-tokens.json` when changing shared colors, categories, or navigation.
+6. Prefer minimal, focused diffs. Mark tasks done: `npm run task -- complete TASK-ID your-agent-name`.
 
 ## Documentation locations
 
@@ -62,4 +63,6 @@ Plaid Link (web/iOS SDK) ─┘
 
 ## Current phase
 
-Structure and rules only. Phase 1: backend schema + health endpoint, then web UI shell. iOS starts Phase 4 per [mobile-ios.md](docs/architecture/mobile-ios.md).
+**Active:** Phase 3.6 statement import (web). Track work in [`docs/development/TASK_BOARD.md`](docs/development/TASK_BOARD.md).
+
+**Deferred:** iPhone app (`ios/`) — **lowest priority (P4)**; partial shell only; no new iOS features until import path ships on web.

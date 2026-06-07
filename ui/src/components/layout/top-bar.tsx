@@ -5,7 +5,9 @@ import { useIsFetching } from "@tanstack/react-query";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { UserMenu } from "@/components/layout/user-menu";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useTheme } from "@/hooks/use-theme";
+import { greetingWithName, userDisplayName } from "@/lib/user-display";
 
 interface TopBarProps {
   title: string;
@@ -38,46 +40,44 @@ function ThemeToggleIcon({ theme }: { theme: "light" | "dark" }) {
   );
 }
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 export function TopBar({ title }: TopBarProps) {
   const { theme, toggleTheme } = useTheme();
   const isFetching = useIsFetching() > 0;
+  const user = useCurrentUser();
+  const firstName = user ? userDisplayName(user) : null;
 
   return (
-    <header className="sticky top-0 z-20 px-4 pt-4 md:px-6 md:pt-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-2">
-          {isFetching ? (
-            <LoadingSpinner size="sm" label="Updating data" className="shrink-0" />
-          ) : null}
+    <header className="sticky top-0 z-20 flex min-w-0 items-center justify-between gap-2 px-4 py-3 md:gap-4 md:px-5 md:py-4">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {isFetching ? (
+          <LoadingSpinner size="sm" label="Updating data" className="shrink-0" />
+        ) : null}
+        {firstName ? (
           <div className="min-w-0">
-          <p className="text-xs font-medium text-text-muted md:hidden">
-            {getGreeting()}
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight text-text md:text-3xl">
+            <p className="truncate text-base font-bold tracking-tight text-text sm:text-lg">
+              {greetingWithName(firstName)}
+            </p>
+            <p className="truncate text-xs font-medium text-text-muted md:hidden">{title}</p>
+          </div>
+        ) : (
+          <h1 className="truncate text-lg font-bold tracking-tight text-text sm:text-xl md:hidden">
             {title}
           </h1>
-          </div>
-        </div>
+        )}
+      </div>
 
-        <div className="flex items-center gap-2">
-          <NotificationBell />
-          <UserMenu />
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] bg-surface text-text-muted transition-colors hover:text-primary card-shadow"
-            aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-          >
-            <ThemeToggleIcon theme={theme} />
-          </button>
-        </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <NotificationBell />
+        <UserMenu />
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] text-text-muted transition-colors hover:bg-primary-soft/40 hover:text-primary"
+          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+          title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+        >
+          <ThemeToggleIcon theme={theme} />
+        </button>
       </div>
     </header>
   );

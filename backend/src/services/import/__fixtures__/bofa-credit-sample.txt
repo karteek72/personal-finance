@@ -1,0 +1,11 @@
+Bank of America
+Visa Signature Account
+
+! Account # 1234 5678 9012 7138 ! January 1, 2024 - January 31, 2024
+
+Trans Date Post Date Description                              Amount
+01/15     01/16     AMAZON MARKETPLACE                      7138  45.67
+01/20     01/21     MOBILE PAYMENT - THANK YOU              7138  -500.00
+01/22     01/23     COSTCO WHOLESALE #123                   7138  128.40
+
+TOTAL PAYMENTS AND CREDITS

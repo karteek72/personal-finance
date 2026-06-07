@@ -45,7 +45,7 @@ See [STRUCTURE.md](STRUCTURE.md) for the full tree.
 NODE_ENV=development
 PORT=4000
 DATABASE_URL=postgresql://spendflow:spendflow@localhost:5432/spendflow
-REDIS_URL=redis://localhost:6379
+REDIS_URL=redis://localhost:6380
 JWT_SECRET=
 ENCRYPTION_KEY=                    # 32-byte hex
 PLAID_CLIENT_ID=

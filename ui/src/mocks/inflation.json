@@ -1,0 +1,68 @@
+{
+  "personalRate": 3.35,
+  "nationalCpi": 3.1,
+  "salaryRaise": 3,
+  "nominalSavingsRate": 18,
+  "realSavingsRate": 14.65,
+  "realRaise": -0.35,
+  "powerLoss": "1240.00",
+  "salary": "80640.00",
+  "breakEvenSalary": "83341.44",
+  "targetSalary": "87373.44",
+  "categories": [
+    {
+      "name": "Housing & Home",
+      "share": 32,
+      "inflation": 3,
+      "severity": "medium"
+    },
+    {
+      "name": "Food & Groceries",
+      "share": 14,
+      "inflation": 3.8,
+      "severity": "high"
+    },
+    {
+      "name": "Dining & Restaurants",
+      "share": 12,
+      "inflation": 4.2,
+      "severity": "high"
+    },
+    {
+      "name": "Transportation",
+      "share": 9,
+      "inflation": 2.4,
+      "severity": "low"
+    },
+    {
+      "name": "Health & Medical",
+      "share": 8,
+      "inflation": 4.1,
+      "severity": "high"
+    },
+    {
+      "name": "Utilities & Bills",
+      "share": 8,
+      "inflation": 3.3,
+      "severity": "medium"
+    },
+    {
+      "name": "Subscriptions & Software",
+      "share": 6,
+      "inflation": 5,
+      "severity": "high"
+    },
+    {
+      "name": "Shopping & Retail",
+      "share": 7,
+      "inflation": 1.9,
+      "severity": "low"
+    },
+    {
+      "name": "Travel",
+      "share": 4,
+      "inflation": 2.7,
+      "severity": "low"
+    }
+  ]
+}

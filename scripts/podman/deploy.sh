@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build (if needed) and start the SpendFlow Podman stack.
+# Start the SpendFlow Podman stack (images must exist — run build.sh first, or pass --build).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,26 +8,28 @@ source "${SCRIPT_DIR}/lib.sh"
 
 spendflow_require_cmd podman
 
-BUILD=1
+BUILD=0
 EXTRA_ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --no-build) BUILD=0; shift ;;
+    --build) BUILD=1; shift ;;
+    --no-build)
+      echo "warn: --no-build is the default; use --build to rebuild images" >&2
+      shift
+      ;;
     *) EXTRA_ARGS+=("$1"); shift ;;
   esac
 done
 
 spendflow_load_env
 
-if [[ ! -f "${SPENDFLOW_CONTAINERS_DIR}/.env" && ! -f "${SPENDFLOW_REPO_ROOT}/.env" ]]; then
-  echo "error: create ${SPENDFLOW_CONTAINERS_DIR}/.env from env.example (or use repo root .env)" >&2
+if [[ ! -f "$(spendflow_root_env_file)" ]]; then
+  echo "error: create $(spendflow_root_env_file) from .env.example" >&2
   exit 1
 fi
-
-touch "${SPENDFLOW_CONTAINERS_DIR}/.env"
 spendflow_ensure_jwt_secret
 spendflow_ensure_encryption_key
-spendflow_prepare_postgres
+spendflow_export_compose_runtime_env
 spendflow_apply_build_urls
 spendflow_stop_dev_servers
 
@@ -39,20 +41,14 @@ spendflow_ensure_podman
 
 echo "==> Starting stack on ${SPENDFLOW_HOST}:${SPENDFLOW_UI_PORT} (UI) and :${SPENDFLOW_API_PORT} (API)"
 
-UP_ARGS=(up -d --remove-orphans)
-if [[ "${BUILD}" -eq 0 ]]; then
-  UP_ARGS+=(--no-build)
-fi
+UP_ARGS=(up -d --remove-orphans --no-build)
 if ((${#EXTRA_ARGS[@]})); then
   spendflow_compose "${UP_ARGS[@]}" "${EXTRA_ARGS[@]}"
 else
   spendflow_compose "${UP_ARGS[@]}"
 fi
 
-if [[ -n "${SPENDFLOW_COMPOSE_PROFILE:-}" ]]; then
-  spendflow_wait_container_healthy spendflow-postgres 90 || true
-  spendflow_compose up -d --no-build api ui 2>/dev/null || spendflow_compose up -d api ui
-fi
+spendflow_wait_container_healthy spendflow-api 90 || true
 
 echo ""
 echo "LAN:"

@@ -1,0 +1,54 @@
+{
+  "periodMonth": "2026-05",
+  "budgets": [
+    {
+      "category": "Dining & Restaurants",
+      "periodMonth": "2026-05",
+      "limitAmount": "650.00",
+      "emoji": "🍽️",
+      "color": "#F97316"
+    },
+    {
+      "category": "Food & Groceries",
+      "periodMonth": "2026-05",
+      "limitAmount": "600.00",
+      "emoji": "🛒",
+      "color": "#3B82F6"
+    },
+    {
+      "category": "Transportation",
+      "periodMonth": "2026-05",
+      "limitAmount": "300.00",
+      "emoji": "🚗",
+      "color": "#6B7280"
+    },
+    {
+      "category": "Shopping & Retail",
+      "periodMonth": "2026-05",
+      "limitAmount": "400.00",
+      "emoji": "🛍️",
+      "color": "#22C55E"
+    },
+    {
+      "category": "Entertainment",
+      "periodMonth": "2026-05",
+      "limitAmount": "150.00",
+      "emoji": "🎬",
+      "color": "#A855F7"
+    },
+    {
+      "category": "Subscriptions & Software",
+      "periodMonth": "2026-05",
+      "limitAmount": "180.00",
+      "emoji": "📱",
+      "color": "#EF4444"
+    },
+    {
+      "category": "Health & Medical",
+      "periodMonth": "2026-05",
+      "limitAmount": "120.00",
+      "emoji": "💊",
+      "color": "#EC4899"
+    }
+  ]
+}

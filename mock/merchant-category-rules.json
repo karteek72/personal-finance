@@ -1,0 +1,29 @@
+{
+  "rules": [
+    {
+      "merchantKey": "whole foods market",
+      "category": "Food & Groceries",
+      "subCategory": "Grocery Stores"
+    },
+    {
+      "merchantKey": "uber eats",
+      "category": "Dining & Restaurants",
+      "subCategory": "Food Delivery"
+    },
+    {
+      "merchantKey": "netflix",
+      "category": "Subscriptions & Software",
+      "subCategory": "Streaming"
+    },
+    {
+      "merchantKey": "shell",
+      "category": "Transportation",
+      "subCategory": "Gas"
+    },
+    {
+      "merchantKey": "starbucks",
+      "category": "Dining & Restaurants",
+      "subCategory": "Coffee Shops"
+    }
+  ]
+}

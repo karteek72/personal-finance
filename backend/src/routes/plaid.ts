@@ -12,6 +12,7 @@ import { Products } from "plaid";
 import {
   deletePlaidItem,
   exchangeAndSync,
+  getPlaidItemAccessToken,
   listPlaidItems,
   syncAllPlaidItems,
 } from "../services/plaid/item-store.js";
@@ -20,6 +21,8 @@ import { getPlaidAccountsResponse } from "./transactions.js";
 
 const linkTokenBodySchema = z.object({
   platform: z.enum(["web", "ios"]).optional(),
+  /** DB plaid_items.id — enables Plaid Link update mode for reconnect. */
+  itemId: z.string().uuid().optional(),
 });
 
 const exchangeTokenBodySchema = z.object({
@@ -29,7 +32,9 @@ const exchangeTokenBodySchema = z.object({
 function resolvePlaidRedirectUri(env: {
   PLAID_ENV: string;
   PLAID_REDIRECT_URI?: string;
+  PLAID_OAUTH_ENABLED?: boolean;
 }): string | undefined {
+  if (!env.PLAID_OAUTH_ENABLED) return undefined;
   const uri = env.PLAID_REDIRECT_URI?.trim();
   if (!uri) return undefined;
   if (env.PLAID_ENV === "production" && !uri.startsWith("https://")) {
@@ -40,7 +45,7 @@ function resolvePlaidRedirectUri(env: {
 
 export const plaidRoutes: FastifyPluginAsync = async (app) => {
   app.post("/plaid/link-token", async (request) => {
-    parseBody(linkTokenBodySchema, request.body);
+    const body = parseBody(linkTokenBodySchema, request.body);
 
     const user = await requireRequestUser(request, app.config.env);
     const client = getPlaidClient(app.config.env);
@@ -54,6 +59,14 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
       webhook: `${app.config.env.APP_URL}/api/v1/webhooks/plaid`,
     };
 
+    if (body.itemId) {
+      linkTokenRequest.access_token = await getPlaidItemAccessToken(
+        body.itemId,
+        user.id,
+        app.config.env,
+      );
+    }
+
     if (products.includes(Products.Transactions)) {
       linkTokenRequest.transactions = { days_requested: 730 };
     }
@@ -61,7 +74,10 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
     const redirectUri = resolvePlaidRedirectUri(app.config.env);
     if (redirectUri) {
       linkTokenRequest.redirect_uri = redirectUri;
-    } else if (app.config.env.PLAID_REDIRECT_URI) {
+    } else if (
+      app.config.env.PLAID_REDIRECT_URI &&
+      app.config.env.PLAID_OAUTH_ENABLED
+    ) {
       request.log.warn(
         "PLAID_REDIRECT_URI ignored — production requires HTTPS. Use ngrok or deploy for OAuth banks.",
       );
@@ -229,7 +245,7 @@ export const plaidRoutes: FastifyPluginAsync = async (app) => {
     }
 
     try {
-      await deletePlaidItem(item.id, user.id);
+      await deletePlaidItem(item.id, user.id, app.config.env);
       request.log.info({ userId: user.id, itemId: item.id }, "plaid item removed");
       return reply.status(204).send();
     } catch (error) {

@@ -50,8 +50,10 @@ export interface Account {
   institutionName: string;
   lastSyncedAt: string | null;
   status: "active" | "error" | "reauth_required";
-  source?: "import" | "plaid";
+  source?: "import" | "plaid" | "teller" | "snaptrade";
+  connectionProvider?: "plaid" | "teller" | "snaptrade" | "import";
   plaidItemId?: string | null;
+  tellerEnrollmentId?: string | null;
   memberId?: string | null;
   memberName?: string | null;
   memberColor?: string | null;
@@ -164,6 +166,47 @@ export interface CategoryTrend {
   months: { month: string; amount: string }[];
 }
 
+export type ConnectionProviderId = "plaid" | "teller" | "snaptrade";
+
+export interface ConnectionProviderOption {
+  id: ConnectionProviderId;
+  label: string;
+  description: string;
+  accountTypes: ("depository" | "credit" | "investment")[];
+  enabled: boolean;
+}
+
+export interface ConnectionProvidersResponse {
+  providers: ConnectionProviderOption[];
+}
+
+export interface TellerConnectConfig {
+  applicationId: string;
+  environment: "sandbox" | "development" | "production";
+  products: string[];
+}
+
+export interface TellerExchangeResponse {
+  enrollmentId: string;
+  institutionName: string;
+  accountsSynced: number;
+  transactionsAdded: number;
+  message: string;
+}
+
+export interface SnaptradePortalResponse {
+  redirectUri: string;
+}
+
+export interface SnaptradeCompleteResponse {
+  status: string;
+  connectionsSynced: number;
+  accountsSynced: number;
+  holdingsUpdated: number;
+  activitiesAdded: number;
+  message: string;
+}
+
 export interface PlaidExchangeResponse {
   itemId: string;
   institutionName: string;
@@ -220,6 +263,8 @@ export interface DeleteAccountResponse {
   name: string;
   mask: string;
   transactionsDeleted: number;
+  /** True when this was the last account on a Plaid link and the bank was disconnected. */
+  plaidItemDisconnected: boolean;
 }
 
 export interface AlertsResponse {
@@ -236,6 +281,13 @@ export interface TrendsResponse {
 
 export interface ChartMonthlyPoint {
   month: string;
+  expenses: string;
+  income: string;
+  net: string;
+}
+
+export interface ChartYearlyPoint {
+  year: string;
   expenses: string;
   income: string;
   net: string;
@@ -264,6 +316,8 @@ export interface ChartMemberSlice {
 
 export interface ChartDataResponse {
   monthly: ChartMonthlyPoint[];
+  /** Full-history yearly totals when data spans more than one calendar year. */
+  yearly: ChartYearlyPoint[];
   byCategory: ChartCategorySlice[];
   bySubCategory: ChartCategorySlice[];
   byAccount: ChartAccountSlice[];
@@ -373,6 +427,399 @@ export interface HouseholdInsightsResponse {
   period: { from: string; to: string };
 }
 
+/* ------------------------------------------------------------------ *
+ * Wealth, planning, insights, protect, coach & wrapped
+ * (feature endpoints backed by the demo dataset)
+ * ------------------------------------------------------------------ */
+
+export interface NetWorthResponse {
+  current: { netWorth: string; totalAssets: string; totalLiabilities: string };
+  trend: { month: string; netWorth: string }[];
+}
+
+export interface InvestmentPosition {
+  holdingId: string;
+  accountId: string;
+  accountName: string;
+  institutionName: string;
+  accountMask: string | null;
+  ticker: string;
+  name: string;
+  sector: string | null;
+  assetType: string;
+  quantity: number;
+  costBasis: string;
+  currentPrice: string;
+  value: string;
+  gainLoss: string;
+  gainLossPercent: number;
+  underlyingTicker?: string | null;
+  optionType?: string | null;
+  expirationLabel?: string | null;
+}
+
+export interface StockAggregateLot {
+  accountId: string;
+  accountName: string;
+  quantity: number;
+  value: string;
+  costBasis: string;
+}
+
+export interface StockAggregate {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  assetType: string;
+  totalQuantity: number;
+  currentPrice: string;
+  totalValue: string;
+  totalCost: string;
+  gainLoss: string;
+  gainLossPercent: number;
+  accountCount: number;
+  lots: StockAggregateLot[];
+}
+
+export interface PortfolioBreakdown {
+  stocksValue: string;
+  optionsValue: string;
+  otherValue: string;
+  stocksSharePercent: number;
+  optionsSharePercent: number;
+  stockPositionCount: number;
+  optionPositionCount: number;
+  totalPositionCount: number;
+}
+
+export interface InvestmentHolding {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  assetType: string;
+  quantity: number;
+  costBasis: string;
+  currentPrice: string;
+  value: string;
+  gainLoss: string;
+  gainLossPercent: number;
+  underlyingTicker?: string | null;
+  optionType?: string | null;
+  expirationLabel?: string | null;
+}
+
+export interface InvestmentsResponse {
+  portfolioValue: string;
+  totalCostBasis: string;
+  totalGainLoss: string;
+  totalGainLossPercent: number;
+  accounts: {
+    accountId: string;
+    name: string;
+    institutionName: string;
+    subtype: string | null;
+    value: string;
+  }[];
+  holdings: InvestmentHolding[];
+  positions: InvestmentPosition[];
+  stockAggregates: StockAggregate[];
+  optionPositions: InvestmentPosition[];
+  portfolioBreakdown: PortfolioBreakdown;
+  behavioralAlerts: { type: string; title: string; desc: string }[];
+  investmentHistory: {
+    lookbackYears: number;
+    totalContributed: string;
+    estimatedValueToday: string;
+    currentPortfolioValue: string;
+    monthlyAverageInvest: string;
+    transactionCount: number;
+    buyTransactionCount: number;
+  } | null;
+  monthlyActivity: {
+    cashContributions: string;
+    purchaseDeployments: string;
+    totalDeployed: string;
+  } | null;
+}
+
+export interface BudgetsResponse {
+  periodMonth: string;
+  safeToSpend: string;
+  daysRemaining: number;
+  isLive: boolean;
+  budgets: {
+    category: string;
+    emoji: string | null;
+    color: string | null;
+    spent: string;
+    limit: string;
+  }[];
+  goals: {
+    name: string;
+    emoji: string | null;
+    color: string | null;
+    target: string;
+    current: string;
+    deadline: string | null;
+  }[];
+}
+
+export interface RecurringItem {
+  merchantName: string;
+  category: string;
+  kind: string;
+  amount: string;
+  cadence: string;
+  nextChargeDate: string | null;
+  lastChargeDate: string | null;
+  previousAmount: string | null;
+  priceChanged: boolean;
+  status: string;
+  brandColor: string | null;
+}
+
+export interface RecurringResponse {
+  monthlyTotal: string;
+  annualTotal: string;
+  activeCount: number;
+  priceChanges: number;
+  isLive: boolean;
+  subscriptions: RecurringItem[];
+  bills: RecurringItem[];
+  leaks: {
+    fees: {
+      id: string;
+      label: string;
+      source: string;
+      count: number;
+      total: string;
+      fixable: boolean;
+    }[];
+    habits: { id: string; emoji: string | null; label: string; monthly: string }[];
+  };
+}
+
+export interface FireResponse {
+  currentAge: number;
+  /** True until the user saves their age (system default is 35). */
+  isDefaultAge: boolean;
+  currentNetWorth: string;
+  monthlySpend: string;
+  monthlyInvest: string;
+  withdrawalRate: number;
+  realReturn: number;
+}
+
+export type EmploymentStatus =
+  | "employed"
+  | "self_employed"
+  | "retired"
+  | "student"
+  | "other";
+
+export type RiskTolerance = "conservative" | "moderate" | "aggressive";
+
+export interface UserProfilePatch {
+  displayName?: string;
+  currentAge?: number;
+  householdSize?: number | null;
+  annualGrossIncome?: number | null;
+  targetRetirementAge?: number | null;
+  employmentStatus?: EmploymentStatus | null;
+  riskTolerance?: RiskTolerance | null;
+  withdrawalRate?: number;
+  realReturn?: number;
+}
+
+export interface UserProfileResponse {
+  user: User;
+  currentAge: number;
+  isDefaultAge: boolean;
+  householdSize: number | null;
+  annualGrossIncome: string | null;
+  targetRetirementAge: number | null;
+  employmentStatus: EmploymentStatus | null;
+  riskTolerance: RiskTolerance | null;
+  withdrawalRate: number;
+  realReturn: number;
+  hasLinkedAccounts: boolean;
+  currentNetWorth: string | null;
+  monthlySpend: string | null;
+  monthlyInvest: string | null;
+}
+
+/** @deprecated Use UserProfileResponse fields without user */
+export type AnalyticsProfileResponse = Omit<UserProfileResponse, "user">;
+
+export interface FireProfilePatch {
+  currentAge?: number;
+  withdrawalRate?: number;
+  realReturn?: number;
+}
+
+export interface WellnessResponse {
+  score: number;
+  delta: number;
+  history: { month: string; score: number }[];
+  isLive: boolean;
+  dimensions: {
+    name: string;
+    score: number;
+    weight: number;
+    description: string;
+    trend: string;
+  }[];
+}
+
+export interface DnaResponse {
+  archetype: string;
+  narrative: string;
+  peerRarity: string | null;
+  axes: { label: string; you: number; peers: number }[];
+}
+
+export interface PatternsResponse {
+  dayOfWeek: { day: string; value: string }[];
+  patterns: {
+    label: string;
+    value: string;
+    description: string;
+    severity: string;
+  }[];
+}
+
+export interface BehavioralResponse {
+  archetype: string;
+  creep: { months: string[]; income: string[]; spending: string[] };
+  reasons: {
+    id: string;
+    emoji: string;
+    label: string;
+    color: string;
+    total: string;
+  }[];
+  taggedTransactions: {
+    id: string;
+    merchant: string;
+    amount: string;
+    date: string;
+    reasonId: string;
+  }[];
+  challenges: {
+    title: string;
+    goal: string;
+    progressPercent: number;
+    daysRemaining: number;
+    complete: boolean;
+    color: string | null;
+  }[];
+  streaks: {
+    label: string;
+    currentDays: number;
+    maxDays: number;
+    color: string | null;
+  }[];
+}
+
+export interface InflationResponse {
+  personalRate: number;
+  nationalCpi: number;
+  salaryRaise: number;
+  nominalSavingsRate: number;
+  realSavingsRate: number;
+  realRaise: number;
+  powerLoss: string;
+  salary: string;
+  breakEvenSalary: string;
+  targetSalary: string;
+  categories: {
+    name: string;
+    share: number;
+    inflation: number;
+    severity: string;
+  }[];
+}
+
+export interface ResilienceResponse {
+  liquidCash: string;
+  monthlyBurn: string;
+  runwayMonths: number;
+  immunityScore: number;
+  scenarios: {
+    id: string;
+    name: string;
+    emoji: string | null;
+    shockAmount: string;
+    shockType: string;
+    monthsCovered: number;
+    recommendedMonths: number;
+    detail: string | null;
+  }[];
+}
+
+export interface CoachResponse {
+  narrative: string;
+  forecast: string;
+  qa: { q: string; a: string }[];
+}
+
+export interface CoachAskResponse {
+  answer: string;
+  isLive: boolean;
+}
+
+export interface WrappedResponse {
+  year: number;
+  totalSpent: string;
+  transactionCount: number;
+  totalSaved: string;
+  savingsRate: number;
+  peerPercentile: string | null;
+  archetype: string | null;
+  topCategory: { name: string; amount: string };
+  personality: Record<string, number>;
+  moments: { label: string; value: string }[];
+  goals: { label: string; target: string; pct: number }[];
+}
+
+export interface MerchantsResponse {
+  merchants: {
+    name: string;
+    emoji: string;
+    visits: number;
+    total: string;
+    trend: number;
+    trail: number[];
+  }[];
+  income: { months: string[]; primary: number[]; side: number[] };
+  merchantCount: number;
+  incomeSources: number;
+  isLive: boolean;
+}
+
+export interface CalendarResponse {
+  month: string;
+  events: { day: number; type: string; label: string; amount: string }[];
+  heat: { day: number; level: number }[];
+  totals: { income: string; bills: string };
+  safeToSpendToday: string;
+}
+
+export interface ForecastResponse {
+  days: {
+    date: string;
+    weekday: string;
+    weather: string;
+    projectedBalance: string;
+    note: string;
+  }[];
+  comfortFloor: string;
+  minBalance: string;
+  lowestDay: string;
+  nextClearDate: string;
+  recommendation: string;
+}
+
 export interface TransactionFilters {
   month?: string;
   category?: string;
@@ -392,4 +839,101 @@ export interface TransactionFilters {
     | "category_asc";
   limit?: number;
   cursor?: string;
+}
+
+export interface ImportFormatInfo {
+  id: string;
+  label: string;
+  extensions: string[];
+  description: string;
+  brokers: string[];
+}
+
+export interface ImportFormatsResponse {
+  formats: ImportFormatInfo[];
+  limits: {
+    maxFiles: number;
+    maxFileBytes: number;
+    maxBatchBytes: number;
+  };
+  consentVersion: string;
+}
+
+export interface ImportBatchCreateResponse {
+  batchId: string;
+  status: "pending" | "processing" | "awaiting_confirmation" | "completed" | "failed";
+  filesTotal: number;
+  message: string;
+}
+
+export interface ImportActiveBatchResponse {
+  activeBatchId: string | null;
+  status?: string;
+  filesTotal?: number;
+  createdAt?: string;
+}
+
+export interface ApiErrorDetails {
+  activeBatchId?: string;
+}
+
+export interface ImportFilePreviewSummary {
+  accounts: {
+    institutionName: string;
+    mask: string;
+    type: string;
+    subtype: string;
+    matchedAccountId: string | null;
+    bankingCount: number;
+    investmentCount: number;
+  }[];
+  dateRange: { min: string | null; max: string | null };
+  sampleTransactions: { date: string; name: string; amount: string }[];
+}
+
+export interface ImportBatchSummary {
+  total: number;
+  pending: number;
+  ready: number;
+  failed: number;
+  imported: number;
+  bankingTransactions: number;
+  investmentTransactions: number;
+  canRetryFailed: boolean;
+  canConfirm: boolean;
+}
+
+export interface ImportBatchStatusResponse {
+  batch: {
+    id: string;
+    status: string;
+    filesTotal: number;
+    filesProcessed: number;
+    txnsInserted: number;
+    txnsSkipped: number;
+    errorMessage: string | null;
+    createdAt: string;
+    completedAt: string | null;
+  };
+  summary: ImportBatchSummary;
+  files: {
+    id: string;
+    filename: string;
+    format: string;
+    byteSize: number;
+    status: string;
+    errorMessage: string | null;
+    canRetry: boolean;
+    canReplace: boolean;
+    preview: ImportFilePreviewSummary | null;
+  }[];
+}
+
+export interface ImportConfirmResponse {
+  batchId: string;
+  status: "completed" | "awaiting_confirmation";
+  txnsInserted: number;
+  txnsSkipped: number;
+  filesImported: number;
+  message: string;
 }

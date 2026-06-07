@@ -116,12 +116,20 @@ spendflow/
 - Per-member color coding on charts
 - Family view with member-level breakdown
 
-### Accounts View
-- All connected accounts in one dashboard
+### Accounts & Debt View
+- All connected accounts in one dashboard, **grouped by type** (Checking, Savings, Cash & Other, Credit Cards, Trading & Investments) with per-group totals
 - Live balances (current + available) per account
-- Institution name and last-synced timestamp
-- Account status badges (active / error / reauth required)
-- One-click Plaid Link to add new institutions
+- **Per-tile credit/liability detail** (merged from the former Debt page): statement balance, minimum due + due date, last payment, APR, est. interest — revealed progressively as Plaid syncs
+- A debt-totals KPI strip appears when credit accounts exist (total balance, statement, min due, utilization)
+- Status shown as **icons with tooltips** in the card header (Live / Imported / Reconnect required / Sync error / Overdue) plus last-synced date
+- Icon-first header actions (cash flow, refresh all, add account) and one-click Plaid Link to add new institutions
+
+### Web App Navigation (Information Architecture)
+- Single **sectioned sidebar** (Overview · Money · Insights · Family) — no separate "Preview" group
+- Related roadmap features are consolidated into **tabbed hubs**: Plan, Wealth, Insights, Protect (see [ui/STRUCTURE.md](ui/STRUCTURE.md))
+- Spend is tabbed (Overview / Merchants / Patterns); legacy routes redirect (`/flow` → `/categories`, `/debt` → `/accounts`)
+- Roadmap concepts ship as interactive **preview** mockups; sections still on illustrative data carry an amber banner, while Net Worth and Investments are wired to real balances
+- Global UI: a floating **Coach** assistant and a seasonal **Wrapped** year-in-review banner
 
 ### Infrastructure
 - BullMQ job queue for async Plaid sync (webhook-enqueued, idempotent)
@@ -142,32 +150,53 @@ spendflow/
 - Redis 7
 - Plaid developer account ([sign up free](https://dashboard.plaid.com/signup))
 
-### Backend
+### Environment (single file)
 
 ```bash
-cd backend
-cp .env.example .env          # fill in DATABASE_URL, REDIS_URL, PLAID_* vars
-npm install
+cp .env.example .env    # repo root — backend, UI, and Podman all read this file
+```
+
+### Backend + UI (from repo root)
+
+```bash
+npm install --prefix backend && npm install --prefix ui
 npm run db:migrate
-npm run dev                   # starts on :4000
+
+# Full dev stack (Postgres + Redis in Podman, API + UI on host):
+npm run dev
+
+# Or run services separately (infra already running):
+npm run dev:api
+npm run dev:worker   # BullMQ: Plaid sync + statement import jobs (needs REDIS_URL)
+npm run dev:ui
 ```
 
-### Web UI
+### Demo data (mock seed)
+
+Load deterministic fixtures from [`mock/`](mock/) into Postgres (see [`mock/README.md`](mock/README.md)):
 
 ```bash
-cd ui
-cp .env.local.example .env.local   # set NEXT_PUBLIC_API_URL and NEXT_PUBLIC_PLAID_ENV
-npm install
-npm run dev                         # starts on :3002
+npm run db:migrate   # if needed
+npm run db:seed
+# npm run db:seed -- --no-reset   # upsert without deleting seed users first
 ```
+
+Regenerate JSON fixtures from the generator:
+
+```bash
+npm run db:gen-mock
+```
+
+Use with `AUTH_ALLOW_DEV_USER=true` and `NEXT_PUBLIC_USE_MOCKS=false` in root `.env` to exercise the real API and UI (dev user: `personal@spendflow.local`).
 
 ### Database migrations
 
 ```bash
-cd backend
-npm run db:generate    # generate migration from schema changes
-npm run db:migrate     # apply migrations
+npm run db:generate    # drizzle-kit: new SQL from schema changes
+npm run db:migrate     # apply backend/drizzle/*.sql (custom runner)
 ```
+
+`db:generate` uses Drizzle Kit; `db:migrate` uses the project migrator in `backend/src/db/migrate.ts` (not `drizzle-kit migrate`).
 
 ### Containers (Podman)
 
@@ -442,9 +471,11 @@ Research shows that tracking data alone doesn't change behavior. What changes be
 
 - ✅ Phase 1: Auth, Plaid integration, DB schema, transaction sync
 - ✅ Phase 2: Webhook receiver, BullMQ queue, reconciliation engine, categorization, dashboard UI
-- 🔄 Phase 3: Categories page, smart alerts, CSV export, mobile responsive polish
-- ⏳ Phase 4: iPhone app (SwiftUI)
-- ⏳ Phase 5: AI coach, budgets, net worth, investment analysis
+- 🔄 Phase 3: Spend page, smart alerts, CSV export, mobile responsive polish, **unified navigation IA + Accounts/Debt merge**
+- 🧪 Phase 3.5: Roadmap features prototyped as interactive **preview** hubs (Plan, Wealth, Insights, Protect, Coach, Wrapped) — Net Worth & Investments wired to real balances, rest on illustrative data pending backend endpoints
+- 🔄 Phase 3.6: **Statement import** — UI upload + encrypted storage shipped; CSV parsers (E*TRADE/Fidelity/Webull) + worker next — see [TASK_BOARD.md](docs/development/TASK_BOARD.md)
+- ⏸️ Phase 4: iPhone app (SwiftUI) — **deferred / lowest priority**
+- ⏳ Phase 5: Productionize AI coach, budgets, net worth, investment analysis (back the previews with real APIs)
 
 ---
 

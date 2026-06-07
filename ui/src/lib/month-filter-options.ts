@@ -1,5 +1,5 @@
 /** Last N calendar months (newest first) for activity filters. */
-export function buildRecentMonthFilterOptions(monthsBack = 24): {
+export function buildRecentMonthFilterOptions(monthsBack = 12): {
   value: string;
   label: string;
 }[] {

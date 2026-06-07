@@ -1,0 +1,58 @@
+{
+  "liquidCash": "14070.95",
+  "monthlyBurn": "5341.51",
+  "runwayMonths": 2.63,
+  "immunityScore": 68,
+  "scenarios": [
+    {
+      "id": "scenario-0",
+      "name": "Job loss",
+      "emoji": "💼",
+      "shockAmount": "5341.51",
+      "shockType": "recurring",
+      "monthsCovered": 1.32,
+      "recommendedMonths": 6,
+      "detail": "No income; covered by liquid savings."
+    },
+    {
+      "id": "scenario-1",
+      "name": "Major car repair",
+      "emoji": "🔧",
+      "shockAmount": "3200.00",
+      "shockType": "one_time",
+      "monthsCovered": 4.4,
+      "recommendedMonths": 1,
+      "detail": "Transmission or engine repair."
+    },
+    {
+      "id": "scenario-2",
+      "name": "Medical emergency",
+      "emoji": "🏥",
+      "shockAmount": "5000.00",
+      "shockType": "one_time",
+      "monthsCovered": 2.81,
+      "recommendedMonths": 2,
+      "detail": "Out-of-pocket max after insurance."
+    },
+    {
+      "id": "scenario-3",
+      "name": "Rate hike on debt",
+      "emoji": "📈",
+      "shockAmount": "180.00",
+      "shockType": "recurring",
+      "monthsCovered": 2.55,
+      "recommendedMonths": 3,
+      "detail": "Variable APR rises on balances."
+    },
+    {
+      "id": "scenario-4",
+      "name": "Rent increase",
+      "emoji": "🏠",
+      "shockAmount": "250.00",
+      "shockType": "recurring",
+      "monthsCovered": 2.52,
+      "recommendedMonths": 3,
+      "detail": "Lease renewal bump."
+    }
+  ]
+}

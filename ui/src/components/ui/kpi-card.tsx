@@ -44,14 +44,14 @@ export function KpiCard({
           : undefined
       }
       className={clsx(
-        "rounded-[var(--radius-card)] border border-border/60 bg-surface card-shadow",
+        "min-w-0 rounded-[var(--radius-card)] border border-border/60 bg-surface card-shadow",
         compact ? "p-3" : "p-4",
         isClickable &&
           "cursor-pointer transition-colors hover:border-primary/40 hover:bg-primary-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
       )}
     >
       <div className="flex items-start justify-between gap-1">
-        <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+        <p className="min-w-0 truncate text-xs font-medium uppercase tracking-wide text-text-muted">
           {label}
         </p>
         {isClickable ? (
@@ -69,7 +69,7 @@ export function KpiCard({
       </div>
       <p
         className={clsx(
-          "mt-1 text-2xl font-bold tabular-nums tracking-tight",
+          "mt-1 truncate text-xl font-bold tabular-nums tracking-tight sm:text-2xl",
           toneClasses[tone],
         )}
         data-money

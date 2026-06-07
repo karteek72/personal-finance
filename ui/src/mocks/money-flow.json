@@ -1,56 +1,131 @@
 {
   "income": {
     "sources": [
-      { "label": "Employer Direct Deposit", "amount": "6200.00" },
-      { "label": "Freelance (Stripe)", "amount": "650.00" }
+      {
+        "label": "Freelance (Stripe)",
+        "amount": "237.86"
+      },
+      {
+        "label": "Acme Robotics",
+        "amount": "6716.00"
+      }
     ],
-    "total": "6850.00"
+    "total": "6953.86"
   },
   "bankAccounts": {
     "accounts": [
-      { "label": "Chase Checking", "amount": "3247.18" },
-      { "label": "Ally Savings", "amount": "12845.67" }
+      {
+        "label": "Everyday Checking",
+        "amount": "2320.23"
+      },
+      {
+        "label": "Ally Savings",
+        "amount": "1000.00"
+      }
     ],
-    "transfersOut": "1623.56"
+    "transfersOut": "1000.00"
   },
   "creditCards": {
     "accounts": [
-      { "label": "Chase Sapphire", "amount": "1845.23" },
-      { "label": "Amex Gold", "amount": "2103.45" },
-      { "label": "Citi Double Cash", "amount": "874.88" }
+      {
+        "label": "Chase Sapphire",
+        "amount": "675.20"
+      },
+      {
+        "label": "Amex Gold",
+        "amount": "995.20"
+      },
+      {
+        "label": "Citi Double Cash",
+        "amount": "1112.11"
+      }
     ],
-    "totalCharges": "4823.56"
+    "totalCharges": "2782.51"
   },
   "monthlySeries": [
     {
+      "month": "2025-04",
+      "income": "6520.00",
+      "expenses": "4750.50",
+      "net": "1769.50"
+    },
+    {
+      "month": "2025-05",
+      "income": "6520.00",
+      "expenses": "5033.15",
+      "net": "1486.85"
+    },
+    {
+      "month": "2025-06",
+      "income": "6941.68",
+      "expenses": "4900.78",
+      "net": "2040.90"
+    },
+    {
+      "month": "2025-07",
+      "income": "6520.00",
+      "expenses": "6691.49",
+      "net": "-171.49"
+    },
+    {
+      "month": "2025-08",
+      "income": "6520.00",
+      "expenses": "4447.60",
+      "net": "2072.40"
+    },
+    {
+      "month": "2025-09",
+      "income": "7049.71",
+      "expenses": "4758.75",
+      "net": "2290.96"
+    },
+    {
+      "month": "2025-10",
+      "income": "6851.50",
+      "expenses": "4733.86",
+      "net": "2117.64"
+    },
+    {
+      "month": "2025-11",
+      "income": "6520.00",
+      "expenses": "6267.16",
+      "net": "252.84"
+    },
+    {
+      "month": "2025-12",
+      "income": "6875.12",
+      "expenses": "4903.38",
+      "net": "1971.74"
+    },
+    {
       "month": "2026-01",
-      "income": "6850.00",
-      "expenses": "4521.33",
-      "net": "2328.67"
+      "income": "6716.00",
+      "expenses": "5202.35",
+      "net": "1513.65"
     },
     {
       "month": "2026-02",
-      "income": "6850.00",
-      "expenses": "4389.72",
-      "net": "2460.28"
+      "income": "7113.27",
+      "expenses": "5198.20",
+      "net": "1915.07"
     },
     {
       "month": "2026-03",
-      "income": "7100.00",
-      "expenses": "4712.45",
-      "net": "2387.55"
+      "income": "7182.27",
+      "expenses": "7329.13",
+      "net": "-146.86"
     },
     {
       "month": "2026-04",
-      "income": "6850.00",
-      "expenses": "4598.21",
-      "net": "2251.79"
+      "income": "6716.00",
+      "expenses": "5408.71",
+      "net": "1307.29"
     },
     {
       "month": "2026-05",
-      "income": "6850.00",
-      "expenses": "4823.56",
-      "net": "2026.44"
+      "income": "6953.86",
+      "expenses": "5156.06",
+      "net": "1797.80"
     }
   ]
 }

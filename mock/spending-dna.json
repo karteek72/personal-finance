@@ -1,0 +1,47 @@
+{
+  "archetype": "The Experience Seeker",
+  "narrative": "You prioritize dining, travel, and experiences over things — and you save more than most peers in your bracket.",
+  "peerRarity": "6% of peers",
+  "axes": [
+    {
+      "label": "Dining",
+      "you": 82,
+      "peers": 48
+    },
+    {
+      "label": "Travel",
+      "you": 71,
+      "peers": 39
+    },
+    {
+      "label": "Shopping",
+      "you": 44,
+      "peers": 58
+    },
+    {
+      "label": "Groceries",
+      "you": 52,
+      "peers": 61
+    },
+    {
+      "label": "Subscriptions",
+      "you": 66,
+      "peers": 41
+    },
+    {
+      "label": "Transport",
+      "you": 49,
+      "peers": 55
+    },
+    {
+      "label": "Wellness",
+      "you": 63,
+      "peers": 44
+    },
+    {
+      "label": "Savings",
+      "you": 70,
+      "peers": 50
+    }
+  ]
+}

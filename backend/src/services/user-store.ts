@@ -15,7 +15,13 @@ export async function getOrCreateDevUser() {
   if (!user) {
     [user] = await db
       .insert(users)
-      .values({ email: DEV_USER_EMAIL })
+      .values({ email: DEV_USER_EMAIL, displayName: "Alex Rivera" })
+      .returning();
+  } else if (!user.displayName?.trim()) {
+    [user] = await db
+      .update(users)
+      .set({ displayName: "Alex Rivera" })
+      .where(eq(users.id, user.id))
       .returning();
   }
 

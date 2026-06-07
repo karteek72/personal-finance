@@ -1,0 +1,55 @@
+{
+  "liabilities": [
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901004",
+      "lastStatementBalance": "1845.23",
+      "lastStatementIssueDate": "2026-05-15",
+      "minimumPaymentAmount": "35.00",
+      "nextPaymentDueDate": "2026-06-12",
+      "lastPaymentAmount": "1500.00",
+      "lastPaymentDate": "2026-05-06",
+      "isOverdue": false,
+      "aprs": [
+        {
+          "apr_type": "purchase",
+          "apr_percentage": 21.49,
+          "balance_subject_to_apr": "1845.23"
+        }
+      ]
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901005",
+      "lastStatementBalance": "2380.66",
+      "lastStatementIssueDate": "2026-05-18",
+      "minimumPaymentAmount": "70.00",
+      "nextPaymentDueDate": "2026-06-15",
+      "lastPaymentAmount": "900.00",
+      "lastPaymentDate": "2026-05-06",
+      "isOverdue": false,
+      "aprs": [
+        {
+          "apr_type": "purchase",
+          "apr_percentage": 24.99,
+          "balance_subject_to_apr": "2380.66"
+        }
+      ]
+    },
+    {
+      "accountId": "a1b2c3d4-e5f6-4789-a012-345678901006",
+      "lastStatementBalance": "940.12",
+      "lastStatementIssueDate": "2026-04-30",
+      "minimumPaymentAmount": "29.00",
+      "nextPaymentDueDate": "2026-05-25",
+      "lastPaymentAmount": "0.00",
+      "lastPaymentDate": "2026-04-10",
+      "isOverdue": true,
+      "aprs": [
+        {
+          "apr_type": "purchase",
+          "apr_percentage": 19.24,
+          "balance_subject_to_apr": "940.12"
+        }
+      ]
+    }
+  ]
+}

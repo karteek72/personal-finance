@@ -1,14 +1,23 @@
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
+import { formatCsvRow } from "../lib/csv.js";
 import { countMonthsInclusive } from "../lib/date-range.js";
 import { formatMoneyAmount, roundDecimal, roundPercent } from "../lib/money.js";
-import { accounts, transactions } from "../db/schema.js";
+import {
+  accounts,
+  creditCardLiabilities,
+  transactions,
+} from "../db/schema.js";
 import { getMemberMapForAccounts } from "./household-store.js";
 import { getLiabilityMapForAccounts } from "./liability-store.js";
 import {
   GENERAL_SUBCATEGORY,
 } from "./infer-subcategory.js";
 import { INTERNAL_TRANSFER_CATEGORY, CREDIT_CARD_PAYMENT_SUBCATEGORY } from "./transfer-classification.js";
+import {
+  getActiveAccountIds,
+  sqlActiveAccountIdsIn,
+} from "./active-account-scope.js";
 
 export async function listAccounts(userId: string) {
   const db = getDb();
@@ -39,6 +48,15 @@ export async function listAccounts(userId: string) {
         lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
         status: (row.status ?? "active") as "active" | "error" | "reauth_required",
         source: row.source ?? "import",
+        connectionProvider:
+          row.source === "plaid" ||
+          row.source === "teller" ||
+          row.source === "snaptrade"
+            ? (row.source as "plaid" | "teller" | "snaptrade")
+            : row.source === "import"
+              ? "import"
+              : undefined,
+        tellerEnrollmentId: row.tellerEnrollmentId,
         memberId: member?.memberId ?? null,
         memberName: member?.memberName ?? null,
         memberColor: member?.memberColor ?? null,
@@ -179,7 +197,17 @@ function sqlUserIdsIn(userIds: string[]) {
   return sql`user_id IN (${sql.join(userIds.map((id) => sql`${id}`), sql`, `)})`;
 }
 
-export async function listTransactions(filters: {
+async function activeTransactionSqlFilters(userIds: string[]) {
+  const accountIds = await getActiveAccountIds(userIds);
+  return {
+    accountIds,
+    userFilter: sqlUserIdsIn(userIds),
+    accountFilter: sqlActiveAccountIdsIn(accountIds),
+    tAccountFilter: sqlActiveAccountIdsIn(accountIds, "t.account_id"),
+  };
+}
+
+export type TransactionListFilters = {
   userIds: string[];
   month?: string;
   category?: string;
@@ -188,17 +216,14 @@ export async function listTransactions(filters: {
   scopedAccountIds?: string[] | null;
   q?: string;
   type?: string;
-  sort?: TransactionSort;
-  limit?: number;
-  cursor?: string;
-}) {
-  const db = getDb();
-  const limit = filters.limit ?? 50;
+};
+
+function buildTransactionFilterConditions(filters: TransactionListFilters) {
   const conditions = [transactionUserFilter(filters.userIds)];
 
   if (filters.scopedAccountIds !== undefined && filters.scopedAccountIds !== null) {
     if (filters.scopedAccountIds.length === 0) {
-      return { items: [], nextCursor: null };
+      return null;
     }
     conditions.push(inArray(transactions.accountId, filters.scopedAccountIds));
   }
@@ -236,6 +261,114 @@ export async function listTransactions(filters: {
       or(ilike(transactions.name, q), ilike(transactions.merchantName, q))!,
     );
   }
+
+  return conditions;
+}
+
+const CSV_EXPORT_HEADER =
+  "date,name,merchant,amount,category,subCategory,account,type";
+
+const CSV_EXPORT_BATCH_SIZE = 500;
+
+export async function* streamTransactionsCsv(
+  filters: TransactionListFilters & { sort?: TransactionSort },
+): AsyncGenerator<string> {
+  yield `${CSV_EXPORT_HEADER}\n`;
+
+  const baseConditions = buildTransactionFilterConditions(filters);
+  if (baseConditions === null) {
+    return;
+  }
+
+  const db = getDb();
+  const sort = filters.sort ?? "date_desc";
+  let cursor: string | undefined;
+
+  do {
+    const conditions = [...baseConditions];
+    if (cursor) {
+      const decoded = decodeCursor(cursor);
+      if (decoded) {
+        conditions.push(buildCursorCondition(decoded, sort));
+      }
+    }
+
+    let query = db
+      .select({
+        id: transactions.id,
+        date: transactions.date,
+        name: transactions.name,
+        merchantName: transactions.merchantName,
+        amount: transactions.amount,
+        category: transactions.category,
+        subCategory: transactions.subCategory,
+        accountName: accounts.name,
+        transactionType: transactions.transactionType,
+        createdAt: transactions.createdAt,
+      })
+      .from(transactions)
+      .innerJoin(accounts, eq(transactions.accountId, accounts.id))
+      .orderBy(...transactionOrderBy(sort))
+      .limit(CSV_EXPORT_BATCH_SIZE + 1);
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as typeof query;
+    }
+
+    const rows = await query;
+    const hasMore = rows.length > CSV_EXPORT_BATCH_SIZE;
+    const page = hasMore ? rows.slice(0, CSV_EXPORT_BATCH_SIZE) : rows;
+
+    for (const row of page) {
+      yield `${formatCsvRow([
+        row.date,
+        row.name,
+        row.merchantName ?? "",
+        formatMoneyAmount(row.amount),
+        row.category,
+        row.subCategory ?? "",
+        row.accountName,
+        row.transactionType,
+      ])}\n`;
+    }
+
+    const lastRow = page[page.length - 1];
+    cursor =
+      hasMore && lastRow
+        ? encodeCursor({
+            id: lastRow.id,
+            date: lastRow.date,
+            createdAt: lastRow.createdAt.toISOString(),
+            amount: lastRow.amount,
+            name: lastRow.name,
+            category: lastRow.category,
+          })
+        : undefined;
+  } while (cursor);
+}
+
+export async function listTransactions(filters: {
+  userIds: string[];
+  month?: string;
+  category?: string;
+  subCategory?: string;
+  accountId?: string;
+  scopedAccountIds?: string[] | null;
+  q?: string;
+  type?: string;
+  sort?: TransactionSort;
+  limit?: number;
+  cursor?: string;
+}) {
+  const db = getDb();
+  const limit = filters.limit ?? 50;
+  const baseConditions = buildTransactionFilterConditions(filters);
+
+  if (baseConditions === null) {
+    return { items: [], nextCursor: null };
+  }
+
+  const conditions = [...baseConditions];
 
   // Decode and apply cursor for keyset pagination
   if (filters.cursor) {
@@ -322,7 +455,9 @@ export async function getSummary(
   to?: string,
 ) {
   const db = getDb();
+  const accountIds = await getActiveAccountIds(userIds);
   const userFilter = sqlUserIdsIn(userIds);
+  const accountFilter = sqlActiveAccountIdsIn(accountIds);
   const dateFilter =
     from && to
       ? sql`date >= ${from} AND date <= ${to}`
@@ -332,6 +467,7 @@ export async function getSummary(
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND category != ${INTERNAL_TRANSFER_CATEGORY}
@@ -343,6 +479,7 @@ export async function getSummary(
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'income'
       AND is_transfer = false
       AND pending = false
@@ -353,6 +490,7 @@ export async function getSummary(
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND is_transfer = true
       AND category = ${INTERNAL_TRANSFER_CATEGORY}
       AND sub_category = ${CREDIT_CARD_PAYMENT_SUBCATEGORY}
@@ -367,6 +505,7 @@ export async function getSummary(
     SELECT category AS name, SUM(ABS(amount::numeric))::text AS amount
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND category != ${INTERNAL_TRANSFER_CATEGORY}
@@ -388,6 +527,7 @@ export async function getSummary(
     SELECT COUNT(*)::text AS count
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND category != ${INTERNAL_TRANSFER_CATEGORY}
@@ -399,6 +539,7 @@ export async function getSummary(
     SELECT COUNT(*)::text AS count
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND pending = true
       AND ${dateFilter}
   `);
@@ -431,7 +572,7 @@ export async function getCategories(
   to?: string,
 ) {
   const db = getDb();
-  const userFilter = sqlUserIdsIn(userIds);
+  const { userFilter, accountFilter } = await activeTransactionSqlFilters(userIds);
   const dateFilter =
     from && to
       ? sql`date >= ${from} AND date <= ${to}`
@@ -449,6 +590,7 @@ export async function getCategories(
       SUM(amount::numeric)::text AS amount
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'expense'
       AND is_transfer = false
       AND category != ${INTERNAL_TRANSFER_CATEGORY}
@@ -518,7 +660,8 @@ export async function getMoneyFlow(
   void from;
   void to;
   const db = getDb();
-  const userFilter = sqlUserIdsIn(userIds);
+  const { userFilter, accountFilter, tAccountFilter } =
+    await activeTransactionSqlFilters(userIds);
   const tUserFilter =
     userIds.length === 1
       ? sql`t.user_id = ${userIds[0]!}`
@@ -528,6 +671,7 @@ export async function getMoneyFlow(
     SELECT name AS label, SUM(ABS(amount::numeric))::text AS amount
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'income' AND is_transfer = false
     GROUP BY name
     ORDER BY SUM(ABS(amount::numeric)) DESC
@@ -539,6 +683,8 @@ export async function getMoneyFlow(
     FROM transactions t
     JOIN accounts a ON a.id = t.account_id
     WHERE ${tUserFilter}
+      AND ${tAccountFilter}
+      AND a.is_active = true
       AND a.type = 'depository' AND t.transaction_type = 'expense' AND t.is_transfer = false
     GROUP BY a.name
   `);
@@ -548,6 +694,8 @@ export async function getMoneyFlow(
     FROM transactions t
     JOIN accounts a ON a.id = t.account_id
     WHERE ${tUserFilter}
+      AND ${tAccountFilter}
+      AND a.is_active = true
       AND a.type = 'credit' AND t.transaction_type = 'expense' AND t.is_transfer = false
     GROUP BY a.name
   `);
@@ -565,6 +713,7 @@ export async function getMoneyFlow(
       COALESCE(SUM(CASE WHEN transaction_type = 'income' AND NOT is_transfer THEN ABS(amount::numeric) WHEN transaction_type = 'expense' AND NOT is_transfer THEN -amount::numeric ELSE 0 END), 0)::text AS net
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
     GROUP BY date_trunc('month', date)
     ORDER BY month
   `);
@@ -575,7 +724,7 @@ export async function getMoneyFlow(
   );
   const transferTotal = await db.execute<{ total: string }>(sql`
     SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
-    FROM transactions WHERE ${userFilter} AND is_transfer = true
+    FROM transactions WHERE ${userFilter} AND ${accountFilter} AND is_transfer = true
   `);
   const ccTotal = creditCards.reduce(
     (s, r) => s + Number.parseFloat(r.amount),
@@ -607,7 +756,7 @@ export async function getTrends(
   void from;
   void to;
   const db = getDb();
-  const userFilter = sqlUserIdsIn(userIds);
+  const { userFilter, accountFilter } = await activeTransactionSqlFilters(userIds);
 
   const rows = await db.execute<{
     name: string;
@@ -620,6 +769,7 @@ export async function getTrends(
       SUM(amount::numeric)::text AS amount
     FROM transactions
     WHERE ${userFilter}
+      AND ${accountFilter}
       AND transaction_type = 'expense' AND NOT is_transfer
       AND category != ${INTERNAL_TRANSFER_CATEGORY}
     GROUP BY category, date_trunc('month', date)
@@ -649,14 +799,25 @@ export interface ChartDataParams {
   scopedAccountIds?: string[] | null;
 }
 
-function buildChartFilters(params: ChartDataParams) {
+/** When `dateRange` is null, no date filter is applied (used for bounds + yearly history). */
+function buildChartFilters(
+  params: ChartDataParams,
+  dateRange?: { from: string; to: string } | null,
+) {
   const userFilter =
     params.userIds.length === 1
       ? sql`t.user_id = ${params.userIds[0]!}`
       : sql`t.user_id IN (${sql.join(params.userIds.map((id) => sql`${id}`), sql`, `)})`;
   const parts = [userFilter, sql`t.pending = false`];
-  if (params.from && params.to) {
-    parts.push(sql`t.date >= ${params.from} AND t.date <= ${params.to}`);
+  const range =
+    dateRange === null
+      ? null
+      : (dateRange ??
+        (params.from && params.to
+          ? { from: params.from, to: params.to }
+          : null));
+  if (range) {
+    parts.push(sql`t.date >= ${range.from} AND t.date <= ${range.to}`);
   }
   if (params.accountId) {
     parts.push(sql`t.account_id = ${params.accountId}`);
@@ -679,6 +840,18 @@ function buildChartFilters(params: ChartDataParams) {
   return sql.join(parts, sql` AND `);
 }
 
+const CHART_PERIOD_AGG_SQL = sql`
+  COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' AND NOT t.is_transfer AND t.category != ${INTERNAL_TRANSFER_CATEGORY} THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS expenses,
+  COALESCE(SUM(CASE WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS income,
+  COALESCE(SUM(
+    CASE
+      WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric)
+      WHEN t.transaction_type = 'expense' AND NOT t.is_transfer AND t.category != ${INTERNAL_TRANSFER_CATEGORY} THEN -ABS(t.amount::numeric)
+      ELSE 0
+    END
+  ), 0)::text AS net
+`;
+
 export async function getChartData(params: ChartDataParams) {
   const db = getDb();
   const whereClause = buildChartFilters(params);
@@ -691,20 +864,56 @@ export async function getChartData(params: ChartDataParams) {
   }>(sql`
     SELECT
       to_char(date_trunc('month', t.date), 'YYYY-MM') AS month,
-      COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' AND NOT t.is_transfer AND t.category != ${INTERNAL_TRANSFER_CATEGORY} THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS expenses,
-      COALESCE(SUM(CASE WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric) ELSE 0 END), 0)::text AS income,
-      COALESCE(SUM(
-        CASE
-          WHEN t.transaction_type = 'income' AND NOT t.is_transfer THEN ABS(t.amount::numeric)
-          WHEN t.transaction_type = 'expense' AND NOT t.is_transfer AND t.category != ${INTERNAL_TRANSFER_CATEGORY} THEN -ABS(t.amount::numeric)
-          ELSE 0
-        END
-      ), 0)::text AS net
+      ${CHART_PERIOD_AGG_SQL}
     FROM transactions t
     WHERE ${whereClause}
     GROUP BY date_trunc('month', t.date)
     ORDER BY month
   `);
+
+  const boundsRows = await db.execute<{
+    min_date: string | null;
+    max_date: string | null;
+  }>(sql`
+    SELECT min(t.date)::text AS min_date, max(t.date)::text AS max_date
+    FROM transactions t
+    WHERE ${buildChartFilters(params, null)}
+  `);
+
+  let yearly: {
+    year: string;
+    expenses: string;
+    income: string;
+    net: string;
+  }[] = [];
+
+  const minDate = boundsRows[0]?.min_date;
+  const maxDate = boundsRows[0]?.max_date;
+  if (minDate && maxDate) {
+    const minYear = Number.parseInt(minDate.slice(0, 4), 10);
+    const maxYear = Number.parseInt(maxDate.slice(0, 4), 10);
+    if (
+      Number.isFinite(minYear) &&
+      Number.isFinite(maxYear) &&
+      maxYear > minYear
+    ) {
+      const yearlyRows = await db.execute<{
+        year: string;
+        expenses: string;
+        income: string;
+        net: string;
+      }>(sql`
+        SELECT
+          to_char(date_trunc('year', t.date), 'YYYY') AS year,
+          ${CHART_PERIOD_AGG_SQL}
+        FROM transactions t
+        WHERE ${buildChartFilters(params, { from: minDate, to: maxDate })}
+        GROUP BY date_trunc('year', t.date)
+        ORDER BY year
+      `);
+      yearly = yearlyRows;
+    }
+  }
 
   const categoryRows = await db.execute<{ name: string; amount: string }>(sql`
     SELECT t.category AS name, SUM(ABS(t.amount::numeric))::text AS amount
@@ -856,6 +1065,12 @@ export async function getChartData(params: ChartDataParams) {
       income: formatMoneyAmount(row.income),
       net: formatMoneyAmount(row.net),
     })),
+    yearly: yearly.map((row) => ({
+      year: row.year,
+      expenses: formatMoneyAmount(row.expenses),
+      income: formatMoneyAmount(row.income),
+      net: formatMoneyAmount(row.net),
+    })),
     byCategory: categoryRows.map((row) => ({
       name: row.name,
       amount: formatMoneyAmount(row.amount),
@@ -902,10 +1117,134 @@ export async function getChartData(params: ChartDataParams) {
   };
 }
 
-export async function getAlerts() {
+type AlertSeverity = "warning" | "info";
+
+interface SpendingAlert {
+  id: string;
+  severity: AlertSeverity;
+  title: string;
+  message: string;
+  dismissible: boolean;
+}
+
+function monthBounds(month: string): { from: string; to: string } {
+  const [year, mon] = month.split("-");
+  const lastDay = new Date(Number.parseInt(year!, 10), Number.parseInt(mon!, 10), 0)
+    .getDate();
   return {
-    alerts: [],
+    from: `${year}-${mon}-01`,
+    to: `${year}-${mon}-${String(lastDay).padStart(2, "0")}`,
   };
+}
+
+function priorMonth(month: string): string {
+  const [yearStr, monStr] = month.split("-");
+  const year = Number.parseInt(yearStr ?? "", 10);
+  const mon = Number.parseInt(monStr ?? "", 10);
+  const date = new Date(year, mon - 2, 1);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+async function categorySpendByMonth(
+  userIds: string[],
+  month: string,
+  category: string,
+): Promise<number> {
+  const db = getDb();
+  const { from, to } = monthBounds(month);
+  const { userFilter, accountFilter } = await activeTransactionSqlFilters(userIds);
+  const rows = await db.execute<{ total: string }>(sql`
+    SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
+    FROM transactions
+    WHERE ${userFilter}
+      AND ${accountFilter}
+      AND transaction_type = 'expense'
+      AND is_transfer = false
+      AND category = ${category}
+      AND pending = false
+      AND date >= ${from}
+      AND date <= ${to}
+  `);
+  return Number.parseFloat(rows[0]?.total ?? "0");
+}
+
+export async function getAlerts(
+  userIds: string[],
+  month?: string,
+): Promise<{ alerts: SpendingAlert[] }> {
+  const db = getDb();
+  const alerts: SpendingAlert[] = [];
+  const refMonth = month ?? "2026-05";
+  const prevMonth = priorMonth(refMonth);
+
+  const watchCategories = [
+    "Dining & Restaurants",
+    "Subscriptions & Software",
+  ] as const;
+
+  for (const category of watchCategories) {
+    const current = await categorySpendByMonth(userIds, refMonth, category);
+    const previous = await categorySpendByMonth(userIds, prevMonth, category);
+    if (previous <= 0 || current <= previous) {
+      continue;
+    }
+    const pct = Math.round(((current - previous) / previous) * 100);
+    alerts.push({
+      id: `alert-spend-${category.toLowerCase().replace(/\s+/g, "-")}`,
+      severity: pct >= 15 ? "warning" : "info",
+      title: `${category} spend up ${pct}%`,
+      message: `You spent ${formatMoneyAmount(current)} on ${category} in ${refMonth}, up ${pct}% from ${prevMonth} (${formatMoneyAmount(previous)}).`,
+      dismissible: true,
+    });
+  }
+
+  const { userFilter, accountFilter } = await activeTransactionSqlFilters(userIds);
+  const { from, to } = monthBounds(refMonth);
+  const pendingRows = await db.execute<{ count: string }>(sql`
+    SELECT COUNT(*)::text AS count
+    FROM transactions
+    WHERE ${userFilter}
+      AND ${accountFilter}
+      AND pending = true
+      AND date >= ${from}
+      AND date <= ${to}
+  `);
+  const pendingCount = Number.parseInt(pendingRows[0]?.count ?? "0", 10);
+  if (pendingCount > 0) {
+    alerts.push({
+      id: "alert-pending-transactions",
+      severity: "info",
+      title: `${pendingCount} pending transaction${pendingCount === 1 ? "" : "s"}`,
+      message: `There ${pendingCount === 1 ? "is" : "are"} ${pendingCount} pending charge${pendingCount === 1 ? "" : "s"} this month that are not included in spend totals yet.`,
+      dismissible: true,
+    });
+  }
+
+  const overdueRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(creditCardLiabilities)
+    .innerJoin(accounts, eq(accounts.id, creditCardLiabilities.accountId))
+    .where(
+      and(
+        inArray(accounts.userId, userIds),
+        eq(creditCardLiabilities.isOverdue, true),
+      ),
+    );
+
+  const overdueCount = overdueRows[0]?.count ?? 0;
+  if (overdueCount > 0) {
+    alerts.push({
+      id: "alert-overdue-card",
+      severity: "warning",
+      title: "Credit card payment overdue",
+      message: `${overdueCount} linked card${overdueCount === 1 ? " has" : "s have"} an overdue statement balance. Pay at least the minimum to avoid fees.`,
+      dismissible: true,
+    });
+  }
+
+  return { alerts };
 }
 
 export async function transactionCount(userId?: string): Promise<number> {

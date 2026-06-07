@@ -1,0 +1,58 @@
+{
+  "days": [
+    {
+      "date": "Jun 3",
+      "weekday": "Wed",
+      "weather": "sunny",
+      "projectedBalance": "4218.00",
+      "note": ""
+    },
+    {
+      "date": "Jun 4",
+      "weekday": "Thu",
+      "weather": "sunny",
+      "projectedBalance": "4038.00",
+      "note": ""
+    },
+    {
+      "date": "Jun 5",
+      "weekday": "Fri",
+      "weather": "sunny",
+      "projectedBalance": "3858.00",
+      "note": ""
+    },
+    {
+      "date": "Jun 6",
+      "weekday": "Sat",
+      "weather": "partly",
+      "projectedBalance": "3678.00",
+      "note": ""
+    },
+    {
+      "date": "Jun 7",
+      "weekday": "Sun",
+      "weather": "cloudy",
+      "projectedBalance": "2848.00",
+      "note": "Rent + bills cluster"
+    },
+    {
+      "date": "Jun 8",
+      "weekday": "Mon",
+      "weather": "partly",
+      "projectedBalance": "3318.00",
+      "note": ""
+    },
+    {
+      "date": "Jun 9",
+      "weekday": "Tue",
+      "weather": "cloudy",
+      "projectedBalance": "3138.00",
+      "note": "Just before payday"
+    }
+  ],
+  "comfortFloor": "2500.00",
+  "minBalance": "2488.00",
+  "lowestDay": "Jun 9",
+  "nextClearDate": "Jun 15",
+  "recommendation": "Move ~$150 of discretionary spending past Jun 15 to stay above your $2,500 comfort floor."
+}

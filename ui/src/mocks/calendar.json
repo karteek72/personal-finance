@@ -1,0 +1,216 @@
+{
+  "month": "2026-06",
+  "events": [
+    {
+      "day": 1,
+      "type": "bill",
+      "label": "Greystar Apartments",
+      "amount": "1850.00"
+    },
+    {
+      "day": 10,
+      "type": "bill",
+      "label": "Verizon Fios",
+      "amount": "79.99"
+    },
+    {
+      "day": 12,
+      "type": "bill",
+      "label": "T-Mobile",
+      "amount": "85.00"
+    },
+    {
+      "day": 20,
+      "type": "bill",
+      "label": "GEICO Insurance",
+      "amount": "142.00"
+    },
+    {
+      "day": 3,
+      "type": "subscription",
+      "label": "Netflix",
+      "amount": "15.49"
+    },
+    {
+      "day": 5,
+      "type": "subscription",
+      "label": "Spotify",
+      "amount": "11.99"
+    },
+    {
+      "day": 14,
+      "type": "subscription",
+      "label": "Disney+",
+      "amount": "13.99"
+    },
+    {
+      "day": 18,
+      "type": "subscription",
+      "label": "Adobe Creative Cloud",
+      "amount": "54.99"
+    },
+    {
+      "day": 6,
+      "type": "subscription",
+      "label": "Equinox",
+      "amount": "24.99"
+    },
+    {
+      "day": 9,
+      "type": "subscription",
+      "label": "ChatGPT Plus",
+      "amount": "20.00"
+    },
+    {
+      "day": 22,
+      "type": "subscription",
+      "label": "Amazon Prime",
+      "amount": "14.99"
+    },
+    {
+      "day": 1,
+      "type": "income",
+      "label": "Paycheck",
+      "amount": "3358.00"
+    },
+    {
+      "day": 15,
+      "type": "income",
+      "label": "Paycheck",
+      "amount": "3358.00"
+    },
+    {
+      "day": 2,
+      "type": "goal",
+      "label": "Japan fund transfer",
+      "amount": "200.00"
+    }
+  ],
+  "heat": [
+    {
+      "day": 1,
+      "level": 3
+    },
+    {
+      "day": 2,
+      "level": 0
+    },
+    {
+      "day": 3,
+      "level": 1
+    },
+    {
+      "day": 4,
+      "level": 0
+    },
+    {
+      "day": 5,
+      "level": 0
+    },
+    {
+      "day": 6,
+      "level": 3
+    },
+    {
+      "day": 7,
+      "level": 0
+    },
+    {
+      "day": 8,
+      "level": 0
+    },
+    {
+      "day": 9,
+      "level": 0
+    },
+    {
+      "day": 10,
+      "level": 1
+    },
+    {
+      "day": 11,
+      "level": 2
+    },
+    {
+      "day": 12,
+      "level": 0
+    },
+    {
+      "day": 13,
+      "level": 0
+    },
+    {
+      "day": 14,
+      "level": 3
+    },
+    {
+      "day": 15,
+      "level": 3
+    },
+    {
+      "day": 16,
+      "level": 0
+    },
+    {
+      "day": 17,
+      "level": 3
+    },
+    {
+      "day": 18,
+      "level": 3
+    },
+    {
+      "day": 19,
+      "level": 2
+    },
+    {
+      "day": 20,
+      "level": 2
+    },
+    {
+      "day": 21,
+      "level": 3
+    },
+    {
+      "day": 22,
+      "level": 3
+    },
+    {
+      "day": 23,
+      "level": 3
+    },
+    {
+      "day": 24,
+      "level": 1
+    },
+    {
+      "day": 25,
+      "level": 0
+    },
+    {
+      "day": 26,
+      "level": 1
+    },
+    {
+      "day": 27,
+      "level": 0
+    },
+    {
+      "day": 28,
+      "level": 2
+    },
+    {
+      "day": 29,
+      "level": 0
+    },
+    {
+      "day": 30,
+      "level": 3
+    }
+  ],
+  "totals": {
+    "income": "6716.00",
+    "bills": "2316.42"
+  },
+  "safeToSpendToday": "74.00"
+}

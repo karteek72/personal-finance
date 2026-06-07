@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import { Readable } from "node:stream";
 import { z } from "zod";
 import { SPEND_CATEGORIES, SUBCATEGORY_MAP } from "../config/categories.js";
 import { requireRequestUser } from "../lib/auth-http.js";
@@ -15,6 +16,7 @@ import {
   getSummary,
   getTrends,
   listTransactions,
+  streamTransactionsCsv,
 } from "../services/transaction-store.js";
 import type { Env } from "../config/env.js";
 
@@ -51,6 +53,41 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
     const ctx = await resolveHouseholdContext(user.id);
     const query = request.query as { from?: string; to?: string };
     return getSummary(ctx.userIds, query.from, query.to);
+  });
+
+  app.get("/transactions/export.csv", async (request, reply) => {
+    const query = request.query as Record<string, string | undefined>;
+    const scope = await resolveScopeFilters(request, app.config.env, query);
+    const month = query.month;
+    const filename = month ? `transactions-${month}.csv` : "transactions.csv";
+
+    reply.header("Content-Type", "text/csv; charset=utf-8");
+    reply.header("Content-Disposition", `attachment; filename="${filename}"`);
+    reply.header("Cache-Control", "no-store");
+
+    const csvStream = Readable.from(
+      streamTransactionsCsv({
+        userIds: scope.ctx.userIds,
+        month: query.month,
+        category: query.category,
+        subCategory: query.subCategory,
+        accountId: query.accountId,
+        scopedAccountIds: scope.scopedAccountIds,
+        q: query.q,
+        type: query.type,
+        sort: query.sort as
+          | "date_desc"
+          | "date_asc"
+          | "amount_desc"
+          | "amount_asc"
+          | "name_asc"
+          | "name_desc"
+          | "category_asc"
+          | undefined,
+      }),
+    );
+
+    return reply.send(csvStream);
   });
 
   app.get("/transactions", async (request) => {
@@ -143,8 +180,10 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
 
 export const insightRoutes: FastifyPluginAsync = async (app) => {
   app.get("/insights/alerts", async (request) => {
-    await requireRequestUser(request, app.config.env);
-    return getAlerts();
+    const user = await requireRequestUser(request, app.config.env);
+    const ctx = await resolveHouseholdContext(user.id);
+    const query = request.query as { month?: string };
+    return getAlerts(ctx.userIds, query.month);
   });
 
   app.get("/insights/trends", async (request) => {

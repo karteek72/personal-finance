@@ -7,9 +7,8 @@
  *
  * If email is omitted, uses the only user with a Google account (google_sub set).
  */
-import { config as loadDotenv } from "dotenv";
+import { loadRootEnv } from "../src/config/load-root-env.js";
 import { eq, inArray, ne, sql } from "drizzle-orm";
-import { resolve } from "node:path";
 import { loadEnv } from "../src/config/env.js";
 import { closeDb, getDb } from "../src/db/client.js";
 import { runMigrations } from "../src/db/migrate.js";
@@ -25,8 +24,7 @@ import {
 import { DEV_USER_EMAIL } from "../src/services/user-store.js";
 import { getHouseholdForUser } from "../src/services/household-store.js";
 
-loadDotenv({ path: resolve(process.cwd(), "../.env") });
-loadDotenv({ path: resolve(process.cwd(), ".env") });
+loadRootEnv();
 loadEnv();
 
 async function resolveTargetUser(emailArg?: string) {

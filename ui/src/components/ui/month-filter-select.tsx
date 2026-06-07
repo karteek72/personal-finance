@@ -16,7 +16,7 @@ interface MonthFilterSelectProps {
 export function MonthFilterSelect({
   selectedMonth,
   onChange,
-  monthsBack = 24,
+  monthsBack = 12,
   className,
 }: MonthFilterSelectProps) {
   const options = useMemo(

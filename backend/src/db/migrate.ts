@@ -13,6 +13,14 @@ const MIGRATION_FILES = [
   "0004_household_invitations.sql",
   "0005_merchant_category_rules.sql",
   "0006_subcategories.sql",
+  "0007_credit_card_liabilities.sql",
+  "0008_feature_tables.sql",
+  "0009_import_batches.sql",
+  "0010_import_preview_dedup.sql",
+  "0011_import_compliance.sql",
+  "0012_teller_snaptrade.sql",
+  "0013_fire_profile_age.sql",
+  "0014_user_profile_analytics.sql",
 ];
 
 let migrationPromise: Promise<void> | null = null;

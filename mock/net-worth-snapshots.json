@@ -1,0 +1,326 @@
+{
+  "snapshots": [
+    {
+      "month": "2025-04",
+      "totalAssets": "67124.78",
+      "totalLiabilities": "5588.09",
+      "netWorth": "61536.69",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "9849.66"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "57615.06"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5588.09"
+        }
+      ]
+    },
+    {
+      "month": "2025-05",
+      "totalAssets": "69413.84",
+      "totalLiabilities": "5034.61",
+      "netWorth": "64379.23",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "10174.38"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "60569.68"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5034.61"
+        }
+      ]
+    },
+    {
+      "month": "2025-06",
+      "totalAssets": "73978.12",
+      "totalLiabilities": "5855.65",
+      "netWorth": "68122.47",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "10499.09"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "63524.30"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5855.65"
+        }
+      ]
+    },
+    {
+      "month": "2025-07",
+      "totalAssets": "76050.46",
+      "totalLiabilities": "4912.76",
+      "netWorth": "71137.70",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "10823.81"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "66478.92"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-4912.76"
+        }
+      ]
+    },
+    {
+      "month": "2025-08",
+      "totalAssets": "80086.67",
+      "totalLiabilities": "5339.81",
+      "netWorth": "74746.86",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "11148.52"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "69433.53"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5339.81"
+        }
+      ]
+    },
+    {
+      "month": "2025-09",
+      "totalAssets": "83506.00",
+      "totalLiabilities": "5253.99",
+      "netWorth": "78252.01",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "11473.24"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "72388.15"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5253.99"
+        }
+      ]
+    },
+    {
+      "month": "2025-10",
+      "totalAssets": "86209.80",
+      "totalLiabilities": "4934.40",
+      "netWorth": "81275.40",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "11797.95"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "75342.77"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-4934.40"
+        }
+      ]
+    },
+    {
+      "month": "2025-11",
+      "totalAssets": "90470.84",
+      "totalLiabilities": "5586.77",
+      "netWorth": "84884.07",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "12122.66"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "78297.39"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5586.77"
+        }
+      ]
+    },
+    {
+      "month": "2025-12",
+      "totalAssets": "93365.35",
+      "totalLiabilities": "5331.48",
+      "netWorth": "88033.87",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "12447.38"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "81252.01"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5331.48"
+        }
+      ]
+    },
+    {
+      "month": "2026-01",
+      "totalAssets": "96501.20",
+      "totalLiabilities": "5084.23",
+      "netWorth": "91416.97",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "12772.09"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "84206.63"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5084.23"
+        }
+      ]
+    },
+    {
+      "month": "2026-02",
+      "totalAssets": "100084.86",
+      "totalLiabilities": "5410.27",
+      "netWorth": "94674.59",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "13096.81"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "87161.24"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5410.27"
+        }
+      ]
+    },
+    {
+      "month": "2026-03",
+      "totalAssets": "103728.80",
+      "totalLiabilities": "5557.23",
+      "netWorth": "98171.57",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "13421.52"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "90115.86"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5557.23"
+        }
+      ]
+    },
+    {
+      "month": "2026-04",
+      "totalAssets": "107260.77",
+      "totalLiabilities": "5709.96",
+      "netWorth": "101550.81",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "13746.24"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "93070.48"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5709.96"
+        }
+      ]
+    },
+    {
+      "month": "2026-05",
+      "totalAssets": "110096.05",
+      "totalLiabilities": "5166.01",
+      "netWorth": "104930.04",
+      "breakdown": [
+        {
+          "type": "cash",
+          "label": "Cash & Savings",
+          "value": "14070.95"
+        },
+        {
+          "type": "investment",
+          "label": "Investments",
+          "value": "96025.10"
+        },
+        {
+          "type": "credit",
+          "label": "Credit Cards",
+          "value": "-5166.01"
+        }
+      ]
+    }
+  ]
+}

@@ -34,7 +34,46 @@ HTTP status codes: `200` success, `201` created, `204` no content, `400` validat
 | POST | `/auth/refresh` | `{ refreshToken }` | `{ accessToken, refreshToken }` |
 | POST | `/auth/logout` | — | `204` |
 | GET | `/auth/me` | — | `{ user }` |
+| GET | `/auth/export` | — | Portable JSON download (`Content-Disposition: attachment`). No secrets (Plaid tokens, encrypted import blobs, invitation tokens). Logs `data_export` audit event. |
 | DELETE | `/users/me` | — | `204` (CCPA cascade delete) |
+
+---
+
+## Account connections
+
+Users choose a provider when linking accounts. The UI calls `GET /connections/providers` to see which integrations are enabled server-side.
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/connections/providers` | `{ providers: ConnectionProvider[] }` — `id`: `plaid` \| `teller` \| `snaptrade`, `enabled`, `accountTypes` |
+
+`Account.source` and `Account.connectionProvider`: `import` \| `plaid` \| `teller` \| `snaptrade`.
+
+---
+
+## Teller (banking & credit cards)
+
+Teller Connect runs in the browser; the UI exchanges the enrollment `accessToken` on the backend. API calls use mTLS client certificates in `development`/`production` (`TELLER_CERT_PATH`, `TELLER_KEY_PATH`); sandbox does not require certs.
+
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| GET | `/teller/config` | — | `{ applicationId, environment, products }` for Teller Connect |
+| POST | `/teller/exchange` | `{ accessToken, enrollmentId, institutionName? }` | `{ enrollmentId, institutionName, accountsSynced, transactionsAdded, message }` |
+| GET | `/teller/enrollments` | — | `{ items }` |
+| POST | `/teller/enrollments/:enrollmentId/sync` | — | sync result |
+| DELETE | `/teller/enrollments/:enrollmentId` | — | `204` |
+
+---
+
+## SnapTrade (brokerage)
+
+Connection Portal URL is generated server-side; after the user finishes linking, call `POST /snaptrade/complete` (or open `/accounts/snaptrade/callback` with `SNAPTRADE_REDIRECT_URI`).
+
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| POST | `/snaptrade/portal-url` | `{ broker?, reconnectAuthorizationId? }` | `{ redirectUri }` |
+| POST | `/snaptrade/complete` | — | `{ status, connectionsSynced, accountsSynced, holdingsUpdated, activitiesAdded, message }` |
+| POST | `/snaptrade/sync` | — | `202` — background sync all SnapTrade connections |
 
 ---
 
@@ -45,7 +84,7 @@ HTTP status codes: `200` success, `201` created, `204` no content, `400` validat
 | POST | `/plaid/link-token` | `{ platform?: "web" \| "ios" }` | `{ linkToken }` |
 | POST | `/plaid/exchange-token` | `{ publicToken }` | `{ itemId, institutionName }` |
 | GET | `/plaid/accounts` | — | `{ accounts: Account[] }` |
-| DELETE | `/plaid/items/:itemId` | — | `204` |
+| DELETE | `/plaid/items/:itemId` | — | `204` — Plaid `itemRemove` plus delete of all accounts and transactions on that item |
 | POST | `/plaid/items/:itemId/sync` | — | `{ status: "queued" }` |
 
 ### Liabilities (credit cards)
@@ -68,13 +107,44 @@ Requires `PLAID_PRODUCTS=transactions,liabilities`. Existing items must be re-li
 
 | Method | Path | Query | Response |
 |--------|------|-------|----------|
-| GET | `/transactions` | `month`, `category`, `accountId`, `q`, `type`, `limit`, `cursor` | `{ items: Transaction[], nextCursor }` |
+| GET | `/transactions` | `month`, `category`, `subCategory`, `accountId`, `memberId`, `scope` (`all`\|`household`\|`personal`), `q`, `type`, `sort` (`date_desc`\|`date_asc`\|`amount_desc`\|`amount_asc`), `limit`, `cursor` | `{ items: Transaction[], nextCursor }` |
 | GET | `/transactions/summary` | `from`, `to` | `TransactionSummary` |
 | GET | `/transactions/by-category` | `from`, `to` | `{ categories: CategoryTotal[] }` |
+| GET | `/transactions/chart-data` | `from`, `to`, `category`, `accountId` | `ChartDataResponse` — `monthly` (filtered by `from`/`to`), `yearly` (full history when data spans 2+ calendar years), category breakdown |
 | GET | `/transactions/flow` | `from`, `to` | `MoneyFlowResponse` |
 | PATCH | `/transactions/:id/category` | `{ category, rememberForMerchant? }` | `{ transaction, merchantTransactionsUpdated }` |
 | GET | `/transactions/category-options` | — | `{ categories: string[] }` |
 | GET | `/transactions/export.csv` | same as list filters | `text/csv` stream |
+
+---
+
+## Accounts
+
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| GET | `/accounts` | — | `{ accounts: Account[] }` (includes liability detail when available) |
+| DELETE | `/accounts/:accountId` | — | `{ id, name, mask, transactionsDeleted, plaidItemDisconnected }` — cascades transactions; when the last account on a Plaid item is removed, calls Plaid `itemRemove` and deletes the item |
+| POST | `/accounts/:accountId/sync` | — | `202` for Plaid, Teller, or SnapTrade-linked accounts |
+| POST | `/plaid/sync` | — | `{ queued: number }` (sync all items) |
+
+---
+
+## Imports (statement upload)
+
+Multipart upload for QFX/OFX/CSV/PDF statement files. Files encrypted at rest (AES-256-GCM) before parsing. See [statement-import-ui-and-security.md](statement-import-ui-and-security.md).
+
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| GET | `/imports/formats` | — | `{ formats, limits, consentVersion }` |
+| POST | `/imports/batches` | `multipart/form-data`: `files[]`, `consentAccepted=true` | `{ batchId, status, filesTotal, message }` |
+| GET | `/imports/batches/:batchId` | — | `{ batch, summary, files[] }` — per-file status, errors, `canRetry`/`canReplace`, preview |
+| POST | `/imports/batches/:batchId/confirm` | `{ accountMappings?, fileIds? }` | `{ batchId, status, txnsInserted, txnsSkipped, filesImported, message }` |
+| POST | `/imports/batches/:batchId/retry-failed` | — | `{ batchId, retried, message }` |
+| POST | `/imports/batches/:batchId/files/:fileId/retry` | — | `{ batchId, fileId, message }` |
+| POST | `/imports/batches/:batchId/files/:fileId/replace` | `multipart/form-data`: `file` | `{ batchId, fileId, message }` |
+| DELETE | `/imports/batches/:batchId` | — | `204` |
+
+**Limits (defaults, env-configurable):** 12 files, 10 MiB/file, 120 MiB/batch.
 
 ---
 
@@ -85,6 +155,72 @@ Requires `PLAID_PRODUCTS=transactions,liabilities`. Existing items must be re-li
 | GET | `/insights/alerts` | `month` | `{ alerts: Alert[] }` |
 | GET | `/insights/trends` | `from`, `to` | `{ trends: CategoryTrend[] }` |
 | GET | `/insights/subscriptions` | — | `{ subscriptions: Subscription[] }` (V2) |
+
+### Insights — advanced (V2)
+
+Backed by the demo dataset (Drizzle tables + derived rollups). All scoped to the household.
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/insights/wellness` | `WellnessResponse` — composite score, dimensions, history |
+| GET | `/insights/dna` | `DnaResponse` — archetype, narrative, axes, peer rarity (`404` if none) |
+| GET | `/insights/patterns` | `PatternsResponse` — day-of-week averages + detected patterns |
+| GET | `/insights/behavioral` | `BehavioralResponse` — challenges, streaks, spending/income creep, reasons |
+| GET | `/insights/merchants` | `MerchantsResponse` — top/most-visited/fastest-growing merchants, income insights (`isLive` when computed from synced transactions) |
+
+---
+
+## Wealth
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/wealth/net-worth` | `NetWorthResponse` — current totals + monthly snapshot trend + asset/liability breakdown |
+| GET | `/wealth/investments` | `InvestmentsResponse` — `positions`, `stockAggregates`, `optionPositions`, `portfolioBreakdown`, `behavioralAlerts` (portfolio health + trading-style), `investmentHistory`, `monthlyActivity` (cash deployed this month) |
+| GET | `/wealth/fire` | `FireResponse` — age (`isDefaultAge` true until user saves age; default 35), net worth, monthly spend/invest, withdrawal rate, real return (computed live from accounts + investment activity; `404` only when no accounts) |
+| PATCH | `/wealth/fire` | `FireProfilePatch` body (`currentAge`, `withdrawalRate`, `realReturn` — at least one) → `FireResponse` |
+
+---
+
+## User profile
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/user/profile` | `UserProfileResponse` — identity (name, email) + analytics preferences + live account-derived totals when linked |
+| PATCH | `/user/profile` | `UserProfilePatch` body (at least one field) → `UserProfileResponse` |
+| GET | `/user/analytics-profile` | Same analytics fields as above without `user` (deprecated alias) |
+| PATCH | `/user/analytics-profile` | FIRE subset: `currentAge`, `withdrawalRate`, `realReturn` (deprecated alias) |
+
+`UserProfilePatch` fields: `displayName`, `currentAge`, `householdSize`, `annualGrossIncome`, `targetRetirementAge`, `employmentStatus` (`employed` \| `self_employed` \| `retired` \| `student` \| `other`), `riskTolerance` (`conservative` \| `moderate` \| `aggressive`), `withdrawalRate`, `realReturn`.
+
+---
+
+## Planning
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/planning/budgets` | `BudgetsResponse` — per-category budget vs spend, savings goals, safe-to-spend |
+| GET | `/planning/recurring` | `RecurringResponse` — subscriptions, bills, price changes, leak fees + lifestyle habits |
+| GET | `/planning/calendar` | `CalendarResponse` — month events (bills/subscriptions/income), spend heatmap, safe-to-spend today (derived) |
+| GET | `/planning/forecast` | `ForecastResponse` — 14-day cash-flow projection with weather, comfort floor, recommendation (derived) |
+
+---
+
+## Protect
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/protect/inflation` | `InflationResponse` — personal vs national rate, power loss, category basket |
+| GET | `/protect/resilience` | `ResilienceResponse` — liquid cash, monthly burn, shock scenarios + runway scores |
+
+---
+
+## Coach & Wrapped
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/coach/insights` | `CoachResponse` — monthly narrative, Q&A pairs, 30-day forecast text |
+| POST | `/coach/ask` | `{ question: string }` → `{ answer: string, isLive: boolean }` — rule-based answers from transaction summaries (no LLM) |
+| GET | `/wrapped` | `WrappedResponse` — year-in-review totals, archetype, top category, moments |
 
 ---
 
@@ -185,6 +321,12 @@ Multi-user households: owner invites partners by email; partner signs in with Go
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
 | GET | `/household` | Bearer | Returns `accessRole` (`owner` \| `member`), members, accounts |
+| PATCH | `/household` | Owner | Body `{ name }` → updated household |
+| GET | `/household/insights` | Bearer | Household-level spend/income rollups |
+| POST | `/household/members` | Owner | Body `{ name, relationship?, … }` → `HouseholdMember` |
+| PATCH | `/household/members/:memberId` | Owner | Update member fields → `HouseholdMember` |
+| DELETE | `/household/members/:memberId` | Owner | `204` |
+| PUT | `/household/accounts/:accountId/assign` | Owner | Body `{ memberId }` → `{ accountId, memberId }` |
 | POST | `/household/members/:memberId/invite` | Owner | Body `{ email }` → `{ inviteUrl, expiresAt, … }` |
 | DELETE | `/household/members/:memberId/invite` | Owner | Revoke pending invite |
 | GET | `/household/invites/preview?token=` | Public | Invite metadata before sign-in |

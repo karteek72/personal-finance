@@ -1,0 +1,5 @@
+"Exported on 01/01/2024"
+"Account Number","87654321"
+"Date","Action","Symbol","Description","Quantity","Price","Fees & Comm","Amount"
+"01/15/2024","Buy","AAPL","APPLE INC","10","150.00","0.00","-1500.00"
+"02/01/2024","Sell","AAPL","APPLE INC","5","160.00","0.00","800.00"

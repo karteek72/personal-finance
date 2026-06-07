@@ -37,16 +37,17 @@ export function DrilldownDrawer({ config, onClose }: DrilldownDrawerProps) {
     }
   }, [open]);
 
+  if (!open || !config) {
+    return null;
+  }
+
   return (
     <>
       {/* Backdrop */}
       <div
         aria-hidden
         onClick={onClose}
-        className={clsx(
-          "fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px] transition-opacity duration-200",
-          open ? "opacity-100" : "pointer-events-none opacity-0",
-        )}
+        className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px] transition-opacity duration-200"
       />
 
       {/* Drawer panel */}
@@ -54,29 +55,27 @@ export function DrilldownDrawer({ config, onClose }: DrilldownDrawerProps) {
         ref={drawerRef}
         role="dialog"
         aria-modal="true"
-        aria-label={config?.title ?? "Transaction detail"}
+        aria-label={config.title}
         tabIndex={-1}
         className={clsx(
           "fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-surface outline-none",
           "border-l border-border/60",
-          "transition-transform duration-300 ease-in-out",
-          open ? "translate-x-0" : "translate-x-full",
         )}
       >
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between border-b border-border/60 px-5 py-4">
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold text-text">
-              {config?.title}
+              {config.title}
             </h2>
-            {config?.subtitle ? (
+            {config.subtitle ? (
               <p className="mt-0.5 truncate text-xs text-text-muted">
                 {config.subtitle}
               </p>
             ) : null}
           </div>
           <div className="ml-3 flex shrink-0 items-center gap-2">
-            {config?.viewAllHref ? (
+            {config.viewAllHref ? (
               <a
                 href={config.viewAllHref}
                 className="rounded-[var(--radius-pill)] bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
@@ -110,16 +109,14 @@ export function DrilldownDrawer({ config, onClose }: DrilldownDrawerProps) {
 
         {/* Scrollable body */}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {config ? (
-            <TransactionList
-              key={JSON.stringify(config.filters)}
-              filters={config.filters}
-              pageSize={25}
-              infiniteScroll
-              showLoadAll
-              emptyMessage="No transactions match this filter."
-            />
-          ) : null}
+          <TransactionList
+            key={JSON.stringify(config.filters)}
+            filters={config.filters}
+            pageSize={25}
+            infiniteScroll
+            showLoadAll
+            emptyMessage="No transactions match this filter."
+          />
         </div>
       </div>
     </>

@@ -1,0 +1,28 @@
+{
+  "reasons": [
+    {
+      "transactionId": "b0000000-0000-4000-8000-0000000003ea",
+      "reasonId": "need"
+    },
+    {
+      "transactionId": "b0000000-0000-4000-8000-0000000003f5",
+      "reasonId": "treat"
+    },
+    {
+      "transactionId": "b0000000-0000-4000-8000-00000000040a",
+      "reasonId": "social"
+    },
+    {
+      "transactionId": "b0000000-0000-4000-8000-0000000003e1",
+      "reasonId": "bored"
+    },
+    {
+      "transactionId": "b0000000-0000-4000-8000-0000000003f1",
+      "reasonId": "stress"
+    },
+    {
+      "transactionId": "b0000000-0000-4000-8000-0000000003f4",
+      "reasonId": "impulse"
+    }
+  ]
+}

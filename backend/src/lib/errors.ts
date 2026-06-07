@@ -13,6 +13,13 @@ export type ErrorCode =
   | "PLAID_ERROR"
   | "PLAID_SYNC_ERROR"
   | "NOT_PLAID_ACCOUNT"
+  | "TELLER_ERROR"
+  | "TELLER_SYNC_ERROR"
+  | "SNAPTRADE_ERROR"
+  | "SNAPTRADE_SYNC_ERROR"
+  | "PROVIDER_NOT_CONFIGURED"
+  | "NOT_SYNCABLE_ACCOUNT"
+  | "RATE_LIMITED"
   | "INTERNAL_ERROR";
 
 export interface ApiErrorBody {
@@ -72,8 +79,8 @@ export class AppError extends Error {
     return new AppError("NOT_FOUND", 404, message);
   }
 
-  static conflict(message: string): AppError {
-    return new AppError("CONFLICT", 409, message);
+  static conflict(message: string, details?: unknown): AppError {
+    return new AppError("CONFLICT", 409, message, { details });
   }
 
   static authNotConfigured(message: string): AppError {
@@ -101,6 +108,42 @@ export class AppError extends Error {
       400,
       "Only Plaid-linked accounts can be synced",
     );
+  }
+
+  static notSyncableAccount(): AppError {
+    return new AppError(
+      "NOT_SYNCABLE_ACCOUNT",
+      400,
+      "Only live-linked accounts can be synced",
+    );
+  }
+
+  static providerNotConfigured(provider: string): AppError {
+    return new AppError(
+      "PROVIDER_NOT_CONFIGURED",
+      503,
+      `${provider} is not configured on this server`,
+    );
+  }
+
+  static tellerError(message: string, cause?: unknown): AppError {
+    return new AppError("TELLER_ERROR", 502, message, { cause });
+  }
+
+  static tellerSyncError(message: string, cause?: unknown): AppError {
+    return new AppError("TELLER_SYNC_ERROR", 502, message, { cause });
+  }
+
+  static snaptradeError(message: string, cause?: unknown): AppError {
+    return new AppError("SNAPTRADE_ERROR", 502, message, { cause });
+  }
+
+  static snaptradeSyncError(message: string, cause?: unknown): AppError {
+    return new AppError("SNAPTRADE_SYNC_ERROR", 502, message, { cause });
+  }
+
+  static rateLimited(message = "Too many requests; try again later"): AppError {
+    return new AppError("RATE_LIMITED", 429, message);
   }
 
   static internal(cause?: unknown): AppError {

@@ -1,6 +1,6 @@
 # SpendFlow — Podman deployment
 
-Run the full stack (PostgreSQL, API, UI) on your LAN and expose HTTPS on **stockpulse.win** via Cloudflare Tunnel.
+Run the full stack (PostgreSQL, Redis, API, BullMQ worker, UI) on your LAN and expose HTTPS on **stockpulse.win** via Cloudflare Tunnel.
 
 ## Quick start
 
@@ -10,19 +10,19 @@ cp containers/deploy.env.example containers/deploy.env
 # Edit SPENDFLOW_HOST=192.168.68.100 and public URLs if needed
 
 # 2. Secrets (Plaid, JWT, Google)
-cp containers/env.example containers/.env
-# Or symlink: ln -sf ../.env containers/.env
+cp .env.example .env   # repo root (compose loads ../.env)
 
 # 3. Build and start
+./scripts/podman/build.sh
 ./scripts/podman/deploy.sh
 ```
 
-**LAN (Wi‑Fi / same subnet)**
+**LAN (Wi‑Fi / same subnet)** — ports from `deploy.env` (`SPENDFLOW_UI_PORT` / `SPENDFLOW_API_PORT`, default **3005** / **4000**)
 
 | Service | URL |
 |---------|-----|
-| UI | http://192.168.68.100:3000 |
-| API | http://192.168.68.100:4000/api/v1 |
+| UI | http://\<your-lan-ip\>:3005 |
+| API | http://\<your-lan-ip\>:4000/api/v1 |
 
 **Internet (after Cloudflare tunnel + DNS)**
 
@@ -37,24 +37,47 @@ The UI image is built with `NEXT_PUBLIC_API_URL` pointing at the **public API** 
 
 | Script | Purpose |
 |--------|---------|
-| `./scripts/podman/dev.sh` | **Local dev** — Postgres container + API/UI on host with logs |
-| `./scripts/podman/dev-down.sh` | Stop dev API/UI (and Postgres unless `--keep-db`) |
-| `./scripts/podman/dev-logs.sh` | Follow `logs/dev/*.log` or Postgres container logs |
-| `./scripts/podman/deploy.sh` | **Production-style** — build + full stack in containers |
+| `./scripts/podman/dev.sh` | **Local dev** — Postgres + Redis containers + API/UI on host with logs |
+| `./scripts/podman/dev-down.sh` | Stop dev API/UI (and Postgres/Redis unless `--keep-db`) |
+| `./scripts/podman/dev-logs.sh` | Follow `logs/dev/*.log` or Postgres/Redis container logs |
+| `./scripts/podman/deploy.sh` | **Production-style** — start full stack in containers (uses existing images) |
+| `./scripts/podman/deploy.sh --build` | Rebuild images, then start stack |
+| `./scripts/podman/verify.sh` | Check config, images, and HTTP health (after deploy) |
 | `./scripts/podman/build.sh` | Build API (Node) + UI (static `out/` in **nginx:alpine**) |
-| `./scripts/podman/deploy.sh --no-build` | Restart without rebuild |
-| `./scripts/podman/down.sh` | Stop and remove containers |
+| `./scripts/podman/down.sh` | Stop app containers (api, worker, ui); Postgres and Redis keep running |
+| `./scripts/podman/down.sh --all` | Stop full stack including Postgres and Redis |
 | `./scripts/podman/logs.sh` | Follow compose logs (container stack) |
+
+## Worker service
+
+The **`worker`** container (`spendflow-worker`) runs BullMQ background jobs (Plaid transaction sync). It reuses the **`spendflow-api`** image with `node dist/worker.js` — no separate build or host ports.
+
+| Property | Value |
+|----------|-------|
+| Image | `localhost/spendflow-api:latest` (same as API) |
+| Container name | `spendflow-worker` |
+| Depends on | Redis (healthy), API (started) |
+| Host ports | None (internal only) |
+
+The API runs database migrations on boot; the worker starts after the API container is up so the schema is ready. Requires `REDIS_URL` (defaults to `redis://redis:6379` in compose) and the same secrets as the API (`DATABASE_URL`, `ENCRYPTION_KEY`, `PLAID_*`, etc.).
+
+```bash
+# Follow worker logs
+./scripts/podman/logs.sh worker
+
+# Or directly
+podman logs -f spendflow-worker
+```
 
 ### Local development (recommended for day-to-day coding)
 
-Postgres runs in Podman; API and UI run with `npm run dev` on your machine so logs are easy to read.
+Postgres and Redis run in Podman on the shared `spendflow-net` network with named volumes (`spendflow-pgdata`, `spendflow-redisdata`) so data survives container restarts. API and UI run with `npm run dev` on your machine so logs are easy to read.
 
 ```bash
-# One-time: secrets in containers/.env (from env.example)
-cp containers/env.example containers/.env
+# One-time: secrets in repo root .env (from .env.example)
+cp .env.example .env
 
-# Start Postgres + API + UI, then stream logs (Ctrl+C stops tail only)
+# Start Postgres + Redis + API + UI, then stream logs (Ctrl+C stops tail only)
 ./scripts/podman/dev.sh
 
 # Or start in background
@@ -69,7 +92,8 @@ cp containers/env.example containers/.env
 |---------|---------|
 | UI | http://localhost:3002 |
 | API | http://localhost:4000/api/v1/health |
-| Postgres | `127.0.0.1:5433` (user/db from `containers/.env`) |
+| Postgres | `127.0.0.1:5433` (user/db from `containers/.env`, volume `spendflow-pgdata`) |
+| Redis | `127.0.0.1:6380` (volume `spendflow-redisdata`; host port avoids clashing with other local Redis on 6379) |
 
 Log files: `logs/dev/api.log`, `logs/dev/ui.log`.
 
@@ -88,8 +112,8 @@ With `--token`, ingress is configured in Cloudflare, not in a local file:
 
 | Hostname | Upstream URL |
 |----------|----------------|
-| `spendflow.stockpulse.win` | `http://192.168.68.100:3000` |
-| `spendflow-api.stockpulse.win` | `http://192.168.68.100:4000` |
+| `spendflow.stockpulse.win` | `http://<host-ip>:3005` |
+| `spendflow-api.stockpulse.win` | `http://<host-ip>:4000` |
 
 3. Leave the existing Kong route on `http://192.168.68.100:8000` unchanged.
 4. The `cloudflared` pod usually picks up new routes within ~1 minute (no restart required).
@@ -107,7 +131,7 @@ Set `SPENDFLOW_BUILD_TARGET=public` in `deploy.env` before `build.sh` so the UI 
 Add these to your Google OAuth client (**Authorized JavaScript origins**):
 
 - `https://spendflow.stockpulse.win`
-- `http://192.168.68.100:3000`
+- `http://<your-lan-ip>:3005`
 
 **Plaid** redirect URI (in Plaid Dashboard):
 
@@ -129,7 +153,7 @@ Use the same Google OAuth **iOS** client or Web client ID as configured in backe
 
 Allow inbound on the host (if you rely on LAN access without tunnel):
 
-- TCP `3000` (UI)
+- TCP `3005` (UI — default `SPENDFLOW_UI_PORT`)
 - TCP `4000` (API)
 
 Postgres is bound to `127.0.0.1:5433` only (not exposed on LAN).
@@ -152,7 +176,7 @@ The API container runs with `NODE_ENV=production`. An empty `ENCRYPTION_KEY=` in
    ENCRYPTION_KEY=<paste-the-value>
    ```
 
-3. Restart: `./scripts/podman/deploy.sh --no-build`
+3. Restart: `./scripts/podman/deploy.sh`
 
 `./scripts/podman/deploy.sh` also auto-generates `ENCRYPTION_KEY` when the line is missing or empty (see `spendflow_ensure_encryption_key` in `scripts/podman/lib.sh`).
 
@@ -171,5 +195,5 @@ podman exec -it spendflow-postgres psql -U spendflow -d spendflow -c '\dt'
 Rebuild UI after changing public URLs:
 
 ```bash
-./scripts/podman/build.sh && ./scripts/podman/deploy.sh --no-build
+./scripts/podman/build.sh && ./scripts/podman/deploy.sh
 ```

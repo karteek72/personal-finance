@@ -1,0 +1,10 @@
+Bank of America
+Advantage Banking
+Account ending in 4857
+
+Date        Description                          Amount
+01/15/24    DIRECT DEPOSIT CISCO SYSTEMS PAYROLL  -3500.00
+01/16/24    COSTCO WHOLESALE #0123                 125.43
+01/18/24    ZELLE PAYMENT TO JOHN DOE              50.00
+
+Beginning balance

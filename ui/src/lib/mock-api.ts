@@ -5,24 +5,184 @@ import moneyFlowData from "@/mocks/money-flow.json";
 import summaryData from "@/mocks/summary.json";
 import transactionsData from "@/mocks/transactions.json";
 import trendsData from "@/mocks/trends.json";
+import netWorthData from "@/mocks/net-worth.json";
+import investmentsData from "@/mocks/investments.json";
+import budgetsData from "@/mocks/budgets.json";
+import recurringData from "@/mocks/recurring.json";
+import wellnessData from "@/mocks/wellness.json";
+import dnaData from "@/mocks/dna.json";
+import patternsData from "@/mocks/patterns.json";
+import behavioralData from "@/mocks/behavioral.json";
+import inflationData from "@/mocks/inflation.json";
+import resilienceData from "@/mocks/resilience.json";
+import fireData from "@/mocks/fire.json";
+import coachData from "@/mocks/coach.json";
+import wrappedData from "@/mocks/wrapped.json";
+import merchantsData from "@/mocks/merchants.json";
+import calendarData from "@/mocks/calendar.json";
+import forecastData from "@/mocks/forecast.json";
 import type {
+  Account,
   AccountsResponse,
   AlertsResponse,
+  BehavioralResponse,
+  BudgetsResponse,
+  CalendarResponse,
   CategoriesResponse,
   ChartDataResponse,
+  CoachResponse,
   CreditDebtSummary,
+  DnaResponse,
+  FireResponse,
+  UserProfileResponse,
+  UserProfilePatch,
+  AnalyticsProfileResponse,
+  FireProfilePatch,
+  ForecastResponse,
   HouseholdInsightsResponse,
   HouseholdMember,
   HouseholdResponse,
+  InflationResponse,
+  InvestmentsResponse,
+  InvestmentPosition,
+  StockAggregate,
+  MerchantsResponse,
   MoneyFlowResponse,
+  NetWorthResponse,
   PaginatedTransactions,
+  PatternsResponse,
+  RecurringResponse,
+  ResilienceResponse,
+  Transaction,
   TransactionFilters,
   TransactionSummary,
   TrendsResponse,
   UpdateTransactionCategoryResponse,
+  WellnessResponse,
+  WrappedResponse,
 } from "@/types/api";
 
 const MOCK_DELAY_MS = 150;
+
+const INTERNAL_TRANSFER_CATEGORY = "Internal Transfers";
+const CREDIT_CARD_PAYMENT_SUBCATEGORY = "Credit Card Payments";
+
+const INITIAL_MOCK_ACCOUNTS = (accountsData as AccountsResponse).accounts;
+const mockAccounts: Account[] = structuredClone(INITIAL_MOCK_ACCOUNTS);
+let mockTransactionItems: Transaction[] = structuredClone(
+  (transactionsData as PaginatedTransactions).items,
+);
+let mockDataMutated = false;
+
+const EMPTY_SUMMARY: TransactionSummary = {
+  totalSpent: "0.00",
+  income: "0.00",
+  netSavings: "0.00",
+  avgMonthlySpend: "0.00",
+  topCategory: { name: "None", amount: "0.00" },
+  ccPaymentsExcluded: "0.00",
+  savingsRate: 0,
+  transactionCount: 0,
+  pendingCount: 0,
+  monthsInPeriod: 1,
+};
+
+function activeMockAccountIds(): Set<string> {
+  return new Set(mockAccounts.map((account) => account.id));
+}
+
+function filterMockTransactions(items: Transaction[]): Transaction[] {
+  const activeIds = activeMockAccountIds();
+  return items.filter((tx) => activeIds.has(tx.accountId));
+}
+
+function computeMockSummary(from?: string, to?: string): TransactionSummary {
+  let items = filterMockTransactions(mockTransactionItems);
+  if (from && to) {
+    items = items.filter((tx) => tx.date >= from && tx.date <= to);
+  } else {
+    const month = monthFromDateRange(from, to);
+    if (month) {
+      items = items.filter((tx) => transactionMatchesMonth(tx.date, month));
+    }
+  }
+
+  if (items.length === 0) {
+    return { ...EMPTY_SUMMARY };
+  }
+
+  let totalSpent = 0;
+  let income = 0;
+  let ccPaymentsExcluded = 0;
+  let pendingCount = 0;
+  let transactionCount = 0;
+  const categoryTotals = new Map<string, number>();
+
+  for (const tx of items) {
+    if (tx.pending) {
+      pendingCount += 1;
+      continue;
+    }
+    const amount = Math.abs(Number.parseFloat(tx.amount));
+    if (
+      tx.transactionType === "expense" &&
+      !tx.isTransfer &&
+      tx.category !== INTERNAL_TRANSFER_CATEGORY
+    ) {
+      totalSpent += amount;
+      transactionCount += 1;
+      categoryTotals.set(
+        tx.category,
+        (categoryTotals.get(tx.category) ?? 0) + amount,
+      );
+    } else if (tx.transactionType === "income" && !tx.isTransfer) {
+      income += amount;
+    } else if (
+      tx.isTransfer &&
+      tx.category === INTERNAL_TRANSFER_CATEGORY &&
+      tx.subCategory === CREDIT_CARD_PAYMENT_SUBCATEGORY
+    ) {
+      ccPaymentsExcluded += amount;
+    }
+  }
+
+  const net = income - totalSpent;
+  let topCategory = { name: "None", amount: "0.00" };
+  for (const [name, amount] of categoryTotals) {
+    if (
+      topCategory.name === "None" ||
+      amount > Number.parseFloat(topCategory.amount)
+    ) {
+      topCategory = { name, amount: amount.toFixed(2) };
+    }
+  }
+
+  return {
+    totalSpent: totalSpent.toFixed(2),
+    income: income.toFixed(2),
+    netSavings: net.toFixed(2),
+    avgMonthlySpend: totalSpent.toFixed(2),
+    topCategory,
+    ccPaymentsExcluded: ccPaymentsExcluded.toFixed(2),
+    savingsRate: income > 0 ? Math.round((net / income) * 10000) / 100 : 0,
+    transactionCount,
+    pendingCount,
+    monthsInPeriod: 1,
+  };
+}
+
+function syncMockHouseholdAccounts(): void {
+  mockHouseholdState.accounts = mockAccounts.map((account, index) => ({
+    accountId: account.id,
+    name: account.name,
+    mask: account.mask ?? "0000",
+    institutionName: account.institutionName,
+    balanceCurrent: account.balanceCurrent,
+    memberId: index % 2 === 0 ? "mock-member-owner" : "mock-member-partner",
+    memberName: index % 2 === 0 ? "Me" : "Partner",
+    memberColor: index % 2 === 0 ? "#7c3aed" : "#ec4899",
+  }));
+}
 
 function delay(): Promise<void> {
   return new Promise((resolve) => {
@@ -48,10 +208,13 @@ function transactionMatchesMonth(date: string, month?: string): boolean {
 }
 
 export async function getSummary(
-  _from?: string,
-  _to?: string,
+  from?: string,
+  to?: string,
 ): Promise<TransactionSummary> {
   await delay();
+  if (mockDataMutated) {
+    return computeMockSummary(from, to);
+  }
   return summaryData as TransactionSummary;
 }
 
@@ -115,13 +278,10 @@ export async function getTransactions(
   } = filters;
 
   const accountMasks = new Map(
-    (accountsData as AccountsResponse).accounts.map((account) => [
-      account.id,
-      account.mask,
-    ]),
+    mockAccounts.map((account) => [account.id, account.mask]),
   );
 
-  const allItems = (transactionsData as PaginatedTransactions).items.map(
+  const allItems = filterMockTransactions(mockTransactionItems).map(
     (tx) => ({
       ...tx,
       accountMask: tx.accountMask ?? accountMasks.get(tx.accountId) ?? null,
@@ -190,13 +350,12 @@ export async function getTransactions(
 
 export async function getAccounts(): Promise<AccountsResponse> {
   await delay();
-  return accountsData as AccountsResponse;
+  return { accounts: [...mockAccounts] };
 }
 
 export async function getCreditDebtSummary(): Promise<CreditDebtSummary> {
   await delay();
-  const data = accountsData as AccountsResponse;
-  const cards = data.accounts
+  const cards = mockAccounts
     .filter((account) => account.type === "credit")
     .map((account) => ({
       accountId: account.id,
@@ -204,18 +363,31 @@ export async function getCreditDebtSummary(): Promise<CreditDebtSummary> {
       mask: account.mask,
       institutionName: account.institutionName,
       balanceCurrent: account.balanceCurrent,
-      liability: null,
+      liability: account.liability ?? null,
     }));
+
+  const num = (v: string | null | undefined): number =>
+    v ? Number.parseFloat(v) : 0;
+  const withLiability = cards.filter((c) => c.liability);
 
   return {
     totalCurrentBalance: cards
       .reduce((sum, card) => sum + Number.parseFloat(card.balanceCurrent), 0)
       .toFixed(2),
-    totalStatementBalance: "0.00",
-    totalMinimumDue: "0.00",
-    totalEstimatedMonthlyInterest: "0.00",
-    overdueCount: 0,
-    coverageLabel: "Mock mode — link cards with Liabilities enabled for statement data",
+    totalStatementBalance: cards
+      .reduce((s, c) => s + num(c.liability?.lastStatementBalance), 0)
+      .toFixed(2),
+    totalMinimumDue: cards
+      .reduce((s, c) => s + num(c.liability?.minimumPaymentAmount), 0)
+      .toFixed(2),
+    totalEstimatedMonthlyInterest: cards
+      .reduce((s, c) => s + num(c.liability?.estimatedMonthlyInterest), 0)
+      .toFixed(2),
+    overdueCount: cards.filter((c) => c.liability?.isOverdue).length,
+    coverageLabel:
+      withLiability.length === cards.length
+        ? `Statement data for all ${cards.length} cards`
+        : `Statement data for ${withLiability.length} of ${cards.length} cards`,
     cards,
   };
 }
@@ -224,16 +396,38 @@ export async function deleteAccount(
   accountId: string,
 ): Promise<import("@/types/api").DeleteAccountResponse> {
   await delay();
-  const data = accountsData as AccountsResponse;
-  const account = data.accounts.find((row) => row.id === accountId);
+  const index = mockAccounts.findIndex((row) => row.id === accountId);
+  if (index < 0) {
+    throw new Error("Account not found");
+  }
+  const account = mockAccounts[index];
   if (!account) {
     throw new Error("Account not found");
   }
+  mockAccounts.splice(index, 1);
+  const transactionsDeleted = mockTransactionItems.filter(
+    (tx) => tx.accountId === accountId,
+  ).length;
+  mockTransactionItems = mockTransactionItems.filter(
+    (tx) => tx.accountId !== accountId,
+  );
+  mockDataMutated = true;
+  syncMockHouseholdAccounts();
+
+  const plaidItemDisconnected =
+    account.source === "plaid" &&
+    !mockAccounts.some(
+      (row) =>
+        row.source === "plaid" &&
+        row.institutionName === account.institutionName,
+    );
+
   return {
     id: account.id,
     name: account.name,
     mask: account.mask ?? "0000",
-    transactionsDeleted: 0,
+    transactionsDeleted,
+    plaidItemDisconnected,
   };
 }
 
@@ -319,18 +513,27 @@ export async function getChartData(params: {
 }): Promise<ChartDataResponse> {
   await delay();
 
-  const accounts = (accountsData as AccountsResponse).accounts;
-  const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
+  const accountNames = new Map(mockAccounts.map((a) => [a.id, a.name]));
 
-  let items = (transactionsData as PaginatedTransactions).items.filter((tx) => {
+  const scopedItems = filterMockTransactions(mockTransactionItems).filter(
+    (tx) => {
+      if (params.accountId && tx.accountId !== params.accountId) return false;
+      if (params.category && tx.category !== params.category) return false;
+      return true;
+    },
+  );
+
+  let items = scopedItems.filter((tx) => {
     if (params.from && tx.date < params.from) return false;
     if (params.to && tx.date > params.to) return false;
-    if (params.accountId && tx.accountId !== params.accountId) return false;
-    if (params.category && tx.category !== params.category) return false;
     return true;
   });
 
   const monthlyMap = new Map<
+    string,
+    { expenses: number; income: number; net: number }
+  >();
+  const yearlyMap = new Map<
     string,
     { expenses: number; income: number; net: number }
   >();
@@ -358,6 +561,22 @@ export async function getChartData(params: {
     }
 
     monthlyMap.set(month, entry);
+  }
+
+  for (const tx of scopedItems) {
+    const year = tx.date.slice(0, 4);
+    const entry = yearlyMap.get(year) ?? { expenses: 0, income: 0, net: 0 };
+    const amount = Number.parseFloat(tx.amount);
+
+    if (tx.transactionType === "expense" && !tx.isTransfer) {
+      entry.expenses += amount;
+      entry.net -= amount;
+    } else if (tx.transactionType === "income" && !tx.isTransfer) {
+      entry.income += Math.abs(amount);
+      entry.net += Math.abs(amount);
+    }
+
+    yearlyMap.set(year, entry);
   }
 
   const monthly = [...monthlyMap.entries()]
@@ -415,8 +634,21 @@ export async function getChartData(params: {
     0,
   );
 
+  const yearly =
+    yearlyMap.size > 1
+      ? [...yearlyMap.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([year, values]) => ({
+            year,
+            expenses: values.expenses.toFixed(2),
+            income: values.income.toFixed(2),
+            net: values.net.toFixed(2),
+          }))
+      : [];
+
   return {
     monthly,
+    yearly,
     byCategory,
     bySubCategory: [],
     byAccount,
@@ -461,7 +693,7 @@ const mockHouseholdState: HouseholdResponse = {
       createdAt: new Date().toISOString(),
     },
   ],
-  accounts: (accountsData as AccountsResponse).accounts.map((account, index) => ({
+  accounts: INITIAL_MOCK_ACCOUNTS.map((account, index) => ({
     accountId: account.id,
     name: account.name,
     mask: account.mask ?? "0000",
@@ -626,4 +858,289 @@ export async function acceptHouseholdInvite(token: string) {
     memberId: partner?.id ?? "mock-member-partner",
     memberDisplayName: partner?.displayName ?? "Partner",
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Feature endpoints (demo dataset) — wealth, planning, insights,
+ * protect, coach & wrapped. These mirror the backend /api/v1 routes.
+ * ------------------------------------------------------------------ */
+
+export async function getNetWorth(): Promise<NetWorthResponse> {
+  await delay();
+  return netWorthData as NetWorthResponse;
+}
+
+export async function getInvestments(): Promise<InvestmentsResponse> {
+  await delay();
+  const data = investmentsData as InvestmentsResponse;
+  if (data.positions.length > 0) {
+    return data;
+  }
+
+  const accountByTicker: Record<string, string> = {
+    AAPL: "a1b2c3d4-e5f6-4789-a012-345678901007",
+    VOO: "a1b2c3d4-e5f6-4789-a012-345678901007",
+    MSFT: "a1b2c3d4-e5f6-4789-a012-345678901007",
+    TSLA: "a1b2c3d4-e5f6-4789-a012-345678901007",
+    AMZN: "a1b2c3d4-e5f6-4789-a012-345678901007",
+    VTI: "a1b2c3d4-e5f6-4789-a012-345678901008",
+    VXUS: "a1b2c3d4-e5f6-4789-a012-345678901008",
+    FXAIX: "a1b2c3d4-e5f6-4789-a012-345678901009",
+    VBTLX: "a1b2c3d4-e5f6-4789-a012-345678901009",
+    BTC: "a1b2c3d4-e5f6-4789-a012-345678901010",
+    ETH: "a1b2c3d4-e5f6-4789-a012-345678901010",
+  };
+
+  const accountsById = new Map(
+    data.accounts.map((a) => [a.accountId, a]),
+  );
+
+  const positions: InvestmentPosition[] = data.holdings.map((h, index) => {
+    const accountId =
+      accountByTicker[h.ticker] ?? data.accounts[0]?.accountId ?? "mock-account";
+    const account = accountsById.get(accountId);
+    return {
+      holdingId: `mock-holding-${index}`,
+      accountId,
+      accountName: account?.name ?? "Investment account",
+      institutionName: account?.institutionName ?? "",
+      accountMask: null,
+      ticker: h.ticker,
+      name: h.name,
+      sector: h.sector,
+      assetType: h.assetType,
+      quantity: h.quantity,
+      costBasis: h.costBasis,
+      currentPrice: h.currentPrice,
+      value: h.value,
+      gainLoss: h.gainLoss,
+      gainLossPercent: h.gainLossPercent,
+      underlyingTicker: h.underlyingTicker,
+      optionType: h.optionType,
+      expirationLabel: h.expirationLabel,
+    };
+  });
+
+  const stockAggregates: StockAggregate[] = data.holdings
+    .filter((h) => h.assetType !== "option")
+    .map((h) => {
+      const accountId =
+        accountByTicker[h.ticker] ?? data.accounts[0]?.accountId ?? "mock-account";
+      const account = accountsById.get(accountId);
+      const totalCost = (h.quantity * Number.parseFloat(h.costBasis)).toFixed(2);
+      return {
+        ticker: h.ticker,
+        name: h.name,
+        sector: h.sector,
+        assetType: h.assetType,
+        totalQuantity: h.quantity,
+        currentPrice: h.currentPrice,
+        totalValue: h.value,
+        totalCost,
+        gainLoss: h.gainLoss,
+        gainLossPercent: h.gainLossPercent,
+        accountCount: 1,
+        lots: [
+          {
+            accountId,
+            accountName: account?.name ?? "Investment account",
+            quantity: h.quantity,
+            value: h.value,
+            costBasis: h.costBasis,
+          },
+        ],
+      };
+    });
+
+  const optionPositions = positions.filter((p) => p.assetType === "option");
+
+  return {
+    ...data,
+    positions,
+    stockAggregates,
+    optionPositions,
+  };
+}
+
+export async function getBudgets(): Promise<BudgetsResponse> {
+  await delay();
+  return budgetsData as BudgetsResponse;
+}
+
+export async function getRecurring(): Promise<RecurringResponse> {
+  await delay();
+  return recurringData as RecurringResponse;
+}
+
+let mockFireState: FireResponse = { ...(fireData as FireResponse) };
+
+let mockUserProfile: UserProfileResponse = {
+  user: {
+    id: "mock-user",
+    email: "demo@spendflow.app",
+    displayName: "Demo User",
+    createdAt: new Date().toISOString(),
+  },
+  currentAge: mockFireState.currentAge,
+  isDefaultAge: mockFireState.isDefaultAge ?? false,
+  householdSize: 2,
+  annualGrossIncome: "120000.00",
+  targetRetirementAge: 55,
+  employmentStatus: "employed",
+  riskTolerance: "moderate",
+  withdrawalRate: mockFireState.withdrawalRate,
+  realReturn: mockFireState.realReturn,
+  hasLinkedAccounts: true,
+  currentNetWorth: mockFireState.currentNetWorth,
+  monthlySpend: mockFireState.monthlySpend,
+  monthlyInvest: mockFireState.monthlyInvest,
+};
+
+let mockAnalyticsProfile: AnalyticsProfileResponse = {
+  currentAge: mockUserProfile.currentAge,
+  isDefaultAge: mockUserProfile.isDefaultAge,
+  householdSize: mockUserProfile.householdSize,
+  annualGrossIncome: mockUserProfile.annualGrossIncome,
+  targetRetirementAge: mockUserProfile.targetRetirementAge,
+  employmentStatus: mockUserProfile.employmentStatus,
+  riskTolerance: mockUserProfile.riskTolerance,
+  withdrawalRate: mockUserProfile.withdrawalRate,
+  realReturn: mockUserProfile.realReturn,
+  hasLinkedAccounts: mockUserProfile.hasLinkedAccounts,
+  currentNetWorth: mockUserProfile.currentNetWorth,
+  monthlySpend: mockUserProfile.monthlySpend,
+  monthlyInvest: mockUserProfile.monthlyInvest,
+};
+
+export async function getUserProfile(): Promise<UserProfileResponse> {
+  await delay();
+  return mockUserProfile;
+}
+
+export async function patchUserProfile(
+  patch: UserProfilePatch,
+): Promise<UserProfileResponse> {
+  await delay();
+  mockUserProfile = {
+    ...mockUserProfile,
+    ...patch,
+    user: {
+      ...mockUserProfile.user,
+      displayName:
+        patch.displayName != null
+          ? patch.displayName
+          : mockUserProfile.user.displayName,
+    },
+    annualGrossIncome:
+      patch.annualGrossIncome !== undefined
+        ? patch.annualGrossIncome == null
+          ? null
+          : patch.annualGrossIncome.toFixed(2)
+        : mockUserProfile.annualGrossIncome,
+    isDefaultAge:
+      patch.currentAge != null ? false : mockUserProfile.isDefaultAge,
+  };
+  const { user: _user, ...analytics } = mockUserProfile;
+  mockAnalyticsProfile = analytics;
+  mockFireState = {
+    ...mockFireState,
+    currentAge: mockUserProfile.currentAge,
+    isDefaultAge: mockUserProfile.isDefaultAge,
+    withdrawalRate: mockUserProfile.withdrawalRate,
+    realReturn: mockUserProfile.realReturn,
+  };
+  return mockUserProfile;
+}
+
+export async function getAnalyticsProfile(): Promise<AnalyticsProfileResponse> {
+  await delay();
+  return mockAnalyticsProfile;
+}
+
+export async function patchAnalyticsProfile(
+  patch: FireProfilePatch,
+): Promise<AnalyticsProfileResponse> {
+  await delay();
+  mockAnalyticsProfile = {
+    ...mockAnalyticsProfile,
+    ...patch,
+    isDefaultAge:
+      patch.currentAge != null ? false : mockAnalyticsProfile.isDefaultAge,
+  };
+  mockFireState = {
+    ...mockFireState,
+    ...patch,
+    isDefaultAge: mockAnalyticsProfile.isDefaultAge,
+  };
+  return mockAnalyticsProfile;
+}
+
+export async function getFire(): Promise<FireResponse> {
+  await delay();
+  return mockFireState;
+}
+
+export async function patchFire(patch: FireProfilePatch): Promise<FireResponse> {
+  await delay();
+  mockFireState = {
+    ...mockFireState,
+    ...patch,
+    isDefaultAge: patch.currentAge != null ? false : mockFireState.isDefaultAge,
+  };
+  return mockFireState;
+}
+
+export async function getWellness(): Promise<WellnessResponse> {
+  await delay();
+  return wellnessData as WellnessResponse;
+}
+
+export async function getDna(): Promise<DnaResponse> {
+  await delay();
+  return dnaData as DnaResponse;
+}
+
+export async function getPatterns(): Promise<PatternsResponse> {
+  await delay();
+  return patternsData as PatternsResponse;
+}
+
+export async function getBehavioral(): Promise<BehavioralResponse> {
+  await delay();
+  return behavioralData as BehavioralResponse;
+}
+
+export async function getInflation(): Promise<InflationResponse> {
+  await delay();
+  return inflationData as InflationResponse;
+}
+
+export async function getResilience(): Promise<ResilienceResponse> {
+  await delay();
+  return resilienceData as ResilienceResponse;
+}
+
+export async function getCoach(): Promise<CoachResponse> {
+  await delay();
+  return coachData as CoachResponse;
+}
+
+export async function getWrapped(): Promise<WrappedResponse> {
+  await delay();
+  return wrappedData as WrappedResponse;
+}
+
+export async function getMerchants(): Promise<MerchantsResponse> {
+  await delay();
+  return { ...(merchantsData as MerchantsResponse), isLive: false };
+}
+
+export async function getCalendar(): Promise<CalendarResponse> {
+  await delay();
+  return calendarData as CalendarResponse;
+}
+
+export async function getForecast(): Promise<ForecastResponse> {
+  await delay();
+  return forecastData as ForecastResponse;
 }

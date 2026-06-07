@@ -6,10 +6,16 @@ import {
   Products,
 } from "plaid";
 import type { Env } from "../../config/env.js";
+import { isPlaidConfigured } from "../../config/env.js";
+import { AppError } from "../../lib/errors.js";
 
 let plaidClient: PlaidApi | null = null;
 
 export function getPlaidClient(env: Env): PlaidApi {
+  if (!isPlaidConfigured(env)) {
+    throw AppError.providerNotConfigured("Plaid");
+  }
+
   if (plaidClient) {
     return plaidClient;
   }

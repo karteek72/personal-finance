@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { isGoogleAuthEnabled, requiresSignIn } from "@/lib/auth-session";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -24,7 +25,8 @@ function LoginContent() {
   }, [router, status, nextPath]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+    <div className="flex min-h-screen flex-col bg-bg px-4">
+      <div className="flex flex-1 items-center justify-center">
       <div className="w-full max-w-sm rounded-[var(--radius-lg)] bg-surface p-8 card-shadow">
         <p className="text-2xl font-extrabold tracking-tight text-gradient">
           SpendFlow
@@ -93,7 +95,21 @@ function LoginContent() {
             Create an account
           </Link>
         </p>
+
+        <p className="mt-4 text-center text-[11px] leading-relaxed text-text-muted">
+          By signing in, you agree to our{" "}
+          <Link href="/legal/terms" className="font-medium text-primary hover:underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/legal/privacy" className="font-medium text-primary hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
+      </div>
+      <SiteFooter variant="compact" className="border-t-0" />
     </div>
   );
 }

@@ -7,9 +7,21 @@ export type NotificationKind = "info" | "success" | "error" | "progress";
 export type NotificationSource =
   | "plaid-sync"
   | "plaid-link"
+  | "account-connect"
+  | "snaptrade-connect"
   | "import"
   | "household"
+  | "insight"
   | "system";
+
+export interface InsightAlertInput {
+  id: string;
+  severity: "info" | "warning" | "danger";
+  title: string;
+  message: string;
+}
+
+const INSIGHT_ID_PREFIX = "insight:";
 
 export interface AppNotification {
   id: string;
@@ -55,8 +67,21 @@ interface NotificationState {
   markAllRead: () => void;
   dismiss: (id: string) => void;
   clearDismissed: () => void;
+  /** Replaces active insight alerts; preserves read/dismissed per alert id */
+  syncInsightNotifications: (alerts: InsightAlertInput[]) => void;
   setPanelOpen: (open: boolean) => void;
   togglePanel: () => void;
+}
+
+function insightNotificationId(alertId: string): string {
+  return `${INSIGHT_ID_PREFIX}${alertId}`;
+}
+
+function insightSeverityToKind(
+  severity: InsightAlertInput["severity"],
+): NotificationKind {
+  if (severity === "danger") return "error";
+  return "info";
 }
 
 function createId(): string {
@@ -150,6 +175,55 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     set((state) => ({
       notifications: state.notifications.filter((n) => !n.dismissed),
     }));
+  },
+
+  syncInsightNotifications: (alerts) => {
+    set((state) => {
+      const incomingIds = new Set(
+        alerts.map((alert) => insightNotificationId(alert.id)),
+      );
+      const existingById = new Map(
+        state.notifications.map((notification) => [
+          notification.id,
+          notification,
+        ]),
+      );
+
+      const withoutStaleInsights = state.notifications.filter(
+        (notification) =>
+          notification.source !== "insight" ||
+          (incomingIds.has(notification.id) && !notification.dismissed),
+      );
+
+      const syncedInsights: AppNotification[] = alerts.map((alert) => {
+        const id = insightNotificationId(alert.id);
+        const existing = existingById.get(id);
+        return {
+          id,
+          kind: insightSeverityToKind(alert.severity),
+          title: alert.title,
+          message: alert.message,
+          source: "insight",
+          createdAt: existing?.createdAt ?? new Date().toISOString(),
+          read: existing?.read ?? false,
+          dismissed: existing?.dismissed ?? false,
+        };
+      });
+
+      const nonInsight = withoutStaleInsights.filter(
+        (notification) => notification.source !== "insight",
+      );
+      const activeInsights = syncedInsights.filter(
+        (notification) => !notification.dismissed,
+      );
+
+      return {
+        notifications: trimNotifications([
+          ...activeInsights,
+          ...nonInsight,
+        ]),
+      };
+    });
   },
 
   setPanelOpen: (open) => set({ panelOpen: open }),

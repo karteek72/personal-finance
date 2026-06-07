@@ -1,0 +1,49 @@
+{
+  "scenarios": [
+    {
+      "name": "Job loss",
+      "emoji": "💼",
+      "shockAmount": "5341.51",
+      "shockType": "recurring",
+      "recommendedMonths": 6,
+      "detail": "No income; covered by liquid savings.",
+      "sortOrder": 0
+    },
+    {
+      "name": "Major car repair",
+      "emoji": "🔧",
+      "shockAmount": "3200.00",
+      "shockType": "one_time",
+      "recommendedMonths": 1,
+      "detail": "Transmission or engine repair.",
+      "sortOrder": 1
+    },
+    {
+      "name": "Medical emergency",
+      "emoji": "🏥",
+      "shockAmount": "5000.00",
+      "shockType": "one_time",
+      "recommendedMonths": 2,
+      "detail": "Out-of-pocket max after insurance.",
+      "sortOrder": 2
+    },
+    {
+      "name": "Rate hike on debt",
+      "emoji": "📈",
+      "shockAmount": "180.00",
+      "shockType": "recurring",
+      "recommendedMonths": 3,
+      "detail": "Variable APR rises on balances.",
+      "sortOrder": 3
+    },
+    {
+      "name": "Rent increase",
+      "emoji": "🏠",
+      "shockAmount": "250.00",
+      "shockType": "recurring",
+      "recommendedMonths": 3,
+      "detail": "Lease renewal bump.",
+      "sortOrder": 4
+    }
+  ]
+}

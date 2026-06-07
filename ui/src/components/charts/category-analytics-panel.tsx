@@ -15,12 +15,26 @@ import type { CategoryTotal } from "@/types/api";
 
 interface CategoryAnalyticsPanelProps {
   initialCategories?: CategoryTotal[];
+  selectedAccountId?: string;
+  onAccountChange?: (id: string) => void;
 }
 
 export function CategoryAnalyticsPanel({
   initialCategories = [],
+  selectedAccountId: selectedAccountIdProp = "",
+  onAccountChange,
 }: CategoryAnalyticsPanelProps) {
-  const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [internalAccountId, setInternalAccountId] = useState("");
+
+  // Use prop when provided (controlled), fall back to internal state
+  const selectedAccountId = onAccountChange !== undefined ? selectedAccountIdProp : internalAccountId;
+  function setSelectedAccountId(id: string) {
+    if (onAccountChange) {
+      onAccountChange(id);
+    } else {
+      setInternalAccountId(id);
+    }
+  }
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(
     null,

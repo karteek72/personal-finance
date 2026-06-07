@@ -128,6 +128,19 @@ export function inferClassification(
     }
   }
 
+  if (category === "Uncategorized") {
+    for (const rule of MERCHANT_RULES) {
+      if (!rule.pattern.test(haystack)) {
+        continue;
+      }
+      for (const parent of rule.categories) {
+        if (isValidSubCategory(parent, rule.subCategory)) {
+          return { category: parent, subCategory: rule.subCategory };
+        }
+      }
+    }
+  }
+
   const subCategory = inferSubCategory(category, merchantName, name);
   return { category, subCategory };
 }

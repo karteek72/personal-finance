@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# View local dev logs (API/UI files or Postgres container).
+# View local dev logs (API/UI files or Postgres/Redis containers).
 #
 # Usage:
 #   ./scripts/podman/dev-logs.sh              # follow API + UI
 #   ./scripts/podman/dev-logs.sh --no-follow  # print last lines and exit
 #   ./scripts/podman/dev-logs.sh postgres     # Postgres container only
+#   ./scripts/podman/dev-logs.sh redis        # Redis container only
 #   ./scripts/podman/dev-logs.sh api ui       # subset
 set -euo pipefail
 
@@ -23,7 +24,7 @@ while [[ $# -gt 0 ]]; do
       grep '^#' "$0" | head -8
       exit 0
       ;;
-    api | ui | postgres) TARGETS+=("$1"); shift ;;
+    api | ui | postgres | redis) TARGETS+=("$1"); shift ;;
     *)
       echo "error: unknown argument: $1" >&2
       exit 1
@@ -39,6 +40,7 @@ spendflow_load_dev_env
 
 LOG_FILES=()
 HAS_POSTGRES=0
+HAS_REDIS=0
 
 for target in "${TARGETS[@]}"; do
   case "${target}" in
@@ -52,6 +54,9 @@ for target in "${TARGETS[@]}"; do
       ;;
     postgres)
       HAS_POSTGRES=1
+      ;;
+    redis)
+      HAS_REDIS=1
       ;;
     *)
       echo "error: unknown target: ${target}" >&2
@@ -80,5 +85,15 @@ if [[ "${HAS_POSTGRES}" -eq 1 ]]; then
     spendflow_compose logs -f postgres
   else
     spendflow_compose logs --tail 80 postgres
+  fi
+fi
+
+if [[ "${HAS_REDIS}" -eq 1 ]]; then
+  spendflow_require_cmd podman
+  spendflow_ensure_podman
+  if [[ "${FOLLOW}" -eq 1 ]]; then
+    spendflow_compose logs -f redis
+  else
+    spendflow_compose logs --tail 80 redis
   fi
 fi

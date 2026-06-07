@@ -72,7 +72,7 @@ Worker shares the API image with a different `CMD` — same codebase, no secrets
 | `postgres` | `docker.io/library/postgres:16-alpine` | — | named volume `pgdata` |
 | `redis` | `docker.io/library/redis:7-alpine` | — | optional persistence |
 | `api` | `spendflow-api` | postgres, redis | — |
-| `worker` | `spendflow-api` | postgres, redis | — |
+| `worker` | `spendflow-api` | redis, api (migrations) | — |
 | `ui` | `spendflow-ui` | api | — |
 
 Environment via `containers/.env` (gitignored) or Podman secrets.
@@ -113,12 +113,15 @@ Environment via `containers/.env` (gitignored) or Podman secrets.
 ```bash
 cp containers/deploy.env.example containers/deploy.env
 cp containers/env.example containers/.env
+# Edit secrets in containers/.env (Plaid, JWT, ENCRYPTION_KEY, POSTGRES_PASSWORD)
 ./scripts/podman/deploy.sh
+./scripts/podman/verify.sh
 ```
+
+Requires **Podman** and **podman-compose**. Use `SPENDFLOW_HOST=0.0.0.0` in `deploy.env` for portable LAN binding on any machine.
 
 See [containers/README.md](../../containers/README.md) for Cloudflare Tunnel hostnames (`spendflow.stockpulse.win`, `spendflow-api.stockpulse.win`) and LAN access at `192.168.68.100`.
 
 ## Next steps
 
-- Add `spendflow-worker` image when BullMQ worker entry ships.
 - TLS / Caddy on host is optional when using Cloudflare Tunnel.

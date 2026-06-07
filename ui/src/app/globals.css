@@ -39,8 +39,9 @@
 
 @layer utilities {
   .glass {
-    background: color-mix(in srgb, var(--color-surface) 85%, transparent);
-    backdrop-filter: blur(12px);
+    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
   .card-shadow {
@@ -52,6 +53,15 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+
+  /* Subtle press feedback for tappable cards */
+  .tap-card {
+    transition: transform 0.1s ease, opacity 0.1s ease;
+  }
+  .tap-card:active {
+    transform: scale(0.985);
+    opacity: 0.9;
   }
 }
 

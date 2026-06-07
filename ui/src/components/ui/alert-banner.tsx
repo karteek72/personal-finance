@@ -44,7 +44,7 @@ export function AlertBanner({
   const [visible, setVisible] = useState(true);
   const styles = severityStyles[severity];
 
-  if (!visible) {
+  if (!visible || (!title.trim() && !message.trim())) {
     return null;
   }
 

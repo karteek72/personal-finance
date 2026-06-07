@@ -1,0 +1,16 @@
+{
+  "users": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "email": "personal@spendflow.local",
+      "displayName": "Alex Rivera",
+      "googleSub": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "email": "partner@spendflow.local",
+      "displayName": "Sam Rivera",
+      "googleSub": null
+    }
+  ]
+}

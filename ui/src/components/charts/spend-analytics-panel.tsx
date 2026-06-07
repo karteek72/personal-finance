@@ -8,11 +8,9 @@ import { InteractiveAreaChart } from "@/components/charts/interactive-area-chart
 import { InteractiveBarChart } from "@/components/charts/interactive-bar-chart";
 import { InteractiveDonutChart } from "@/components/charts/interactive-donut-chart";
 import { InteractiveMemberChart } from "@/components/charts/interactive-member-chart";
-import { InteractiveMultiLineChart } from "@/components/charts/interactive-multi-line-chart";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useChartData } from "@/hooks/use-chart-data";
 import { useHousehold } from "@/hooks/use-household";
-import { formatMoney } from "@/lib/format-money";
 import { useViewModeStore } from "@/stores/view-mode-store";
 import type { DrilldownConfig } from "@/components/ui/drilldown-drawer";
 
@@ -117,41 +115,24 @@ export function SpendAnalyticsPanel({ onOpenDrilldown }: SpendAnalyticsPanelProp
         ) : null}
       </div>
 
-      <div className="grid gap-2 rounded-[var(--radius-card)] bg-primary-soft/40 px-4 py-3 sm:grid-cols-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-            Spent
-          </p>
-          <p className="text-lg font-bold tabular-nums text-text" data-money>
-            {formatMoney(data.totals.expenses)}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-            Income
-          </p>
-          <p className="text-lg font-bold tabular-nums text-success" data-money>
-            {formatMoney(data.totals.income)}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-            Net
-          </p>
-          <p className="text-lg font-bold tabular-nums text-primary" data-money>
-            {formatMoney(data.totals.net)}
-          </p>
-        </div>
-      </div>
-
       <InteractiveAreaChart monthly={data.monthly} />
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <InteractiveMemberChart
-          slices={data.byMember}
-          selectedMemberId={selectedMemberId}
-          onSelectMember={setSelectedMemberId}
-        />
+      <div
+        className="grid gap-5"
+        style={{
+          gridTemplateColumns:
+            data.byMember.length > 0
+              ? "repeat(auto-fit, minmax(min(100%, 20rem), 1fr))"
+              : "1fr",
+        }}
+      >
+        {data.byMember.length > 0 ? (
+          <InteractiveMemberChart
+            slices={data.byMember}
+            selectedMemberId={selectedMemberId}
+            onSelectMember={setSelectedMemberId}
+          />
+        ) : null}
         <InteractiveDonutChart
           slices={data.byCategory}
           selectedCategory={selectedCategory}
@@ -163,14 +144,6 @@ export function SpendAnalyticsPanel({ onOpenDrilldown }: SpendAnalyticsPanelProp
         slices={data.byAccount}
         selectedAccountId={selectedAccountId}
         onSelectAccount={setSelectedAccountId}
-      />
-
-      <InteractiveMultiLineChart
-        trends={data.categoryTrends}
-        highlightedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-        title="Top categories over time"
-        subtitle="Click a legend item to focus"
       />
     </section>
       ) : null}

@@ -1,17 +1,31 @@
 {
   "alerts": [
     {
-      "id": "f3a8b2c1-4d5e-4f67-8901-234567890abc",
+      "id": "alert-dining",
       "severity": "warning",
-      "title": "Dining spend up 18%",
-      "message": "You spent $487.50 on Dining & Restaurants in May, up 18% from April ($412.88). Consider cooking at home more often this month.",
+      "title": "Dining up 22% this month",
+      "message": "You've spent more on restaurants and delivery than your 6-month average.",
       "dismissible": true
     },
     {
-      "id": "f3a8b2c1-4d5e-4f67-8901-234567890abd",
+      "id": "alert-large",
       "severity": "info",
-      "title": "Subscription creep detected",
-      "message": "Your Subscriptions & Software total rose to $187.43 this month (+12.5% vs April). Review recurring charges for services you no longer use.",
+      "title": "Large purchase detected",
+      "message": "A $2,199.00 Apple Store charge posted in March.",
+      "dismissible": true
+    },
+    {
+      "id": "alert-overdue",
+      "severity": "danger",
+      "title": "Citi Double Cash payment overdue",
+      "message": "The minimum payment was due and is now past due.",
+      "dismissible": false
+    },
+    {
+      "id": "alert-savings",
+      "severity": "info",
+      "title": "Savings rate holding at 18%",
+      "message": "You're on pace with your emergency-fund goal.",
       "dismissible": true
     }
   ]

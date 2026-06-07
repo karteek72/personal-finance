@@ -2,7 +2,7 @@
 
 **Product:** SpendFlow  
 **Last Updated:** May 2026  
-**Status:** Phase 1 scaffolded — see `ios/README.md`
+**Status:** Phase 1 scaffolded — **deferred (lowest priority)**. See `ios/README.md`. Active work is web + statement import (Phase 3.6).
 
 ---
 

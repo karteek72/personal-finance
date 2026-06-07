@@ -1,0 +1,28 @@
+{
+  "challenges": [
+    {
+      "title": "Dining budget cut",
+      "goal": "Reduce dining by 20% this month",
+      "progressPercent": 62,
+      "daysRemaining": 18,
+      "complete": false,
+      "color": "#F97316"
+    },
+    {
+      "title": "No impulse over $50",
+      "goal": "Wait 24h before any purchase >$50",
+      "progressPercent": 85,
+      "daysRemaining": 6,
+      "complete": false,
+      "color": "#22C55E"
+    },
+    {
+      "title": "Cook 5 nights/week",
+      "goal": "Five home-cooked dinners weekly",
+      "progressPercent": 100,
+      "daysRemaining": 0,
+      "complete": true,
+      "color": "#3B82F6"
+    }
+  ]
+}
