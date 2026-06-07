@@ -1,8 +1,19 @@
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { formatCsvRow } from "../lib/csv.js";
-import { countMonthsInclusive } from "../lib/date-range.js";
+import { countMonthsInclusive, deltaPercentVsPrior, priorComparablePeriod } from "../lib/date-range.js";
+import { seasonalCategoryDeltas } from "./category-seasonal-delta.js";
+import { getPersistedAlerts } from "./alert-engine.js";
 import { formatMoneyAmount, roundDecimal, roundPercent } from "../lib/money.js";
+import {
+  paginateInMemory,
+  type Page,
+  type ParsedListQuery,
+} from "../lib/list-query.js";
+import {
+  metricNumericValue,
+  savingsRateMetric,
+} from "./metrics/index.js";
 import {
   accounts,
   creditCardLiabilities,
@@ -18,6 +29,37 @@ import {
   getActiveAccountIds,
   sqlActiveAccountIdsIn,
 } from "./active-account-scope.js";
+
+function buildTransactionDateFilter(from?: string, to?: string) {
+  return from && to
+    ? sql`date >= ${from} AND date <= ${to}`
+    : sql`TRUE`;
+}
+
+function buildTDateFilter(from?: string, to?: string) {
+  return from && to
+    ? sql`t.date >= ${from} AND t.date <= ${to}`
+    : sql`TRUE`;
+}
+
+/** Rank trend categories by total spend (desc) before slicing. Exported for tests. */
+export function rankTrendCategoriesBySpend(
+  entries: Iterable<[string, { month: string; amount: string }[]]>,
+  monthRows: Array<{ name: string; amount: string }>,
+  limit = 8,
+): Array<{ name: string; months: { month: string; amount: string }[] }> {
+  const totals = new Map<string, number>();
+  for (const row of monthRows) {
+    totals.set(row.name, (totals.get(row.name) ?? 0) + Number.parseFloat(row.amount));
+  }
+  return [...entries]
+    .sort(
+      ([nameA], [nameB]) =>
+        (totals.get(nameB) ?? 0) - (totals.get(nameA) ?? 0),
+    )
+    .slice(0, limit)
+    .map(([name, months]) => ({ name, months }));
+}
 
 export async function listAccounts(userId: string) {
   const db = getDb();
@@ -559,7 +601,13 @@ export async function getSummary(
         }
       : { name: "None", amount: "0.00" },
     ccPaymentsExcluded: formatMoneyAmount(ccPaymentsExcluded),
-    savingsRate: roundDecimal(incomeNum > 0 ? net / incomeNum : 0),
+    savingsRate: metricNumericValue(
+      savingsRateMetric({
+        income: incomeNum,
+        expense: spentNum,
+        asOf: to ?? new Date().toISOString().slice(0, 10),
+      }),
+    ),
     transactionCount: Number.parseInt(txCountRows[0]?.count ?? "0", 10),
     pendingCount: Number.parseInt(pendingCountRows[0]?.count ?? "0", 10),
     monthsInPeriod,
@@ -573,10 +621,7 @@ export async function getCategories(
 ) {
   const db = getDb();
   const { userFilter, accountFilter } = await activeTransactionSqlFilters(userIds);
-  const dateFilter =
-    from && to
-      ? sql`date >= ${from} AND date <= ${to}`
-      : sql`TRUE`;
+  const dateFilter = buildTransactionDateFilter(from, to);
 
   // Single query: group by category + sub_category to get both levels at once
   const rows = await db.execute<{
@@ -598,6 +643,31 @@ export async function getCategories(
     GROUP BY category, sub_category
     ORDER BY category, SUM(amount::numeric) DESC
   `);
+
+  let priorByCategory = new Map<string, number>();
+  let seasonalDeltas = new Map<string, number>();
+  const refMonth = from?.slice(0, 7) ?? to?.slice(0, 7);
+  if (refMonth) {
+    seasonalDeltas = await seasonalCategoryDeltas(userIds, refMonth);
+  }
+  if (from && to && seasonalDeltas.size === 0) {
+    const { priorFrom, priorTo } = priorComparablePeriod(from, to);
+    const priorFilter = buildTransactionDateFilter(priorFrom, priorTo);
+    const priorRows = await db.execute<{ category: string; amount: string }>(sql`
+      SELECT category, SUM(amount::numeric)::text AS amount
+      FROM transactions
+      WHERE ${userFilter}
+        AND ${accountFilter}
+        AND transaction_type = 'expense'
+        AND is_transfer = false
+        AND category != ${INTERNAL_TRANSFER_CATEGORY}
+        AND ${priorFilter}
+      GROUP BY category
+    `);
+    priorByCategory = new Map(
+      priorRows.map((row) => [row.category, Number.parseFloat(row.amount)]),
+    );
+  }
 
   // Aggregate category totals and nest subcategories
   const categoryMap = new Map<string, { amount: number; subs: Map<string, number> }>();
@@ -644,7 +714,10 @@ export async function getCategories(
         percentage: roundPercent(
           grandTotal > 0 ? (catTotal / grandTotal) * 100 : 0,
         ),
-        deltaVsPriorMonth: 0,
+        deltaVsPriorMonth: roundPercent(
+          seasonalDeltas.get(name) ??
+            deltaPercentVsPrior(catTotal, priorByCategory.get(name) ?? 0),
+        ),
         subcategories,
       };
     });
@@ -652,31 +725,59 @@ export async function getCategories(
   return { categories };
 }
 
+export interface FlowLine {
+  label: string;
+  amount: string;
+}
+
+export const FLOW_SOURCE_SORTABLE = ["label", "amount"] as const;
+
+function flowLineSortKey(column: string): (row: FlowLine) => number | string {
+  switch (column) {
+    case "label":
+      return (r) => r.label.toLowerCase();
+    default:
+      return (r) => Number.parseFloat(r.amount);
+  }
+}
+
 export async function getMoneyFlow(
   userIds: string[],
-  from?: string,
-  to?: string,
+  q: ParsedListQuery,
 ) {
-  void from;
-  void to;
   const db = getDb();
+  const from = q.from;
+  const to = q.to;
   const { userFilter, accountFilter, tAccountFilter } =
     await activeTransactionSqlFilters(userIds);
+  const dateFilter = buildTransactionDateFilter(from, to);
   const tUserFilter =
     userIds.length === 1
       ? sql`t.user_id = ${userIds[0]!}`
       : sql`t.user_id IN (${sql.join(userIds.map((id) => sql`${id}`), sql`, `)})`;
 
-  const incomeSources = await db.execute<{ label: string; amount: string }>(sql`
+  const incomeSourceRows = await db.execute<{ label: string; amount: string }>(sql`
     SELECT name AS label, SUM(ABS(amount::numeric))::text AS amount
     FROM transactions
     WHERE ${userFilter}
       AND ${accountFilter}
       AND transaction_type = 'income' AND is_transfer = false
+      AND ${dateFilter}
     GROUP BY name
     ORDER BY SUM(ABS(amount::numeric)) DESC
-    LIMIT 10
   `);
+
+  const incomeSources: Page<FlowLine> = paginateInMemory(
+    incomeSourceRows.map((r) => ({
+      label: r.label,
+      amount: formatMoneyAmount(r.amount),
+    })),
+    q,
+    {
+      sortKey: flowLineSortKey,
+      textFilter: (row, needle) => row.label.toLowerCase().includes(needle),
+    },
+  );
 
   const bankAccounts = await db.execute<{ label: string; amount: string }>(sql`
     SELECT a.name AS label, SUM(ABS(t.amount::numeric))::text AS amount
@@ -686,6 +787,7 @@ export async function getMoneyFlow(
       AND ${tAccountFilter}
       AND a.is_active = true
       AND a.type = 'depository' AND t.transaction_type = 'expense' AND t.is_transfer = false
+      AND ${buildTDateFilter(from, to)}
     GROUP BY a.name
   `);
 
@@ -697,6 +799,7 @@ export async function getMoneyFlow(
       AND ${tAccountFilter}
       AND a.is_active = true
       AND a.type = 'credit' AND t.transaction_type = 'expense' AND t.is_transfer = false
+      AND ${buildTDateFilter(from, to)}
     GROUP BY a.name
   `);
 
@@ -714,17 +817,27 @@ export async function getMoneyFlow(
     FROM transactions
     WHERE ${userFilter}
       AND ${accountFilter}
+      AND ${dateFilter}
     GROUP BY date_trunc('month', date)
     ORDER BY month
   `);
 
-  const incomeTotal = incomeSources.reduce(
+  const incomeTotal = incomeSourceRows.reduce(
     (s, r) => s + Number.parseFloat(r.amount),
     0,
   );
   const transferTotal = await db.execute<{ total: string }>(sql`
-    SELECT COALESCE(SUM(ABS(amount::numeric)), 0)::text AS total
-    FROM transactions WHERE ${userFilter} AND ${accountFilter} AND is_transfer = true
+    SELECT COALESCE(SUM(transfer_amount), 0)::text AS total
+    FROM (
+      SELECT date, ABS(amount::numeric) AS transfer_amount
+      FROM transactions
+      WHERE ${userFilter}
+        AND ${accountFilter}
+        AND is_transfer = true
+        AND (sub_category IS NULL OR sub_category != ${CREDIT_CARD_PAYMENT_SUBCATEGORY})
+        AND ${dateFilter}
+      GROUP BY date, ABS(amount::numeric)
+    ) paired_legs
   `);
   const ccTotal = creditCards.reduce(
     (s, r) => s + Number.parseFloat(r.amount),
@@ -753,10 +866,9 @@ export async function getTrends(
   from?: string,
   to?: string,
 ) {
-  void from;
-  void to;
   const db = getDb();
   const { userFilter, accountFilter } = await activeTransactionSqlFilters(userIds);
+  const dateFilter = buildTransactionDateFilter(from, to);
 
   const rows = await db.execute<{
     name: string;
@@ -772,6 +884,7 @@ export async function getTrends(
       AND ${accountFilter}
       AND transaction_type = 'expense' AND NOT is_transfer
       AND category != ${INTERNAL_TRANSFER_CATEGORY}
+      AND ${dateFilter}
     GROUP BY category, date_trunc('month', date)
     ORDER BY category, month
   `);
@@ -784,9 +897,7 @@ export async function getTrends(
   }
 
   return {
-    trends: [...byCategory.entries()]
-      .slice(0, 8)
-      .map(([name, months]) => ({ name, months })),
+    trends: rankTrendCategoriesBySpend(byCategory.entries(), rows),
   };
 }
 
@@ -1174,6 +1285,22 @@ export async function getAlerts(
   userIds: string[],
   month?: string,
 ): Promise<{ alerts: SpendingAlert[] }> {
+  const ownerId = userIds[0];
+  if (ownerId) {
+    const persisted = await getPersistedAlerts(ownerId);
+    if (persisted.length > 0) {
+      return {
+        alerts: persisted.map((a) => ({
+          id: a.id,
+          severity: (a.severity === "danger" ? "warning" : a.severity) as AlertSeverity,
+          title: a.title,
+          message: a.message,
+          dismissible: a.dismissible,
+        })),
+      };
+    }
+  }
+
   const db = getDb();
   const alerts: SpendingAlert[] = [];
   const refMonth = month ?? "2026-05";

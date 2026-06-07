@@ -1,4 +1,5 @@
 import * as mockApi from "@/lib/mock-api";
+import { normalizeSavingsRate } from "@/lib/savings-rate";
 import { getAccessToken } from "@/lib/auth-session";
 import type {
   AuthRefreshResponse,
@@ -7,6 +8,12 @@ import type {
   AlertsResponse,
   BehavioralResponse,
   BudgetsResponse,
+  BudgetRow,
+  CreateGoalInput,
+  GoalRow,
+  PatchBudgetInput,
+  PatchGoalInput,
+  UpsertBudgetInput,
   CalendarResponse,
   CategoriesResponse,
   ChartDataFilters,
@@ -16,6 +23,7 @@ import type {
   CreditDebtSummary,
   DeleteAccountResponse,
   DnaResponse,
+  FireQueryOverrides,
   FireResponse,
   UserProfileResponse,
   UserProfilePatch,
@@ -201,7 +209,10 @@ export const api = {
     }
     return fetchJson<TransactionSummary>(
       `/transactions/summary${buildQuery({ from, to })}`,
-    );
+    ).then((summary) => ({
+      ...summary,
+      savingsRate: normalizeSavingsRate(summary.savingsRate),
+    }));
   },
 
   updateTransactionCategory(
@@ -694,14 +705,18 @@ export const api = {
     return fetchJson<NetWorthResponse>("/wealth/net-worth");
   },
 
-  getInvestments(): Promise<InvestmentsResponse> {
-    if (USE_MOCKS) return mockApi.getInvestments();
-    return fetchJson<InvestmentsResponse>("/wealth/investments");
+  getInvestments(params: ListQuery & { accountId?: string } = {}): Promise<InvestmentsResponse> {
+    if (USE_MOCKS) return mockApi.getInvestments(params);
+    return fetchJson<InvestmentsResponse>(
+      `/wealth/investments${buildQuery({ ...params })}`,
+    );
   },
 
-  getFire(): Promise<FireResponse> {
-    if (USE_MOCKS) return mockApi.getFire();
-    return fetchJson<FireResponse>("/wealth/fire");
+  getFire(overrides: FireQueryOverrides = {}): Promise<FireResponse> {
+    if (USE_MOCKS) return mockApi.getFire(overrides);
+    return fetchJson<FireResponse>(
+      `/wealth/fire${buildQuery({ ...overrides })}`,
+    );
   },
 
   patchFire(patch: FireProfilePatch): Promise<FireResponse> {
@@ -940,9 +955,61 @@ export const api = {
     return fetchJson<BudgetsResponse>("/planning/budgets");
   },
 
-  getRecurring(): Promise<RecurringResponse> {
-    if (USE_MOCKS) return mockApi.getRecurring();
-    return fetchJson<RecurringResponse>("/planning/recurring");
+  upsertBudget(body: UpsertBudgetInput): Promise<BudgetRow> {
+    if (USE_MOCKS) return mockApi.upsertBudget(body);
+    return fetchJson<BudgetRow>("/planning/budgets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  patchBudget(budgetId: string, body: PatchBudgetInput): Promise<BudgetRow> {
+    if (USE_MOCKS) return mockApi.patchBudget(budgetId, body);
+    return fetchJson<BudgetRow>(`/planning/budgets/${budgetId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  deleteBudget(budgetId: string): Promise<{ id: string }> {
+    if (USE_MOCKS) return mockApi.deleteBudget(budgetId);
+    return fetchJson<{ id: string }>(`/planning/budgets/${budgetId}`, {
+      method: "DELETE",
+    });
+  },
+
+  createGoal(body: CreateGoalInput): Promise<GoalRow> {
+    if (USE_MOCKS) return mockApi.createGoal(body);
+    return fetchJson<GoalRow>("/planning/goals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  patchGoal(goalId: string, body: PatchGoalInput): Promise<GoalRow> {
+    if (USE_MOCKS) return mockApi.patchGoal(goalId, body);
+    return fetchJson<GoalRow>(`/planning/goals/${goalId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  deleteGoal(goalId: string): Promise<{ id: string }> {
+    if (USE_MOCKS) return mockApi.deleteGoal(goalId);
+    return fetchJson<{ id: string }>(`/planning/goals/${goalId}`, {
+      method: "DELETE",
+    });
+  },
+
+  getRecurring(params: ListQuery = {}): Promise<RecurringResponse> {
+    if (USE_MOCKS) return mockApi.getRecurring(params);
+    return fetchJson<RecurringResponse>(
+      `/planning/recurring${buildQuery({ ...params })}`,
+    );
   },
 
   getCalendar(): Promise<CalendarResponse> {
@@ -987,9 +1054,11 @@ export const api = {
     );
   },
 
-  getInflation(): Promise<InflationResponse> {
-    if (USE_MOCKS) return mockApi.getInflation();
-    return fetchJson<InflationResponse>("/protect/inflation");
+  getInflation(params: ListQuery = {}): Promise<InflationResponse> {
+    if (USE_MOCKS) return mockApi.getInflation(params);
+    return fetchJson<InflationResponse>(
+      `/protect/inflation${buildQuery({ ...params })}`,
+    );
   },
 
   getResilience(): Promise<ResilienceResponse> {
@@ -1024,7 +1093,10 @@ export const api = {
 
   getWrapped(): Promise<WrappedResponse> {
     if (USE_MOCKS) return mockApi.getWrapped();
-    return fetchJson<WrappedResponse>("/wrapped");
+    return fetchJson<WrappedResponse>("/wrapped").then((wrapped) => ({
+      ...wrapped,
+      savingsRate: normalizeSavingsRate(wrapped.savingsRate),
+    }));
   },
 };
 

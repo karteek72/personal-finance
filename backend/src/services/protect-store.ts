@@ -7,8 +7,27 @@ import {
   resilienceScenarios,
 } from "../db/schema.js";
 import { formatMoneyAmount, roundDecimal } from "../lib/money.js";
+import {
+  paginateInMemory,
+  type Page,
+  type ParsedListQuery,
+} from "../lib/list-query.js";
 import { refreshProtectProfiles } from "./protect-analytics.js";
 import { resolveHouseholdContext } from "./household-access.js";
+
+export interface InflationCategoryRow {
+  name: string;
+  share: number;
+  inflation: number;
+  severity: string;
+}
+
+export const INFLATION_CATEGORY_SORTABLE = [
+  "name",
+  "share",
+  "inflation",
+  "severity",
+] as const;
 
 export interface InflationResponse {
   personalRate: number;
@@ -21,16 +40,29 @@ export interface InflationResponse {
   salary: string;
   breakEvenSalary: string;
   targetSalary: string;
-  categories: Array<{
-    name: string;
-    share: number;
-    inflation: number;
-    severity: string;
-  }>;
+  categories: Page<InflationCategoryRow>;
+}
+
+function inflationCategorySortKey(
+  column: string,
+): (row: InflationCategoryRow) => number | string {
+  switch (column) {
+    case "name":
+      return (r) => r.name.toLowerCase();
+    case "share":
+      return (r) => r.share;
+    case "inflation":
+      return (r) => r.inflation;
+    case "severity":
+      return (r) => r.severity;
+    default:
+      return (r) => r.share;
+  }
 }
 
 export async function getInflation(
   userId: string,
+  q: ParsedListQuery,
 ): Promise<InflationResponse | null> {
   const ctx = await resolveHouseholdContext(userId);
   await refreshProtectProfiles(userId);
@@ -54,23 +86,28 @@ export async function getInflation(
   const nominalSavings = Number.parseFloat(profile.nominalSavingsRate);
   const raise = Number.parseFloat(profile.raisePercent);
 
+  const allCategories: InflationCategoryRow[] = cats.map((c) => ({
+    name: c.name,
+    share: roundDecimal(Number.parseFloat(c.share)),
+    inflation: roundDecimal(Number.parseFloat(c.inflationRate)),
+    severity: c.severity,
+  }));
+
   return {
     personalRate: roundDecimal(personal),
     nationalCpi: roundDecimal(Number.parseFloat(profile.nationalCpi)),
     salaryRaise: roundDecimal(raise),
     nominalSavingsRate: roundDecimal(nominalSavings),
-    realSavingsRate: roundDecimal(nominalSavings - personal),
+    realSavingsRate: roundDecimal(nominalSavings * 100 - personal),
     realRaise: roundDecimal(raise - personal),
     powerLoss: formatMoneyAmount(profile.powerLoss ?? "0"),
     salary: formatMoneyAmount(salary),
     breakEvenSalary: formatMoneyAmount(salary * (1 + personal / 100)),
     targetSalary: formatMoneyAmount(salary * (1 + (personal + 5) / 100)),
-    categories: cats.map((c) => ({
-      name: c.name,
-      share: roundDecimal(Number.parseFloat(c.share)),
-      inflation: roundDecimal(Number.parseFloat(c.inflationRate)),
-      severity: c.severity,
-    })),
+    categories: paginateInMemory(allCategories, q, {
+      sortKey: inflationCategorySortKey,
+      textFilter: (row, needle) => row.name.toLowerCase().includes(needle),
+    }),
   };
 }
 

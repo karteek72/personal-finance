@@ -15,6 +15,10 @@ import { WrappedBanner } from "@/components/preview/wrapped-banner";
 import { ProfileSetupBanner } from "@/components/profile/profile-setup-banner";
 import { useSummary } from "@/hooks/use-summary";
 import {
+  formatSavingsRatePercent,
+  normalizeSavingsRate,
+} from "@/lib/savings-rate";
+import {
   analyticsDateRange,
   analyticsPeriodLabel,
 } from "@/lib/date-ranges";
@@ -54,12 +58,13 @@ function DashboardContent({
 
   const netSavings = Number.parseFloat(summary.netSavings);
   const isPositive = netSavings >= 0;
-  const savingsRatePct = (summary.savingsRate * 100).toFixed(1);
+  const savingsRate = normalizeSavingsRate(summary.savingsRate);
+  const savingsRatePct = formatSavingsRatePercent(savingsRate, 1).replace("%", "");
 
   const savingsRateTone =
-    summary.savingsRate >= 0.2
+    savingsRate >= 0.2
       ? "success"
-      : summary.savingsRate >= 0.05
+      : savingsRate >= 0.05
         ? "warning"
         : "danger";
 

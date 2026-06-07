@@ -19,7 +19,9 @@
     "db:wipe-user": "tsx scripts/wipe-user-financial-data.ts",
     "seed:mock": "tsx scripts/seed-mock-data.ts",
     "test:import": "tsx --test src/services/import/__tests__/*.test.ts",
-    "test:export": "tsx --test src/services/__tests__/export-user-data.test.ts"
+    "test:export": "tsx --test src/services/__tests__/export-user-data.test.ts",
+    "test:tenant": "tsx scripts/check-transaction-scoping.ts && tsx --test src/services/__tests__/tenant-isolation.test.ts",
+    "test:unit": "tsx --test src/services/__tests__/*.test.ts src/lib/__tests__/*.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

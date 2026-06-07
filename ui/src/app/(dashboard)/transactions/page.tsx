@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { TransactionList } from "@/components/transactions/transaction-list";
@@ -41,12 +41,23 @@ function monthQueryValue(selectedMonth: string | null): string | undefined {
   return selectedMonth ?? undefined;
 }
 
+const SORT_VALUES = new Set(
+  SORT_OPTIONS.map((option) => option.value),
+);
+
+function readSortFromUrl(value: string | null): NonNullable<TransactionFilters["sort"]> {
+  if (value && SORT_VALUES.has(value as NonNullable<TransactionFilters["sort"]>)) {
+    return value as NonNullable<TransactionFilters["sort"]>;
+  }
+  return "date_desc";
+}
+
 function TransactionsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [filter, setFilter] = useState<TransactionFilter>("all");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [accountId, setAccountId] = useState(
     () => searchParams.get("accountId") ?? "",
@@ -57,8 +68,8 @@ function TransactionsContent() {
   const [subCategory, setSubCategory] = useState(
     () => searchParams.get("subCategory") ?? "",
   );
-  const [sort, setSort] = useState<NonNullable<TransactionFilters["sort"]>>(
-    "date_desc",
+  const [sort, setSort] = useState<NonNullable<TransactionFilters["sort"]>>(() =>
+    readSortFromUrl(searchParams.get("sort")),
   );
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const scope = useViewModeStore((state) => state.scope);
@@ -106,8 +117,18 @@ function TransactionsContent() {
     [categoriesData],
   );
 
-  function updateUrlFilters(nextAccountId: string, nextCategory: string) {
+  function updateUrlFilters(patch: {
+    accountId?: string;
+    category?: string;
+    sort?: string;
+    q?: string;
+  }) {
     const params = new URLSearchParams(searchParams.toString());
+    const nextAccountId = patch.accountId ?? accountId;
+    const nextCategory = patch.category ?? category;
+    const nextSort = patch.sort ?? sort;
+    const nextQ = patch.q ?? search;
+
     if (nextAccountId) {
       params.set("accountId", nextAccountId);
     } else {
@@ -118,11 +139,32 @@ function TransactionsContent() {
     } else {
       params.delete("category");
     }
+    if (nextSort && nextSort !== "date_desc") {
+      params.set("sort", nextSort);
+    } else {
+      params.delete("sort");
+    }
+    if (nextQ.trim()) {
+      params.set("q", nextQ.trim());
+    } else {
+      params.delete("q");
+    }
     const query = params.toString();
     router.replace(query ? `/transactions?${query}` : "/transactions", {
       scroll: false,
     });
   }
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      const urlQ = searchParams.get("q") ?? "";
+      if (search.trim() !== urlQ.trim()) {
+        updateUrlFilters({ q: search });
+      }
+    }, 300);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   async function handleExportCsv() {
     setExporting(true);
@@ -239,7 +281,7 @@ function TransactionsContent() {
           value={accountId}
           onChange={(value) => {
             setAccountId(value);
-            updateUrlFilters(value, category);
+            updateUrlFilters({ accountId: value });
           }}
           options={accountOptions}
         />
@@ -249,7 +291,7 @@ function TransactionsContent() {
           value={category}
           onChange={(value) => {
             setCategory(value);
-            updateUrlFilters(accountId, value);
+            updateUrlFilters({ category: value });
           }}
           options={categoryOptions}
         />
@@ -257,9 +299,11 @@ function TransactionsContent() {
           id="transaction-sort"
           label="Sort"
           value={sort}
-          onChange={(value) =>
-            setSort(value as NonNullable<TransactionFilters["sort"]>)
-          }
+          onChange={(value) => {
+            const next = value as NonNullable<TransactionFilters["sort"]>;
+            setSort(next);
+            updateUrlFilters({ sort: next });
+          }}
           options={SORT_OPTIONS.map((option) => ({
             value: option.value,
             label: option.label,

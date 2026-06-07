@@ -115,6 +115,7 @@ export interface TransactionSummary {
   avgMonthlySpend: string;
   topCategory: { name: string; amount: string };
   ccPaymentsExcluded: string;
+  /** 0–1 fraction; multiply by 100 once at display (unit=percent). */
   savingsRate: number;
   transactionCount: number;
   pendingCount: number;
@@ -128,7 +129,7 @@ export interface FlowLine {
 }
 
 export interface MoneyFlowResponse {
-  income: { sources: FlowLine[]; total: string };
+  income: { sources: Page<FlowLine>; total: string };
   bankAccounts: { accounts: FlowLine[]; transfersOut: string };
   creditCards: { accounts: FlowLine[]; totalCharges: string };
   monthlySeries: {
@@ -433,7 +434,17 @@ export interface HouseholdInsightsResponse {
  * ------------------------------------------------------------------ */
 
 export interface NetWorthResponse {
-  current: { netWorth: string; totalAssets: string; totalLiabilities: string };
+  current: {
+    netWorth: string;
+    totalAssets: string;
+    totalLiabilities: string;
+    accountCount: number;
+  };
+  breakdown: {
+    depository: { total: string; accountCount: number };
+    investment: { total: string; accountCount: number };
+    credit: { total: string; accountCount: number };
+  };
   trend: { month: string; netWorth: string }[];
 }
 
@@ -520,8 +531,8 @@ export interface InvestmentsResponse {
     subtype: string | null;
     value: string;
   }[];
-  holdings: InvestmentHolding[];
-  positions: InvestmentPosition[];
+  holdings: Page<InvestmentHolding>;
+  positions: Page<InvestmentPosition>;
   stockAggregates: StockAggregate[];
   optionPositions: InvestmentPosition[];
   portfolioBreakdown: PortfolioBreakdown;
@@ -542,26 +553,144 @@ export interface InvestmentsResponse {
   } | null;
 }
 
+export type BudgetSource = "user" | "suggested";
+export type BudgetClass = "essential" | "discretionary";
+export type GoalKind = "emergency" | "debt" | "sinking" | "surplus" | "custom";
+export type GoalStatus = "active" | "achieved" | "dismissed";
+export type GoalSource = "user" | "suggested";
+export type SuggestionConfidence = "low" | "medium" | "high";
+
+export interface BudgetItem {
+  id?: string;
+  category: string;
+  emoji: string | null;
+  color: string | null;
+  spent: string;
+  limit: string;
+  source: BudgetSource;
+  class?: BudgetClass | null;
+  rationale?: string;
+  confidence?: SuggestionConfidence;
+}
+
+export interface GoalItem {
+  id?: string;
+  name: string;
+  emoji: string | null;
+  color: string | null;
+  target: string;
+  current: string;
+  deadline: string | null;
+  kind: GoalKind;
+  status: GoalStatus;
+  source: GoalSource;
+  rationale?: string;
+  confidence?: SuggestionConfidence;
+  monthlySetAside?: string;
+  accountId?: string | null;
+}
+
+export interface BudgetRow {
+  id: string;
+  category: string;
+  periodMonth: string;
+  emoji: string | null;
+  color: string | null;
+  limit: string;
+  source: BudgetSource;
+  class: BudgetClass | null;
+}
+
+export interface GoalRow {
+  id: string;
+  name: string;
+  emoji: string | null;
+  color: string | null;
+  target: string;
+  current: string;
+  deadline: string | null;
+  kind: GoalKind;
+  status: GoalStatus;
+  source: GoalSource;
+  accountId: string | null;
+}
+
 export interface BudgetsResponse {
   periodMonth: string;
   safeToSpend: string;
   daysRemaining: number;
   isLive: boolean;
-  budgets: {
-    category: string;
-    emoji: string | null;
-    color: string | null;
-    spent: string;
-    limit: string;
-  }[];
-  goals: {
-    name: string;
-    emoji: string | null;
-    color: string | null;
-    target: string;
-    current: string;
-    deadline: string | null;
-  }[];
+  budgets: BudgetItem[];
+  suggestedBudgets: BudgetItem[];
+  goals: GoalItem[];
+  suggestedGoals: GoalItem[];
+}
+
+export interface UpsertBudgetInput {
+  category: string;
+  periodMonth: string;
+  limit: number;
+  emoji?: string;
+  color?: string;
+  source?: BudgetSource;
+  class?: BudgetClass;
+}
+
+export interface PatchBudgetInput {
+  limit?: number;
+  emoji?: string | null;
+  color?: string | null;
+  class?: BudgetClass | null;
+}
+
+export interface CreateGoalInput {
+  name: string;
+  target: number;
+  current?: number;
+  deadline?: string | null;
+  emoji?: string;
+  color?: string;
+  kind?: GoalKind;
+  status?: GoalStatus;
+  source?: GoalSource;
+  accountId?: string | null;
+}
+
+export interface PatchGoalInput {
+  name?: string;
+  target?: number;
+  current?: number;
+  deadline?: string | null;
+  emoji?: string | null;
+  color?: string | null;
+  kind?: GoalKind;
+  status?: GoalStatus;
+  accountId?: string | null;
+}
+
+export type CostAuditType =
+  | "habit"
+  | "delivery"
+  | "duplicate_subscription"
+  | "price_hike"
+  | "lapsed_subscription"
+  | "impulse"
+  | "fee"
+  | "category_overspend"
+  | "merchant_frequency";
+
+export interface CostAudit {
+  id: string;
+  type: CostAuditType;
+  emoji: string;
+  title: string;
+  monthly: string;
+  annual: string;
+  opportunityCost10y: string;
+  rationale: string;
+  action: string;
+  savingsEstimate: string;
+  confidence: number;
 }
 
 export interface RecurringItem {
@@ -584,8 +713,8 @@ export interface RecurringResponse {
   activeCount: number;
   priceChanges: number;
   isLive: boolean;
-  subscriptions: RecurringItem[];
-  bills: RecurringItem[];
+  subscriptions: Page<RecurringItem>;
+  bills: Page<RecurringItem>;
   leaks: {
     fees: {
       id: string;
@@ -596,7 +725,31 @@ export interface RecurringResponse {
       fixable: boolean;
     }[];
     habits: { id: string; emoji: string | null; label: string; monthly: string }[];
+    audits: CostAudit[];
   };
+  timeMachine: {
+    lookbackYears: number;
+    investMultiple: number;
+    investMultipleBasis: "heuristic";
+    futureCompoundRate: number;
+    futureYears: number;
+    habits: Array<{
+      id: string;
+      emoji: string | null;
+      label: string;
+      spent: string;
+      investedValue: string;
+      yearsAgo: number;
+    }>;
+  };
+}
+
+export interface FireProjection {
+  fireNumber: string;
+  yearsToFire: number;
+  fireAge: number;
+  investingRate: number;
+  curve: number[];
 }
 
 export interface FireResponse {
@@ -608,6 +761,14 @@ export interface FireResponse {
   monthlyInvest: string;
   withdrawalRate: number;
   realReturn: number;
+  projection: FireProjection;
+}
+
+export interface FireQueryOverrides {
+  monthlySpend?: number;
+  monthlyInvest?: number;
+  withdrawalRate?: number;
+  realReturn?: number;
 }
 
 export type EmploymentStatus =
@@ -676,16 +837,17 @@ export interface DnaResponse {
   narrative: string;
   peerRarity: string | null;
   axes: { label: string; you: number; peers: number }[];
+  isLive?: boolean;
 }
 
 export interface PatternsResponse {
   dayOfWeek: { day: string; value: string }[];
-  patterns: {
+  patterns: Page<{
     label: string;
     value: string;
     description: string;
     severity: string;
-  }[];
+  }>;
 }
 
 export interface BehavioralResponse {
@@ -732,12 +894,12 @@ export interface InflationResponse {
   salary: string;
   breakEvenSalary: string;
   targetSalary: string;
-  categories: {
+  categories: Page<{
     name: string;
     share: number;
     inflation: number;
     severity: string;
-  }[];
+  }>;
 }
 
 export interface ResilienceResponse {
@@ -761,6 +923,7 @@ export interface CoachResponse {
   narrative: string;
   forecast: string;
   qa: { q: string; a: string }[];
+  isLive?: boolean;
 }
 
 export interface CoachAskResponse {
@@ -773,6 +936,7 @@ export interface WrappedResponse {
   totalSpent: string;
   transactionCount: number;
   totalSaved: string;
+  /** 0–1 fraction; multiply by 100 once at display (unit=percent). */
   savingsRate: number;
   peerPercentile: string | null;
   archetype: string | null;
@@ -792,9 +956,48 @@ export interface MerchantsResponse {
     trail: number[];
   }[];
   income: { months: string[]; primary: number[]; side: number[] };
+  incomeSummary: {
+    avgMonthlyIncome: string;
+    incomeStability: number;
+    sideIncomeTotal: string;
+    chartYTicks: number[];
+    maxBarTotal: number;
+  };
   merchantCount: number;
   incomeSources: number;
   isLive: boolean;
+}
+
+/**
+ * Analytics metric envelope — every KPI/scalar in /analytics/* responses.
+ * See docs/design/api-contract.md and analytics-architecture.md section 7.
+ */
+export type MetricUnit = "USD" | "percent" | "months" | "ratio" | "score";
+export type MetricClass =
+  | "descriptive"
+  | "diagnostic"
+  | "predictive"
+  | "prescriptive";
+export type MetricBasis = "factual" | "heuristic" | "external";
+export type TrendDirection = "up" | "down" | "flat";
+
+export interface MetricTrend {
+  delta: string;
+  deltaPct: number;
+  direction: TrendDirection;
+  comparison: string;
+}
+
+export interface MetricEnvelope {
+  value: string;
+  unit: MetricUnit;
+  grain: string;
+  asOf: string;
+  class: MetricClass;
+  basis: MetricBasis;
+  confidence: number;
+  trend?: MetricTrend;
+  caveats?: string[];
 }
 
 /**

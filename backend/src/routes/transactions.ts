@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { z } from "zod";
 import { SPEND_CATEGORIES, SUBCATEGORY_MAP } from "../config/categories.js";
 import { requireRequestUser } from "../lib/auth-http.js";
+import { parseListQuery } from "../lib/list-query.js";
 import { parseBody } from "../lib/validate.js";
 import { updateTransactionCategory } from "../services/category-rules.js";
 import { resolveHouseholdContext } from "../services/household-access.js";
@@ -13,6 +14,7 @@ import {
   getCategories,
   getChartData,
   getMoneyFlow,
+  FLOW_SOURCE_SORTABLE,
   getSummary,
   getTrends,
   listTransactions,
@@ -148,8 +150,12 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
   app.get("/transactions/flow", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
     const ctx = await resolveHouseholdContext(user.id);
-    const query = request.query as { from?: string; to?: string };
-    return getMoneyFlow(ctx.userIds, query.from, query.to);
+    const query = parseListQuery(request.query, {
+      sortable: FLOW_SOURCE_SORTABLE,
+      defaultSort: "amount",
+      defaultDir: "desc",
+    });
+    return getMoneyFlow(ctx.userIds, query);
   });
 
   app.get("/transactions/category-options", async () => {

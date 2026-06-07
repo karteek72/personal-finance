@@ -5,6 +5,7 @@ import Observation
 @Observable
 final class AppState {
     let authService = AuthService()
+    let appLock = AppLockService()
     var apiClient: APIClient
     private(set) var plaidLink: PlaidLinkCoordinator
 
@@ -17,6 +18,10 @@ final class AppState {
     func bootstrap() async {
         await authService.bootstrap()
         refreshAPIClient()
+        if authService.isAuthenticated {
+            _ = await PushNotificationService.shared.requestAuthorization()
+            PushNotificationService.shared.registerForRemoteNotifications()
+        }
     }
 
     func refreshAPIClient() {

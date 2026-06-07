@@ -3,6 +3,7 @@ import SwiftUI
 struct MainTabView: View {
     @Environment(AppState.self) private var appState
     @State private var tab: AppTab = .home
+    @State private var showSettings = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -29,6 +30,9 @@ struct MainTabView: View {
                 if let user = appState.authService.user {
                     Text(user.displayName ?? user.email)
                 }
+                Button("Settings") {
+                    showSettings = true
+                }
                 Button("Sign out", role: .destructive) {
                     Task {
                         await appState.authService.signOut()
@@ -45,5 +49,10 @@ struct MainTabView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
+        .sheet(isPresented: $showSettings) {
+            NavigationStack {
+                SettingsView()
+            }
+        }
     }
 }

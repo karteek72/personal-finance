@@ -72,11 +72,21 @@ export function NetWorthPanel() {
   const credit = accounts.filter((a) => a.type === "credit");
   const investment = accounts.filter((a) => a.type === "investment");
 
-  const cash = sum(depository);
-  const invested = sum(investment);
-  const debt = sum(credit);
-  const totalAssets = cash + invested;
-  const netWorth = totalAssets - debt;
+  const cash = netWorthData
+    ? Number.parseFloat(netWorthData.breakdown.depository.total)
+    : sum(depository);
+  const invested = netWorthData
+    ? Number.parseFloat(netWorthData.breakdown.investment.total)
+    : sum(investment);
+  const debt = netWorthData
+    ? Number.parseFloat(netWorthData.breakdown.credit.total)
+    : sum(credit);
+  const totalAssets = netWorthData
+    ? Number.parseFloat(netWorthData.current.totalAssets)
+    : cash + invested;
+  const netWorth = netWorthData
+    ? Number.parseFloat(netWorthData.current.netWorth)
+    : totalAssets - debt;
 
   const assetGroups = [
     { type: "depository" as const, accounts: depository, total: cash, color: "#22c55e" },
@@ -104,7 +114,9 @@ export function NetWorthPanel() {
           </div>
           <div>
             <p className="text-xs text-white/60">Accounts</p>
-            <p className="text-sm font-bold text-white">{accounts.length}</p>
+            <p className="text-sm font-bold text-white">
+              {netWorthData?.current.accountCount ?? accounts.length}
+            </p>
           </div>
         </div>
       </div>

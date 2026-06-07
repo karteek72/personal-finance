@@ -1,11 +1,13 @@
 import type { FastifyPluginAsync } from "fastify";
 import { AppError } from "../lib/errors.js";
 import { requireRequestUser } from "../lib/auth-http.js";
+import { parseListQuery } from "../lib/list-query.js";
 import {
   getBehavioral,
   getDna,
   getPatterns,
   getWellness,
+  PATTERN_SORTABLE,
 } from "../services/insights-store.js";
 import { getMerchants } from "../services/coach-store.js";
 
@@ -26,7 +28,12 @@ export const insightRoutesV2: FastifyPluginAsync = async (app) => {
 
   app.get("/insights/patterns", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
-    return getPatterns(user.id);
+    const query = parseListQuery(request.query, {
+      sortable: PATTERN_SORTABLE,
+      defaultSort: "value",
+      defaultDir: "desc",
+    });
+    return getPatterns(user.id, query);
   });
 
   app.get("/insights/behavioral", async (request) => {

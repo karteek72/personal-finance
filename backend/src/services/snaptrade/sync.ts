@@ -12,8 +12,11 @@ import { AppError } from "../../lib/errors.js";
 import { formatMoneyAmount, formatOptionPremium } from "../../lib/money.js";
 import { createLogger } from "../../lib/logger.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
+import { upsertBalanceSnapshotsForAccountIds } from "../balance-snapshots.js";
+import { writeInvestmentSnapshotsForAccounts } from "../investment-snapshots.js";
 import { refreshFireProfile, repairNonContributionInvestmentTxns } from "../investment-analytics.js";
-import { refreshProtectProfiles } from "../protect-analytics.js";
+import { runPostSyncAnalytics } from "../post-sync-analytics.js";
+import { refreshTransferLinks } from "../transfer-pairing.js";
 import {
   effectiveAssetType,
   isOccOptionTicker,
@@ -439,6 +442,7 @@ export async function syncSnaptradeForUser(
   let accountsSynced = 0;
   let holdingsUpdated = 0;
   let activitiesAdded = 0;
+  const syncedAccountIds: string[] = [];
 
   for (const auth of authorizations) {
     const authorizationId = auth.id;
@@ -541,6 +545,7 @@ export async function syncSnaptradeForUser(
       }
 
       accountIds.push(accountDbId);
+      syncedAccountIds.push(accountDbId);
       accountsSynced += 1;
 
       try {
@@ -699,12 +704,17 @@ export async function syncSnaptradeForUser(
     await ensureAccountsAssignedToOwner(userId, accountIds);
   }
 
+  await upsertBalanceSnapshotsForAccountIds(syncedAccountIds);
+
   const repairedSecurities = await repairMisclassifiedOptionSecurities(db);
   const repairedHoldings = await repairOptionHoldingsCostBasis(db, userId);
   const repairedTxns = await repairNonContributionInvestmentTxns([userId]);
 
+  await writeInvestmentSnapshotsForAccounts(userId, syncedAccountIds);
+
   await refreshFireProfile(userId);
-  await refreshProtectProfiles(userId);
+  await runPostSyncAnalytics(userId);
+  await refreshTransferLinks(userId);
 
   log.info(
     {

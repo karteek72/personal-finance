@@ -125,3 +125,27 @@ export function compareBy<T>(
     return String(av).localeCompare(String(bv)) * factor;
   };
 }
+
+export interface PaginateInMemoryOptions<T> {
+  sortKey: (column: string) => (row: T) => number | string;
+  /** When set, `q` filters rows before sort/slice. */
+  textFilter?: (row: T, needle: string) => boolean;
+}
+
+/** Sort, optionally filter by `q`, slice — for endpoints that aggregate in memory. */
+export function paginateInMemory<T>(
+  rows: T[],
+  q: ParsedListQuery,
+  options: PaginateInMemoryOptions<T>,
+): Page<T> {
+  const needle = q.q?.toLowerCase();
+  const filtered =
+    needle && options.textFilter
+      ? rows.filter((row) => options.textFilter!(row, needle))
+      : rows;
+  const sorted = [...filtered].sort(
+    compareBy(options.sortKey(q.sort), q.dir),
+  );
+  const pageRows = sorted.slice(q.offset, q.offset + q.pageSize);
+  return buildPage(pageRows, sorted.length, q);
+}

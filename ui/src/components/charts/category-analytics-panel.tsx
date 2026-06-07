@@ -58,11 +58,15 @@ export function CategoryAnalyticsPanel({
       categoryBreakdown.map((cat) => [cat.name, cat.subcategories ?? []]),
     );
 
+    const deltaByName = new Map(
+      categoryBreakdown.map((cat) => [cat.name, cat.deltaVsPriorMonth]),
+    );
+
     return data.byCategory.map((slice) => ({
       name: slice.name,
       amount: slice.amount,
       percentage: slice.percentage,
-      deltaVsPriorMonth: 0,
+      deltaVsPriorMonth: deltaByName.get(slice.name) ?? 0,
       subcategories: subMap.get(slice.name) ?? [],
     }));
   }, [data, categoryBreakdown]);

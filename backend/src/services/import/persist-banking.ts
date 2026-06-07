@@ -3,6 +3,7 @@ import type { CategoryRule } from "../category-rules.js";
 import { classifyBankingTransaction } from "../classify-banking-transaction.js";
 import type { getDb } from "../../db/client.js";
 import { transactions } from "../../db/schema.js";
+import { MerchantResolver } from "../dim-merchant-store.js";
 import { bankingDedupFingerprint } from "./fingerprint.js";
 import type { ParsedBankingTransaction } from "./types.js";
 
@@ -25,6 +26,7 @@ export async function persistBankingTransactions(
 ): Promise<PersistBankingResult> {
   let inserted = 0;
   let skipped = 0;
+  const merchantResolver = new MerchantResolver();
 
   for (let i = 0; i < txns.length; i += BANKING_TXN_BATCH_SIZE) {
     const batch = txns.slice(i, i + BANKING_TXN_BATCH_SIZE);
@@ -62,6 +64,13 @@ export async function persistBankingTransactions(
         isTransfer: txn.isTransfer,
       });
 
+      const merchantId = await merchantResolver.resolve(
+        db,
+        userId,
+        txn.merchantName,
+        txn.name,
+      );
+
       const result = await db
         .insert(transactions)
         .values({
@@ -71,6 +80,7 @@ export async function persistBankingTransactions(
           date: txn.date,
           name: txn.name,
           merchantName: txn.merchantName,
+          merchantId,
           amount: txn.amount,
           category: classified.category,
           subCategory: classified.subCategory,

@@ -26,24 +26,10 @@ export function formatMonthLabel(month: string): string {
   });
 }
 
-export function formatCurrency(value: number, currency = "USD"): string {
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-export function formatCurrencyCompact(value: number): string {
-  if (Math.abs(value) >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(1)}M`;
-  }
-  if (Math.abs(value) >= 1_000) {
-    return `$${(value / 1_000).toFixed(1)}k`;
-  }
-  return formatCurrency(value);
-}
+export {
+  formatMoneyCompact as formatCurrencyCompact,
+  formatMoneyValue as formatCurrency,
+} from "@/lib/format-money";
 
 export function createGradient(
   ctx: CanvasRenderingContext2D,

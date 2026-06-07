@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { useChartData } from "@/hooks/use-chart-data";
 import { analyticsPeriodLabel } from "@/lib/date-ranges";
 import { formatMoney } from "@/lib/format-money";
+import { SectionLoader } from "@/components/ui/section-loader";
 import type { ChartMonthlyPoint, ChartYearlyPoint } from "@/types/api";
 
 interface CashFlowPeriodCardProps {
@@ -12,7 +13,7 @@ interface CashFlowPeriodCardProps {
   income: string;
   expenses: string;
   net: string;
-  maxIncome: number;
+  maxScale: number;
 }
 
 function CashFlowPeriodCard({
@@ -20,15 +21,17 @@ function CashFlowPeriodCard({
   income,
   expenses,
   net,
-  maxIncome,
+  maxScale,
 }: CashFlowPeriodCardProps) {
   const inc = Number.parseFloat(income);
   const exp = Number.parseFloat(expenses);
   const netVal = Number.parseFloat(net);
   const isPositive = netVal >= 0;
 
-  const incW = maxIncome > 0 ? Math.round((inc / maxIncome) * 100) : 0;
-  const expW = maxIncome > 0 ? Math.round((exp / maxIncome) * 100) : 0;
+  const incW =
+    maxScale > 0 ? Math.min(100, Math.round((inc / maxScale) * 100)) : 0;
+  const expW =
+    maxScale > 0 ? Math.min(100, Math.round((exp / maxScale) * 100)) : 0;
 
   return (
     <div className="flex min-w-[9rem] flex-1 flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-4">
@@ -93,13 +96,14 @@ function shortMonth(yearMonth: string): string {
   });
 }
 
-function maxIncomeFromPoints(
-  points: { income: string }[],
+function maxScaleFromPoints(
+  points: { income: string; expenses: string }[],
 ): number {
-  return points.reduce(
-    (max, p) => Math.max(max, Number.parseFloat(p.income)),
-    0,
-  );
+  return points.reduce((max, p) => {
+    const inc = Number.parseFloat(p.income);
+    const exp = Number.parseFloat(p.expenses);
+    return Math.max(max, inc, exp);
+  }, 0);
 }
 
 interface CashFlowStripProps {
@@ -117,7 +121,7 @@ function CashFlowStrip({
 }: CashFlowStripProps) {
   if (points.length === 0) return null;
 
-  const maxIncome = maxIncomeFromPoints(points);
+  const maxScale = maxScaleFromPoints(points);
 
   return (
     <section aria-label={ariaLabel}>
@@ -137,7 +141,7 @@ function CashFlowStrip({
             income={p.income}
             expenses={p.expenses}
             net={p.net}
-            maxIncome={maxIncome}
+            maxScale={maxScale}
           />
         ))}
       </div>
@@ -152,9 +156,17 @@ interface OverviewStripsProps {
 export function MonthlyCashFlowOverviewStrip({
   accountId,
 }: OverviewStripsProps) {
-  const { data } = useChartData({ accountId: accountId || undefined });
+  const { data, isLoading } = useChartData({ accountId: accountId || undefined });
 
-  if (!data?.monthly?.length) return null;
+  if (isLoading) {
+    return <SectionLoader message="Loading monthly cash flow" />;
+  }
+
+  if (!data?.monthly?.length) {
+    return (
+      <p className="text-sm text-text-muted">No monthly cash flow data yet.</p>
+    );
+  }
 
   return (
     <CashFlowStrip
@@ -175,10 +187,16 @@ export function MonthlyCashFlowOverviewStrip({
 export function YearlyCashFlowOverviewStrip({
   accountId,
 }: OverviewStripsProps) {
-  const { data } = useChartData({ accountId: accountId || undefined });
+  const { data, isLoading } = useChartData({ accountId: accountId || undefined });
   const yearly = data?.yearly ?? [];
 
-  if (yearly.length < 2) return null;
+  if (isLoading) {
+    return <SectionLoader message="Loading yearly cash flow" />;
+  }
+
+  if (yearly.length < 2) {
+    return null;
+  }
 
   const firstYear = yearly[0]!.year;
   const lastYear = yearly[yearly.length - 1]!.year;

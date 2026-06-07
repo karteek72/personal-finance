@@ -10,7 +10,13 @@ import {
 import { api } from "@/lib/api-client";
 import { readAuthSession } from "@/lib/auth-session";
 import { useAuthStore } from "@/stores/auth-store";
-import type { ListQuery } from "@/types/api";
+import type {
+  CreateGoalInput,
+  ListQuery,
+  PatchBudgetInput,
+  PatchGoalInput,
+  UpsertBudgetInput,
+} from "@/types/api";
 
 /**
  * Hooks for the demo-dataset feature endpoints (wealth, planning, insights,
@@ -22,15 +28,29 @@ export function useNetWorth() {
   return useQuery({ queryKey: ["net-worth"], queryFn: () => api.getNetWorth() });
 }
 
-export function useInvestments() {
+export function useInvestments(params: ListQuery & { accountId?: string } = {}) {
   return useQuery({
-    queryKey: ["investments"],
-    queryFn: () => api.getInvestments(),
+    queryKey: ["investments", params],
+    queryFn: () => api.getInvestments(params),
+    placeholderData: keepPreviousData,
   });
 }
 
-export function useFire() {
-  return useQuery({ queryKey: ["fire"], queryFn: () => api.getFire() });
+export function useRecurring(params: ListQuery = {}) {
+  return useQuery({
+    queryKey: ["recurring", params],
+    queryFn: () => api.getRecurring(params),
+    placeholderData: keepPreviousData,
+  });
+}
+
+import type { FireQueryOverrides } from "@/types/api";
+
+export function useFire(overrides: FireQueryOverrides = {}) {
+  return useQuery({
+    queryKey: ["fire", overrides],
+    queryFn: () => api.getFire(overrides),
+  });
 }
 
 export function usePatchFire() {
@@ -93,10 +113,69 @@ export function useBudgets() {
   return useQuery({ queryKey: ["budgets"], queryFn: () => api.getBudgets() });
 }
 
-export function useRecurring() {
-  return useQuery({
-    queryKey: ["recurring"],
-    queryFn: () => api.getRecurring(),
+function invalidateBudgets(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: ["budgets"] });
+  void queryClient.invalidateQueries({ queryKey: ["calendar"] });
+  void queryClient.invalidateQueries({ queryKey: ["forecast"] });
+}
+
+export function useUpsertBudget() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpsertBudgetInput) => api.upsertBudget(body),
+    onSuccess: () => invalidateBudgets(queryClient),
+  });
+}
+
+export function usePatchBudget() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      budgetId,
+      body,
+    }: {
+      budgetId: string;
+      body: PatchBudgetInput;
+    }) => api.patchBudget(budgetId, body),
+    onSuccess: () => invalidateBudgets(queryClient),
+  });
+}
+
+export function useDeleteBudget() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (budgetId: string) => api.deleteBudget(budgetId),
+    onSuccess: () => invalidateBudgets(queryClient),
+  });
+}
+
+export function useCreateGoal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateGoalInput) => api.createGoal(body),
+    onSuccess: () => invalidateBudgets(queryClient),
+  });
+}
+
+export function usePatchGoal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      goalId,
+      body,
+    }: {
+      goalId: string;
+      body: PatchGoalInput;
+    }) => api.patchGoal(goalId, body),
+    onSuccess: () => invalidateBudgets(queryClient),
+  });
+}
+
+export function useDeleteGoal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (goalId: string) => api.deleteGoal(goalId),
+    onSuccess: () => invalidateBudgets(queryClient),
   });
 }
 
@@ -143,10 +222,11 @@ export function useMerchantsTable(params: ListQuery) {
   });
 }
 
-export function useInflation() {
+export function useInflation(params: ListQuery = {}) {
   return useQuery({
-    queryKey: ["inflation"],
-    queryFn: () => api.getInflation(),
+    queryKey: ["inflation", params],
+    queryFn: () => api.getInflation(params),
+    placeholderData: keepPreviousData,
   });
 }
 

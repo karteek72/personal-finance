@@ -1,3 +1,5 @@
+import { formatLocalDate } from "./local-date";
+
 /** Default dashboard / chart / activity window (statement import friendly). */
 export const DEFAULT_ANALYTICS_MONTHS = 12;
 
@@ -12,8 +14,8 @@ export function analyticsDateRange(
     1,
   );
   return {
-    from: fromDate.toISOString().slice(0, 10),
-    to: toDate.toISOString().slice(0, 10),
+    from: formatLocalDate(fromDate),
+    to: formatLocalDate(toDate),
   };
 }
 

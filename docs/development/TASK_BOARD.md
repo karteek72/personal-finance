@@ -1,6 +1,6 @@
 # Development Task Board
 
-**Last updated:** 2026-06-07 (wave 6 complete — transfer reconciliation R1–R3 done)  
+**Last updated:** 2026-06-07 (all tasks complete — 87/87)  
 **Source of truth:** [`tasks.yaml`](tasks.yaml)  
 **CLI:** `npm run task -- <command>` from repo root
 
@@ -33,7 +33,7 @@
 
 | backend-recon-wave6 | Transfer reconciliation R1–R3 | RECON-001–003 | done |
 
-**Remaining:** RECON-004 (P3 backlog), iOS P4 deferred per AGENTS.md.
+**Status:** All tasks in `tasks.yaml` are **done** (including INTEGRITY M1–M3, RECON-004, iOS Face ID + push).
 
 **Rules for agents:** `npm run task -- claim TASK-ID <name>` before coding; `complete` when done; update this table; read `source_docs` per task.
 
@@ -43,10 +43,10 @@
 
 | Status | Count |
 |--------|------:|
-| done | 81 |
+| done | 87 |
 | ready | 0 |
 | in_progress | 0 |
-| backlog | 3 (RECON-004, iOS P4) |
+| backlog | 0 |
 
 **Statement import + GDPR export: complete.**
 

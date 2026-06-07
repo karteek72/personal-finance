@@ -223,6 +223,112 @@
         "label": "Subscriptions",
         "monthly": "158.00"
       }
+    ],
+    "audits": [
+      {
+        "id": "lapsed-adobe",
+        "type": "lapsed_subscription",
+        "emoji": "✅",
+        "title": "Adobe Creative Cloud looks cancelled",
+        "monthly": "54.99",
+        "annual": "659.88",
+        "opportunityCost10y": "9240.00",
+        "rationale": "No charge from Adobe Creative Cloud in 4 months — looks cancelled",
+        "action": "Confirm cancellation to stop counting this in your subscription total",
+        "savingsEstimate": "659.88",
+        "confidence": 0.85
+      },
+      {
+        "id": "habit-dining",
+        "type": "habit",
+        "emoji": "🍔",
+        "title": "Dining out & delivery",
+        "monthly": "540.00",
+        "annual": "6480.00",
+        "opportunityCost10y": "90720.00",
+        "rationale": "Top discretionary subcategory — $540/mo average over 3 months",
+        "action": "Try a 2-week cooking streak or cap delivery to weekends",
+        "savingsEstimate": "162.00",
+        "confidence": 0.72
+      },
+      {
+        "id": "habit-coffee",
+        "type": "habit",
+        "emoji": "☕",
+        "title": "Coffee runs",
+        "monthly": "118.00",
+        "annual": "1416.00",
+        "opportunityCost10y": "19824.00",
+        "rationale": "Frequent small purchases at coffee shops — 22 visits in 3 months",
+        "action": "Brew at home 3 days a week to cut this habit in half",
+        "savingsEstimate": "35.40",
+        "confidence": 0.68
+      },
+      {
+        "id": "delivery-premium",
+        "type": "delivery",
+        "emoji": "🛵",
+        "title": "Delivery app premium",
+        "monthly": "48.00",
+        "annual": "576.00",
+        "opportunityCost10y": "8064.00",
+        "rationale": "Delivery fees and tips add ~$48/mo on top of food cost",
+        "action": "Pick up orders or batch groceries to skip delivery fees",
+        "savingsEstimate": "48.00",
+        "confidence": 0.6
+      },
+      {
+        "id": "rideshare",
+        "type": "merchant_frequency",
+        "emoji": "🚗",
+        "title": "Rideshare",
+        "monthly": "165.00",
+        "annual": "1980.00",
+        "opportunityCost10y": "27720.00",
+        "rationale": "Uber/Lyft charges 14 times in the last 3 months",
+        "action": "Use transit or carpool for predictable commutes",
+        "savingsEstimate": "49.50",
+        "confidence": 0.65
+      },
+      {
+        "id": "impulse-amazon",
+        "type": "impulse",
+        "emoji": "📦",
+        "title": "Frequent Amazon purchases",
+        "monthly": "92.00",
+        "annual": "1104.00",
+        "opportunityCost10y": "15456.00",
+        "rationale": "12 small Amazon orders in 3 months — avg $23 each",
+        "action": "Add items to a wishlist and review weekly before buying",
+        "savingsEstimate": "27.60",
+        "confidence": 0.55
+      },
+      {
+        "id": "overspend-shopping",
+        "type": "category_overspend",
+        "emoji": "🛍️",
+        "title": "Shopping & Retail overspend",
+        "monthly": "682.50",
+        "annual": "8190.00",
+        "opportunityCost10y": "114660.00",
+        "rationale": "May shopping is 68% above your 3-month baseline",
+        "action": "Pause non-essential retail until next month",
+        "savingsEstimate": "204.75",
+        "confidence": 0.7
+      },
+      {
+        "id": "duplicate-streaming",
+        "type": "duplicate_subscription",
+        "emoji": "📺",
+        "title": "Overlapping streaming services",
+        "monthly": "27.48",
+        "annual": "329.76",
+        "opportunityCost10y": "4616.64",
+        "rationale": "Netflix + Hulu + Disney+ in the same category — pick one primary",
+        "action": "Rotate services monthly instead of stacking all three",
+        "savingsEstimate": "27.48",
+        "confidence": 0.8
+      }
     ]
   }
 }

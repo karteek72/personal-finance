@@ -1,7 +1,7 @@
 # System Overview
 
 **Product:** SpendFlow  
-**Last Updated:** May 2026
+**Last Updated:** June 2026
 
 ---
 
@@ -141,13 +141,42 @@ accounts (
 transactions (
   id, user_id, account_id, plaid_transaction_id, date, name, merchant_name,
   amount, currency_code, category, plaid_category, transaction_type,
-  is_transfer, transfer_pair_id, pending, user_category_override, created_at
+  is_transfer, transfer_pair_id, pending, user_category_override, created_at,
+  signed_amount                    -- GENERATED: expense negative, income positive (Phase 3.7)
 )
 ```
 
 Indexes: `(user_id, date DESC)`, `(user_id, category)`, `(account_id)`.
 
 Row-level security: all queries scoped by `user_id`.
+
+### Analytics data model (Phase 3.7–3.9)
+
+Canonical dimensions, time-series snapshots, and pairing tables support the metric layer described in [analytics-architecture.md](analytics-architecture.md). All are `user_id`-scoped with cascade deletes unless noted.
+
+| Table | Purpose |
+|-------|---------|
+| `dim_category` | Spend taxonomy: `spend_class` (fixed/variable/discretionary/income/transfer), `is_essential`, `cpi_weight_eligible` |
+| `dim_merchant` | Normalized merchant identity per user (`canonical_key`, `display_name`); `transactions.merchant_id` FK |
+| `balance_snapshots` | Daily account balance + credit limit per sync — unlocks net-worth trend, historical utilization |
+| `security_prices` | Daily close price per security |
+| `holdings_snapshots` | Daily quantity, market value, cost basis per account/security — unlocks TWR, drawdown |
+| `transfer_links` | Paired bank↔bank, bank↔brokerage, CC-payment legs with `match_confidence` |
+| `tax_lots` | FIFO cost basis for realized/unrealized P/L |
+
+**Snapshot pipeline:** on every account sync (Plaid, Teller, SnapTrade, import confirm), the worker upserts all three snapshot tables idempotently keyed by `as_of_date`. Until this pipeline runs, net-worth trend, TWR, drawdown, and historical utilization are structurally unavailable.
+
+**Materialized marts:** PostgreSQL materialized views refreshed `CONCURRENTLY` at end of sync (`refresh-marts` BullMQ step). Current month stays live (raw queries); closed months read from marts:
+
+| Mart | Grain |
+|------|-------|
+| `mart_cashflow_month` | Monthly income, outflow, net by user |
+| `mart_category_month` | Category spend + seasonally adjusted deltas |
+| `mart_net_worth_month` | Assets − liabilities trend |
+| `mart_portfolio_daily` | Holdings value, contributions, returns |
+| `mart_recurring` | Detected subscription/bill series |
+
+**Metric layer:** `backend/src/services/metrics/*` — one function per KPI, returns the [metric envelope](../design/api-contract.md#metric-envelope). Composites (Health, Resilience) consume L2 metrics only.
 
 Compliance tables: `consent_records`, `audit_events`, `devices`, `deleted_users` — see [data-security-compliance.md](data-security-compliance.md).
 
@@ -201,6 +230,7 @@ See `backend/.env.example` (planned) and `ui/.env.example` (planned).
 ## Related documents
 
 - [API contract](../design/api-contract.md)
+- [Analytics architecture](analytics-architecture.md)
 - [Mobile iOS](mobile-ios.md)
 - [Data security & compliance](data-security-compliance.md)
 - [Container deployment](container-deployment.md)

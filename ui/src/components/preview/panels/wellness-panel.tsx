@@ -5,6 +5,7 @@ import {
   FeaturePanelLoading,
 } from "@/components/preview/feature-empty-state";
 import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
+import { MetricLiveBadge } from "@/components/ui/metric-live-badge";
 import { useWellness } from "@/hooks/use-features";
 
 interface Dimension {
@@ -73,6 +74,9 @@ export function WellnessPanel() {
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end">
+        <MetricLiveBadge isLive={data?.isLive ?? false} />
+      </div>
 
       {/* Score hero */}
       <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-6">

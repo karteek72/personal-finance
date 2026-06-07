@@ -20,6 +20,8 @@ import {
   savingsGoals,
   spendingDna,
   spendingPatterns,
+  transferLinks,
+  userAlerts,
   wellnessScores,
   wrappedSummaries,
 } from "../db/schema.js";
@@ -64,6 +66,10 @@ export async function purgeDerivedFinancialData(userId: string): Promise<void> {
       () => db.delete(netWorthSnapshots).where(eq(netWorthSnapshots.userId, userId)),
     ],
     [
+      "transfer_links",
+      () => db.delete(transferLinks).where(eq(transferLinks.userId, userId)),
+    ],
+    [
       "wellness_scores",
       () => db.delete(wellnessScores).where(eq(wellnessScores.userId, userId)),
     ],
@@ -96,6 +102,7 @@ export async function purgeDerivedFinancialData(userId: string): Promise<void> {
       "resilience_profiles",
       () => db.delete(resilienceProfiles).where(eq(resilienceProfiles.userId, userId)),
     ],
+    ["user_alerts", () => db.delete(userAlerts).where(eq(userAlerts.userId, userId))],
     ["coach_insights", () => db.delete(coachInsights).where(eq(coachInsights.userId, userId))],
     [
       "wrapped_summaries",

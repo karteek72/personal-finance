@@ -9,6 +9,11 @@ import {
 } from "../db/schema.js";
 import { formatMoneyAmount } from "../lib/money.js";
 import {
+  paginateInMemory,
+  type Page,
+  type ParsedListQuery,
+} from "../lib/list-query.js";
+import {
   drizzleActiveTransactionWhere,
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
@@ -19,6 +24,7 @@ import { resolveHouseholdContext } from "./household-access.js";
 export interface WellnessResponse {
   score: number;
   delta: number;
+  confidence: number;
   history: Array<{ month: string; score: number }>;
   dimensions: Array<{
     name: string;
@@ -26,6 +32,8 @@ export interface WellnessResponse {
     weight: number;
     description: string;
     trend: string;
+    confidence?: number;
+    caveats?: string[];
   }>;
   isLive: boolean;
 }
@@ -34,6 +42,7 @@ export function emptyWellnessResponse(): WellnessResponse {
   return {
     score: 0,
     delta: 0,
+    confidence: 0,
     history: [],
     dimensions: [],
     isLive: false,
@@ -46,7 +55,7 @@ export async function getWellness(userId: string): Promise<WellnessResponse> {
   if (!hasActiveAccounts) {
     return emptyWellnessResponse();
   }
-  return computeWellnessFromTransactions(ctx.userIds);
+  return computeWellnessFromTransactions(ctx.userIds, userId);
 }
 
 export interface DnaResponse {
@@ -66,23 +75,49 @@ export async function getDna(userId: string): Promise<DnaResponse | null> {
   return null;
 }
 
-export interface PatternsResponse {
-  dayOfWeek: Array<{ day: string; value: string }>;
-  patterns: Array<{
-    label: string;
-    value: string;
-    description: string;
-    severity: string;
-  }>;
+export interface PatternRow {
+  label: string;
+  value: string;
+  description: string;
+  severity: string;
 }
 
-export async function getPatterns(userId: string): Promise<PatternsResponse> {
+export const PATTERN_SORTABLE = ["label", "value"] as const;
+
+export interface PatternsResponse {
+  dayOfWeek: Array<{ day: string; value: string }>;
+  patterns: Page<PatternRow>;
+}
+
+function patternSortKey(column: string): (row: PatternRow) => number | string {
+  switch (column) {
+    case "label":
+      return (r) => r.label.toLowerCase();
+    default:
+      return (r) => Number.parseFloat(r.value);
+  }
+}
+
+export async function getPatterns(
+  userId: string,
+  q: ParsedListQuery,
+): Promise<PatternsResponse> {
   const ctx = await resolveHouseholdContext(userId);
   const { hasActiveAccounts } = await resolveActiveAccountScope(ctx.userIds);
   if (!hasActiveAccounts) {
-    return { dayOfWeek: [], patterns: [] };
+    return {
+      dayOfWeek: [],
+      patterns: paginateInMemory([], q, { sortKey: patternSortKey }),
+    };
   }
-  return computePatternsFromTransactions(ctx.userIds);
+  const computed = await computePatternsFromTransactions(ctx.userIds);
+  return {
+    dayOfWeek: computed.dayOfWeek,
+    patterns: paginateInMemory(computed.patterns, q, {
+      sortKey: patternSortKey,
+      textFilter: (row, needle) => row.label.toLowerCase().includes(needle),
+    }),
+  };
 }
 
 const REASON_META: Record<

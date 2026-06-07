@@ -28,7 +28,7 @@ export function PatternsPanel() {
       value: Number.parseFloat(d.value),
     })),
   );
-  const patterns = data?.patterns ?? [];
+  const patterns = data?.patterns?.rows ?? [];
 
   if (dayOfWeek.every((d) => d.value === 0) && patterns.length === 0) {
     return (

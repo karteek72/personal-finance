@@ -52,7 +52,10 @@ export function ResiliencePanel() {
 
   const LIQUID_CASH = Number.parseFloat(data.liquidCash);
   const MONTHLY_BURN = Number.parseFloat(data.monthlyBurn);
-  const RUNWAY_MONTHS = data?.runwayMonths ?? LIQUID_CASH / MONTHLY_BURN;
+  const rawRunway =
+    data.runwayMonths ??
+    (MONTHLY_BURN > 0 ? LIQUID_CASH / MONTHLY_BURN : Number.NaN);
+  const RUNWAY_MONTHS = Number.isFinite(rawRunway) ? rawRunway : null;
 
   const SCENARIOS: Scenario[] = data.scenarios.map((s) => ({
     id: s.id,
@@ -81,9 +84,32 @@ export function ResiliencePanel() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Day-Zero runway</p>
-            <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">{RUNWAY_MONTHS.toFixed(1)}<span className="text-2xl"> months</span></p>
+            <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">
+              {RUNWAY_MONTHS === null ? "—" : RUNWAY_MONTHS.toFixed(1)}
+              <span className="text-2xl"> months</span>
+            </p>
             <p className="mt-1 text-sm text-white/70">
-              At your current burn of <strong>${MONTHLY_BURN.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo</strong>, your ${LIQUID_CASH.toLocaleString(undefined, { maximumFractionDigits: 0 })} in liquid cash lasts about <strong>{RUNWAY_MONTHS.toFixed(1)} months</strong> if income stopped today.
+              {RUNWAY_MONTHS === null ? (
+                <>
+                  At your current burn of{" "}
+                  <strong>
+                    ${MONTHLY_BURN.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo
+                  </strong>
+                  , runway cannot be calculated while burn is zero.
+                </>
+              ) : (
+                <>
+                  At your current burn of{" "}
+                  <strong>
+                    ${MONTHLY_BURN.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo
+                  </strong>
+                  , your $
+                  {LIQUID_CASH.toLocaleString(undefined, { maximumFractionDigits: 0 })} in
+                  liquid cash lasts about{" "}
+                  <strong>{RUNWAY_MONTHS.toFixed(1)} months</strong> if income stopped
+                  today.
+                </>
+              )}
             </p>
           </div>
           <div className="flex flex-col items-center">

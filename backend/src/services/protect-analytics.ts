@@ -9,6 +9,11 @@ import {
   transactions,
 } from "../db/schema.js";
 import { formatMoneyAmount, roundDecimal } from "../lib/money.js";
+import { computeSavingsRate } from "./metrics/savings-rate.js";
+import {
+  computePersonalCpi,
+  NATIONAL_CPI_EXTERNAL,
+} from "./personal-cpi.js";
 import {
   drizzleActiveTransactionWhere,
   resolveActiveAccountScope,
@@ -17,27 +22,8 @@ import { resolveHouseholdContext } from "./household-access.js";
 import { averageMonthlyCashSpending } from "./investment-analytics.js";
 import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
 
-const NATIONAL_CPI = 3.1;
 const DEFAULT_RAISE_PERCENT = 3.0;
 const LOOKBACK_MONTHS = 12;
-
-const CATEGORY_INFLATION: Record<
-  string,
-  { rate: number; severity: "high" | "medium" | "low" }
-> = {
-  "Housing & Home": { rate: 3.0, severity: "medium" },
-  "Food & Groceries": { rate: 3.8, severity: "high" },
-  "Dining & Restaurants": { rate: 4.2, severity: "high" },
-  Transportation: { rate: 2.4, severity: "low" },
-  "Health & Medical": { rate: 4.1, severity: "high" },
-  "Utilities & Bills": { rate: 3.3, severity: "medium" },
-  "Subscriptions & Software": { rate: 5.0, severity: "high" },
-  "Shopping & Retail": { rate: 1.9, severity: "low" },
-  Travel: { rate: 2.7, severity: "low" },
-  Entertainment: { rate: 2.5, severity: "low" },
-  Education: { rate: 4.5, severity: "high" },
-  "Financial & Insurance": { rate: 3.2, severity: "medium" },
-};
 
 function monthsAgo(months: number): string {
   const d = new Date();
@@ -45,11 +31,10 @@ function monthsAgo(months: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function inflationForCategory(name: string): {
-  rate: number;
-  severity: "high" | "medium" | "low";
-} {
-  return CATEGORY_INFLATION[name] ?? { rate: NATIONAL_CPI, severity: "medium" };
+function severityForRate(rate: number): "high" | "medium" | "low" {
+  if (rate >= 4) return "high";
+  if (rate >= 2.5) return "medium";
+  return "low";
 }
 
 async function sumDepositoryCash(userIds: string[]): Promise<number> {
@@ -75,7 +60,7 @@ async function sumDepositoryCash(userIds: string[]): Promise<number> {
   return total;
 }
 
-async function averageMonthlyIncome(
+export async function averageMonthlyIncome(
   userIds: string[],
   lookbackMonths: number,
 ): Promise<number> {
@@ -146,8 +131,7 @@ async function categorySpendShares(
         (Number.parseFloat(row.total ?? "0") / grandTotal) * 100,
       ),
     }))
-    .filter((row) => row.share >= 1)
-    .slice(0, 9);
+    .filter((row) => row.share >= 1);
 }
 
 interface ResilienceScenarioTemplate {
@@ -254,14 +238,19 @@ export async function refreshProtectProfiles(userId: string): Promise<boolean> {
     })),
   );
 
+  const personalCpi = await computePersonalCpi(ctx.userIds);
+
   const inflationRows = categoryShares.map((row) => {
-    const meta = inflationForCategory(row.name);
+    const cpiItem = personalCpi.basket.find((b) => b.category === row.name);
+    const rate = cpiItem && cpiItem.priceBase > 0
+      ? roundDecimal(((cpiItem.priceNow / cpiItem.priceBase) - 1) * 100)
+      : personalCpi.personalRate;
     return {
       userId,
       name: row.name,
       share: String(row.share),
-      inflationRate: String(meta.rate),
-      severity: meta.severity,
+      inflationRate: String(rate),
+      severity: severityForRate(rate),
       sortOrder: 0,
     };
   });
@@ -271,23 +260,25 @@ export async function refreshProtectProfiles(userId: string): Promise<boolean> {
   }
 
   const personalRate =
-    inflationRows.length > 0
-      ? roundDecimal(
-          inflationRows.reduce(
-            (sum, row) =>
-              sum +
-              (Number.parseFloat(row.share) / 100) *
-                Number.parseFloat(row.inflationRate),
-            0,
-          ),
-        )
-      : NATIONAL_CPI;
+    personalCpi.personalRate > 0
+      ? personalCpi.personalRate
+      : inflationRows.length > 0
+        ? roundDecimal(
+            inflationRows.reduce(
+              (sum, row) =>
+                sum +
+                (Number.parseFloat(row.share) / 100) *
+                  Number.parseFloat(row.inflationRate),
+              0,
+            ),
+          )
+        : 0;
 
   const annualSalary = Math.max(monthlyIncome, burn) * 12;
-  const nominalSavingsRate =
-    monthlyIncome > 0
-      ? roundDecimal(((monthlyIncome - burn) / monthlyIncome) * 100)
-      : 0;
+  const nominalSavingsRate = computeSavingsRate({
+    income: monthlyIncome,
+    expense: burn,
+  });
   const powerLoss = roundDecimal((annualSalary * personalRate) / 100);
 
   await db
@@ -295,7 +286,7 @@ export async function refreshProtectProfiles(userId: string): Promise<boolean> {
     .values({
       userId,
       personalRate: String(personalRate),
-      nationalCpi: String(NATIONAL_CPI),
+      nationalCpi: String(NATIONAL_CPI_EXTERNAL.rate),
       salary: formatMoneyAmount(annualSalary),
       raisePercent: String(DEFAULT_RAISE_PERCENT),
       nominalSavingsRate: String(nominalSavingsRate),
@@ -307,7 +298,7 @@ export async function refreshProtectProfiles(userId: string): Promise<boolean> {
       target: inflationProfiles.userId,
       set: {
         personalRate: String(personalRate),
-        nationalCpi: String(NATIONAL_CPI),
+        nationalCpi: String(NATIONAL_CPI_EXTERNAL.rate),
         salary: formatMoneyAmount(annualSalary),
         raisePercent: String(DEFAULT_RAISE_PERCENT),
         nominalSavingsRate: String(nominalSavingsRate),

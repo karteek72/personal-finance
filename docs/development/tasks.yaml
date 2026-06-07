@@ -380,7 +380,7 @@ tasks:
       export-user-data.ts; GET /auth/export with attachment; assertExportHasNoSecrets; data_export audit event.
   - id: TASK-IOS-001
     title: iOS Face ID app unlock
-    status: backlog
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -398,7 +398,7 @@ tasks:
       - Keychain tokens remain; only UI gated
   - id: TASK-IOS-002
     title: iOS push notifications (APNs) for alerts
-    status: backlog
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -1857,7 +1857,7 @@ tasks:
       - typecheck passes
   - id: TASK-RECON-004
     title: Detect cross-provider duplicate accounts and transactions (R4)
-    status: backlog
+    status: done
     priority: P3
     area: backend
     phase: 3.8
@@ -1885,7 +1885,7 @@ tasks:
       - typecheck passes
   - id: TASK-INTEGRITY-001
     title: Guarantee prod builds never enable UI mocks (M1)
-    status: ready
+    status: done
     priority: P2
     area: ui
     phase: 3.8
@@ -1909,7 +1909,7 @@ tasks:
       - Confirm mock-api is not executed in a non-mock production bundle
   - id: TASK-INTEGRITY-002
     title: Make planning projections reproducible (seeded RNG) (M2)
-    status: ready
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -1931,7 +1931,7 @@ tasks:
       - Projection outputs remain labeled as estimates in the metric envelope/UI
   - id: TASK-INTEGRITY-003
     title: Multi-user tenant-isolation test for all read endpoints (M3)
-    status: ready
+    status: done
     priority: P1
     area: backend
     phase: 3.8

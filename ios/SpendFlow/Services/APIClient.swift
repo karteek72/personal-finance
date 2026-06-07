@@ -53,6 +53,15 @@ final class APIClient: Sendable {
         try await send(APIRequest(path: "/auth/me"))
     }
 
+    func registerDeviceToken(_ token: String) async throws {
+        struct Body: Encodable { let token: String; let platform: String }
+        struct Response: Decodable { let ok: Bool }
+        let body = try JSONEncoder.api.encode(Body(token: token, platform: "ios"))
+        let _: Response = try await send(
+            APIRequest(path: "/devices/register", method: .post, body: body)
+        )
+    }
+
     // MARK: - Transactions & insights
 
     func getSummary(from: String? = nil, to: String? = nil) async throws -> TransactionSummary {

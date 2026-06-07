@@ -4,79 +4,164 @@
   "daysRemaining": 27,
   "budgets": [
     {
+      "id": "budget-dining",
       "category": "Dining & Restaurants",
       "emoji": "🍽️",
       "color": "#F97316",
       "limit": "650.00",
-      "spent": "957.50"
+      "spent": "957.50",
+      "source": "user"
     },
     {
+      "id": "budget-groceries",
       "category": "Food & Groceries",
       "emoji": "🛒",
       "color": "#3B82F6",
       "limit": "600.00",
-      "spent": "773.74"
+      "spent": "773.74",
+      "source": "user",
+      "class": "essential"
     },
     {
+      "id": "budget-transport",
       "category": "Transportation",
       "emoji": "🚗",
       "color": "#6B7280",
       "limit": "300.00",
-      "spent": "229.45"
+      "spent": "229.45",
+      "source": "user",
+      "class": "essential"
     },
     {
+      "id": "budget-shopping",
       "category": "Shopping & Retail",
       "emoji": "🛍️",
       "color": "#22C55E",
       "limit": "400.00",
-      "spent": "682.50"
+      "spent": "682.50",
+      "source": "user",
+      "class": "discretionary"
     },
     {
+      "id": "budget-entertainment",
       "category": "Entertainment",
       "emoji": "🎬",
       "color": "#A855F7",
       "limit": "150.00",
-      "spent": "73.54"
+      "spent": "73.54",
+      "source": "user",
+      "class": "discretionary"
     },
     {
+      "id": "budget-subs",
       "category": "Subscriptions & Software",
       "emoji": "📱",
       "color": "#EF4444",
       "limit": "180.00",
-      "spent": "99.45"
+      "spent": "99.45",
+      "source": "user",
+      "class": "discretionary"
     },
     {
+      "id": "budget-health",
       "category": "Health & Medical",
       "emoji": "💊",
       "color": "#EC4899",
       "limit": "120.00",
-      "spent": "24.99"
+      "spent": "24.99",
+      "source": "user",
+      "class": "essential"
+    }
+  ],
+  "suggestedBudgets": [
+    {
+      "category": "Travel & Vacation",
+      "emoji": "✈️",
+      "color": "#14B8A6",
+      "spent": "312.00",
+      "limit": "350.00",
+      "source": "suggested",
+      "class": "discretionary",
+      "rationale": "Median $318.18/mo over 4 of 6 months, +10% buffer",
+      "confidence": "medium"
+    },
+    {
+      "category": "Personal Care",
+      "emoji": "💅",
+      "color": "#EC4899",
+      "spent": "89.50",
+      "limit": "100.00",
+      "source": "suggested",
+      "class": "essential",
+      "rationale": "Median $90.91/mo over 3 of 6 months, +10% buffer",
+      "confidence": "low"
     }
   ],
   "goals": [
     {
+      "id": "goal-emergency",
       "name": "Emergency Fund",
       "emoji": "🛡️",
       "color": "#22C55E",
       "target": "10000.00",
       "current": "6420.00",
-      "deadline": "2026-12-31"
+      "deadline": "2026-12-31",
+      "kind": "emergency",
+      "status": "active",
+      "source": "user"
     },
     {
+      "id": "goal-japan",
       "name": "Japan Trip",
       "emoji": "✈️",
       "color": "#14B8A6",
       "target": "4500.00",
       "current": "1800.00",
-      "deadline": "2026-08-31"
+      "deadline": "2026-08-31",
+      "kind": "custom",
+      "status": "active",
+      "source": "user"
     },
     {
+      "id": "goal-car",
       "name": "New Car Fund",
       "emoji": "🚙",
       "color": "#6366F1",
       "target": "12000.00",
       "current": "4200.00",
-      "deadline": "2027-06-30"
+      "deadline": "2027-06-30",
+      "kind": "custom",
+      "status": "active",
+      "source": "user"
+    }
+  ],
+  "suggestedGoals": [
+    {
+      "name": "Citi Double Cash payoff",
+      "emoji": "💳",
+      "color": "#EF4444",
+      "target": "2840.00",
+      "current": "0.00",
+      "deadline": null,
+      "kind": "debt",
+      "status": "active",
+      "source": "suggested",
+      "rationale": "Credit card balance $2,840.00 — paying it off saves ~$42/mo in interest",
+      "confidence": "high"
+    },
+    {
+      "name": "Monthly surplus saver",
+      "emoji": "📈",
+      "color": "#3B82F6",
+      "target": "400.00",
+      "current": "0.00",
+      "deadline": null,
+      "kind": "surplus",
+      "status": "active",
+      "source": "suggested",
+      "rationale": "You averaged $412/mo surplus after bills and investing over the last 3 months",
+      "confidence": "medium",
+      "monthlySetAside": "400.00"
     }
   ]
 }

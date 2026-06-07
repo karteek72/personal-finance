@@ -3,6 +3,11 @@ import { getDb } from "../db/client.js";
 import { savingsGoals, transactions } from "../db/schema.js";
 import { formatMoneyAmount, roundDecimal, roundPercent } from "../lib/money.js";
 import {
+  metricNumericValue,
+  savingsRateMetric,
+} from "./metrics/index.js";
+import { countNoSpendDays } from "./wellness-scoring.js";
+import {
   drizzleActiveTransactionWhere,
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
@@ -160,8 +165,13 @@ export async function computeWrappedFromTransactions(
   }
 
   const totalSaved = Math.max(totalIncome - totalSpent, 0);
-  const savingsRate =
-    totalIncome > 0 ? roundPercent((totalSaved / totalIncome) * 100) : 0;
+  const savingsRate = metricNumericValue(
+    savingsRateMetric({
+      income: totalIncome,
+      expense: totalSpent,
+      asOf: `${year}-12-31`,
+    }),
+  );
 
   const topCategoryEntry = [...categoryTotals.entries()].sort(
     (a, b) => b[1] - a[1],
@@ -177,22 +187,10 @@ export async function computeWrappedFromTransactions(
     }
   }
 
-  const noSpendDays = (() => {
-    const startDate = new Date(`${year}-01-01T12:00:00Z`);
-    const endDate = new Date(`${year}-12-31T12:00:00Z`);
-    let count = 0;
-    for (
-      let d = new Date(startDate);
-      d <= endDate;
-      d.setUTCDate(d.getUTCDate() + 1)
-    ) {
-      const key = d.toISOString().slice(0, 10);
-      if (!spendByDate.has(key)) {
-        count += 1;
-      }
-    }
-    return count;
-  })();
+  const noSpendDays = countNoSpendDays({
+    year,
+    spendDates: spendByDate.keys(),
+  });
 
   const goalRows = await db
     .select()

@@ -109,6 +109,8 @@ export function InteractiveAreaChart({
   const highlightPoint =
     hoveredIndex >= 0 ? monthly[hoveredIndex] : monthly.at(-1);
 
+  const headlineMetrics = activeMetrics.length > 0 ? activeMetrics : (["expenses"] as MetricKey[]);
+
   function toggleMetric(metric: MetricKey) {
     setActiveMetrics((current) => {
       if (current.includes(metric)) {
@@ -126,13 +128,23 @@ export function InteractiveAreaChart({
       className={className}
       action={
         highlightPoint ? (
-          <div className="text-right">
+          <div className="space-y-0.5 text-right">
             <p className="text-xs text-text-muted">
               {formatMonthLabel(highlightPoint.month)}
             </p>
-            <p className="text-sm font-bold tabular-nums text-text" data-money>
-              {formatCurrency(Number.parseFloat(highlightPoint.expenses))} spent
-            </p>
+            {headlineMetrics.map((metric) => {
+              const meta = METRICS.find((m) => m.id === metric)!;
+              return (
+                <p
+                  key={metric}
+                  className="text-sm font-bold tabular-nums text-text"
+                  data-money
+                >
+                  {formatCurrency(Number.parseFloat(highlightPoint[metric]))}{" "}
+                  {meta.label.toLowerCase()}
+                </p>
+              );
+            })}
           </div>
         ) : null
       }

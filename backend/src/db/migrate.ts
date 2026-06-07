@@ -21,6 +21,13 @@ const MIGRATION_FILES = [
   "0012_teller_snaptrade.sql",
   "0013_fire_profile_age.sql",
   "0014_user_profile_analytics.sql",
+  "0015_analytics_foundation.sql",
+  "0016_analytics_merchants_portfolio.sql",
+  "0017_investment_tax_lots.sql",
+  "0018_analytics_transfers_resilience.sql",
+  "0019_dim_category.sql",
+  "0020_analytics_wave5.sql",
+  "0021_cross_provider_dedup.sql",
 ];
 
 let migrationPromise: Promise<void> | null = null;

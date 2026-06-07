@@ -26,13 +26,21 @@ import type {
   AccountsResponse,
   AlertsResponse,
   BehavioralResponse,
+  BudgetRow,
   BudgetsResponse,
+  CreateGoalInput,
+  GoalRow,
+  PatchBudgetInput,
+  PatchGoalInput,
+  UpsertBudgetInput,
   CalendarResponse,
   CategoriesResponse,
   ChartDataResponse,
   CoachResponse,
   CreditDebtSummary,
   DnaResponse,
+  FireProjection,
+  FireQueryOverrides,
   FireResponse,
   UserProfileResponse,
   UserProfilePatch,
@@ -52,6 +60,7 @@ import type {
   MerchantsTableResponse,
   MoneyFlowResponse,
   NetWorthResponse,
+  Page,
   PaginatedTransactions,
   PatternsResponse,
   RecurringResponse,
@@ -66,6 +75,62 @@ import type {
 } from "@/types/api";
 
 const MOCK_DELAY_MS = 150;
+
+function mockListPage<TRow>(
+  rows: TRow[],
+  sort = "amount",
+  dir: "asc" | "desc" = "desc",
+): Page<TRow> {
+  return {
+    rows,
+    page: 1,
+    pageSize: Math.max(rows.length, 25),
+    total: rows.length,
+    totalPages: 1,
+    sort,
+    dir,
+    appliedFilters: {},
+  };
+}
+
+function paginateMockRows<TRow>(
+  rows: TRow[],
+  params: ListQuery,
+  sortKeys: Record<string, (row: TRow) => number | string>,
+  defaultSort: string,
+  textMatch?: (row: TRow, needle: string) => boolean,
+): Page<TRow> {
+  const needle = params.q?.toLowerCase();
+  let filtered =
+    needle && textMatch
+      ? rows.filter((row) => textMatch(row, needle))
+      : rows;
+  const sort = params.sort ?? defaultSort;
+  const dir = params.dir ?? "desc";
+  const factor = dir === "asc" ? 1 : -1;
+  const keyFn = sortKeys[sort] ?? sortKeys[defaultSort]!;
+  filtered = [...filtered].sort((a, b) => {
+    const av = keyFn(a);
+    const bv = keyFn(b);
+    if (typeof av === "number" && typeof bv === "number") {
+      return (av - bv) * factor;
+    }
+    return String(av).localeCompare(String(bv)) * factor;
+  });
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? 25;
+  const total = filtered.length;
+  return {
+    rows: filtered.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize),
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    sort,
+    dir,
+    appliedFilters: needle ? { q: needle } : {},
+  };
+}
 
 const INTERNAL_TRANSFER_CATEGORY = "Internal Transfers";
 const CREDIT_CARD_PAYMENT_SUBCATEGORY = "Credit Card Payments";
@@ -167,7 +232,8 @@ function computeMockSummary(from?: string, to?: string): TransactionSummary {
     avgMonthlySpend: totalSpent.toFixed(2),
     topCategory,
     ccPaymentsExcluded: ccPaymentsExcluded.toFixed(2),
-    savingsRate: income > 0 ? Math.round((net / income) * 10000) / 100 : 0,
+    savingsRate:
+      income > 0 ? Math.round((net / income) * 10000) / 10000 : 0,
     transactionCount,
     pendingCount,
     monthsInPeriod: 1,
@@ -480,7 +546,24 @@ export async function getMoneyFlow(
   _to?: string,
 ): Promise<MoneyFlowResponse> {
   await delay();
-  return moneyFlowData as MoneyFlowResponse;
+  const raw = moneyFlowData as Omit<MoneyFlowResponse, "income"> & {
+    income: {
+      sources:
+        | MoneyFlowResponse["income"]["sources"]
+        | Array<{ label: string; amount: string }>;
+      total: string;
+    };
+  };
+  const sources = Array.isArray(raw.income.sources)
+    ? raw.income.sources
+    : raw.income.sources.rows;
+  return {
+    ...raw,
+    income: {
+      total: raw.income.total,
+      sources: mockListPage(sources, "amount"),
+    },
+  };
 }
 
 export async function getTrends(
@@ -868,16 +951,211 @@ export async function acceptHouseholdInvite(token: string) {
  * protect, coach & wrapped. These mirror the backend /api/v1 routes.
  * ------------------------------------------------------------------ */
 
-export async function getNetWorth(): Promise<NetWorthResponse> {
-  await delay();
-  return netWorthData as NetWorthResponse;
+function mockFireProjection(input: {
+  currentAge: number;
+  currentNetWorth: number;
+  monthlySpend: number;
+  monthlyInvest: number;
+  withdrawalRate: number;
+  realReturn: number;
+}): FireProjection {
+  const fireNumber =
+    input.withdrawalRate > 0
+      ? (input.monthlySpend * 12) / (input.withdrawalRate / 100)
+      : 0;
+  let balance = input.currentNetWorth;
+  const monthlyReturn = input.realReturn / 100 / 12;
+  let months = 0;
+  while (balance < fireNumber && months < 1200) {
+    balance = balance * (1 + monthlyReturn) + input.monthlyInvest;
+    months += 1;
+  }
+  const yearsToFire = months / 12;
+  const curve: number[] = [];
+  balance = input.currentNetWorth;
+  const cap = Math.min(Math.ceil(yearsToFire) + 2, 45);
+  for (let y = 0; y <= cap; y++) {
+    curve.push(Math.round(balance));
+    for (let m = 0; m < 12; m++) {
+      balance = balance * (1 + monthlyReturn) + input.monthlyInvest;
+    }
+  }
+  const cashFlow = input.monthlySpend + input.monthlyInvest;
+  return {
+    fireNumber: fireNumber.toFixed(2),
+    yearsToFire: Math.round(yearsToFire * 100) / 100,
+    fireAge: Math.round((input.currentAge + yearsToFire) * 10) / 10,
+    investingRate:
+      cashFlow > 0
+        ? Math.round((input.monthlyInvest / cashFlow) * 1000) / 10
+        : 0,
+    curve,
+  };
 }
 
-export async function getInvestments(): Promise<InvestmentsResponse> {
+function mockIncomeSummary(income: {
+  months: string[];
+  primary: number[];
+  side: number[];
+}) {
+  const totalIncome =
+    income.primary.reduce((a, b) => a + b, 0) +
+    income.side.reduce((a, b) => a + b, 0);
+  const avgMonthlyIncome =
+    income.months.length > 0 ? totalIncome / income.months.length : 0;
+  const mean =
+    income.primary.reduce((a, b) => a + b, 0) / (income.primary.length || 1);
+  const variance =
+    income.primary.reduce((s, v) => s + (v - mean) ** 2, 0) /
+    (income.primary.length || 1);
+  const stability =
+    mean > 0
+      ? Math.max(
+          0,
+          Math.min(100, Math.round((1 - Math.sqrt(variance) / mean) * 100)),
+        )
+      : 0;
+  const maxBarTotal = Math.max(
+    ...income.primary.map((v, i) => v + (income.side[i] ?? 0)),
+    1,
+  );
+  return {
+    avgMonthlyIncome: avgMonthlyIncome.toFixed(2),
+    incomeStability: stability,
+    sideIncomeTotal: income.side.reduce((a, b) => a + b, 0).toFixed(2),
+    chartYTicks: [0, maxBarTotal / 2, maxBarTotal].map((v) => Math.round(v)),
+    maxBarTotal: Math.round(maxBarTotal),
+  };
+}
+
+function mockTimeMachine(
+  habits: Array<{ id: string; emoji: string | null; label: string; monthly: string }>,
+) {
+  const lookbackYears = 3;
+  const investMultiple = 1.45;
+  return {
+    lookbackYears,
+    investMultiple,
+    investMultipleBasis: "heuristic" as const,
+    futureCompoundRate: 0.07,
+    futureYears: 20,
+    habits: habits.map((habit) => {
+      const monthly = Number.parseFloat(habit.monthly);
+      const spent = Math.round(monthly * 12 * lookbackYears * 100) / 100;
+      return {
+        id: habit.id,
+        emoji: habit.emoji,
+        label: habit.label,
+        spent: spent.toFixed(2),
+        investedValue: (spent * investMultiple).toFixed(2),
+        yearsAgo: lookbackYears,
+      };
+    }),
+  };
+}
+
+function buildMockFireResponse(
+  base: Omit<FireResponse, "projection"> & { projection?: FireProjection },
+  overrides: FireQueryOverrides = {},
+): FireResponse {
+  const monthlySpend =
+    overrides.monthlySpend ?? Number.parseFloat(base.monthlySpend);
+  const monthlyInvest =
+    overrides.monthlyInvest ?? Number.parseFloat(base.monthlyInvest);
+  const withdrawalRate = overrides.withdrawalRate ?? base.withdrawalRate;
+  const realReturn = overrides.realReturn ?? base.realReturn;
+  return {
+    ...base,
+    monthlySpend: monthlySpend.toFixed(2),
+    monthlyInvest: monthlyInvest.toFixed(2),
+    withdrawalRate,
+    realReturn,
+    projection: mockFireProjection({
+      currentAge: base.currentAge,
+      currentNetWorth: Number.parseFloat(base.currentNetWorth),
+      monthlySpend,
+      monthlyInvest,
+      withdrawalRate,
+      realReturn,
+    }),
+  };
+}
+
+export async function getNetWorth(): Promise<NetWorthResponse> {
   await delay();
-  const data = investmentsData as InvestmentsResponse;
-  if (data.positions.length > 0) {
-    return data;
+  const raw = netWorthData as NetWorthResponse;
+  return {
+    ...raw,
+    current: {
+      ...raw.current,
+      accountCount: raw.current.accountCount ?? 6,
+    },
+    breakdown: raw.breakdown ?? {
+      depository: { total: "45200.00", accountCount: 2 },
+      investment: { total: raw.current.totalAssets, accountCount: 2 },
+      credit: { total: raw.current.totalLiabilities, accountCount: 2 },
+    },
+  };
+}
+
+async function buildMockInvestmentsResponse(
+  params: ListQuery = {},
+): Promise<InvestmentsResponse> {
+  const data = investmentsData as InvestmentsResponse & {
+    positions?: InvestmentsResponse["positions"] | InvestmentPosition[];
+    holdings?: InvestmentsResponse["holdings"] | InvestmentsResponse["holdings"]["rows"];
+  };
+  const legacyHoldings = Array.isArray(data.holdings)
+    ? data.holdings
+    : data.holdings.rows;
+  const legacyPositions = Array.isArray(data.positions)
+    ? data.positions
+    : data.positions.rows;
+
+  const positionSortKeys: Record<
+    string,
+    (row: InvestmentPosition) => number | string
+  > = {
+    ticker: (r) => r.ticker.toLowerCase(),
+    name: (r) => r.name.toLowerCase(),
+    value: (r) => Number.parseFloat(r.value),
+    gainLoss: (r) => Number.parseFloat(r.gainLoss),
+    gainLossPercent: (r) => r.gainLossPercent,
+    costBasis: (r) => Number.parseFloat(r.costBasis),
+  };
+
+  if (legacyPositions.length > 0) {
+    const positionsPage = paginateMockRows(
+      legacyPositions,
+      params,
+      positionSortKeys,
+      "value",
+      (row, needle) =>
+        row.ticker.toLowerCase().includes(needle) ||
+        row.name.toLowerCase().includes(needle),
+    );
+    return {
+      ...data,
+      positions: positionsPage,
+      holdings: {
+        ...positionsPage,
+        rows: positionsPage.rows.map((p) => ({
+          ticker: p.ticker,
+          name: p.name,
+          sector: p.sector,
+          assetType: p.assetType,
+          quantity: p.quantity,
+          costBasis: p.costBasis,
+          currentPrice: p.currentPrice,
+          value: p.value,
+          gainLoss: p.gainLoss,
+          gainLossPercent: p.gainLossPercent,
+          underlyingTicker: p.underlyingTicker,
+          optionType: p.optionType,
+          expirationLabel: p.expirationLabel,
+        })),
+      },
+    };
   }
 
   const accountByTicker: Record<string, string> = {
@@ -898,7 +1176,7 @@ export async function getInvestments(): Promise<InvestmentsResponse> {
     data.accounts.map((a) => [a.accountId, a]),
   );
 
-  const positions: InvestmentPosition[] = data.holdings.map((h, index) => {
+  const positions: InvestmentPosition[] = legacyHoldings.map((h, index) => {
     const accountId =
       accountByTicker[h.ticker] ?? data.accounts[0]?.accountId ?? "mock-account";
     const account = accountsById.get(accountId);
@@ -924,7 +1202,7 @@ export async function getInvestments(): Promise<InvestmentsResponse> {
     };
   });
 
-  const stockAggregates: StockAggregate[] = data.holdings
+  const stockAggregates: StockAggregate[] = legacyHoldings
     .filter((h) => h.assetType !== "option")
     .map((h) => {
       const accountId =
@@ -957,25 +1235,265 @@ export async function getInvestments(): Promise<InvestmentsResponse> {
 
   const optionPositions = positions.filter((p) => p.assetType === "option");
 
+  const positionsPage = paginateMockRows(
+    positions,
+    params,
+    positionSortKeys,
+    "value",
+    (row, needle) =>
+      row.ticker.toLowerCase().includes(needle) ||
+      row.name.toLowerCase().includes(needle),
+  );
+
   return {
     ...data,
-    positions,
+    positions: positionsPage,
+    holdings: {
+      ...positionsPage,
+      rows: positionsPage.rows.map((p) => ({
+        ticker: p.ticker,
+        name: p.name,
+        sector: p.sector,
+        assetType: p.assetType,
+        quantity: p.quantity,
+        costBasis: p.costBasis,
+        currentPrice: p.currentPrice,
+        value: p.value,
+        gainLoss: p.gainLoss,
+        gainLossPercent: p.gainLossPercent,
+        underlyingTicker: p.underlyingTicker,
+        optionType: p.optionType,
+        expirationLabel: p.expirationLabel,
+      })),
+    },
     stockAggregates,
     optionPositions,
   };
 }
 
+export async function getInvestments(
+  params: ListQuery = {},
+): Promise<InvestmentsResponse> {
+  await delay();
+  return buildMockInvestmentsResponse(params);
+}
+
+let mockBudgetsState: BudgetsResponse = {
+  ...(budgetsData as BudgetsResponse),
+  isLive: false,
+};
+
+function nextMockId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}`;
+}
+
 export async function getBudgets(): Promise<BudgetsResponse> {
   await delay();
-  return budgetsData as BudgetsResponse;
+  return { ...mockBudgetsState };
 }
 
-export async function getRecurring(): Promise<RecurringResponse> {
+export async function upsertBudget(body: UpsertBudgetInput): Promise<BudgetRow> {
   await delay();
-  return recurringData as RecurringResponse;
+  const limit = body.limit.toFixed(2);
+  const existingIdx = mockBudgetsState.budgets.findIndex(
+    (b) => b.category === body.category,
+  );
+  const row: BudgetRow = {
+    id: existingIdx >= 0 ? mockBudgetsState.budgets[existingIdx]!.id! : nextMockId("budget"),
+    category: body.category,
+    periodMonth: body.periodMonth,
+    emoji: body.emoji ?? "💸",
+    color: body.color ?? "#3b82f6",
+    limit,
+    source: body.source ?? "user",
+    class: body.class ?? null,
+  };
+  const item = {
+    id: row.id,
+    category: row.category,
+    emoji: row.emoji,
+    color: row.color,
+    spent: existingIdx >= 0 ? mockBudgetsState.budgets[existingIdx]!.spent : "0.00",
+    limit: row.limit,
+    source: row.source,
+    class: row.class,
+  };
+  if (existingIdx >= 0) {
+    mockBudgetsState.budgets[existingIdx] = item;
+  } else {
+    mockBudgetsState.budgets.push(item);
+  }
+  mockBudgetsState.suggestedBudgets = mockBudgetsState.suggestedBudgets.filter(
+    (s) => s.category !== body.category,
+  );
+  return row;
 }
 
-let mockFireState: FireResponse = { ...(fireData as FireResponse) };
+export async function patchBudget(
+  budgetId: string,
+  body: PatchBudgetInput,
+): Promise<BudgetRow> {
+  await delay();
+  const idx = mockBudgetsState.budgets.findIndex((b) => b.id === budgetId);
+  if (idx < 0) throw new Error("Budget not found");
+  const current = mockBudgetsState.budgets[idx]!;
+  const limit = body.limit != null ? body.limit.toFixed(2) : current.limit;
+  mockBudgetsState.budgets[idx] = {
+    ...current,
+    limit,
+    emoji: body.emoji !== undefined ? body.emoji : current.emoji,
+    color: body.color !== undefined ? body.color : current.color,
+    class: body.class !== undefined ? body.class : current.class,
+  };
+  return {
+    id: budgetId,
+    category: current.category,
+    periodMonth: mockBudgetsState.periodMonth,
+    emoji: mockBudgetsState.budgets[idx]!.emoji,
+    color: mockBudgetsState.budgets[idx]!.color,
+    limit,
+    source: current.source,
+    class: mockBudgetsState.budgets[idx]!.class ?? null,
+  };
+}
+
+export async function deleteBudget(budgetId: string): Promise<{ id: string }> {
+  await delay();
+  mockBudgetsState.budgets = mockBudgetsState.budgets.filter((b) => b.id !== budgetId);
+  return { id: budgetId };
+}
+
+export async function createGoal(body: CreateGoalInput): Promise<GoalRow> {
+  await delay();
+  const row: GoalRow = {
+    id: nextMockId("goal"),
+    name: body.name,
+    emoji: body.emoji ?? "🎯",
+    color: body.color ?? "#22c55e",
+    target: body.target.toFixed(2),
+    current: (body.current ?? 0).toFixed(2),
+    deadline: body.deadline ?? null,
+    kind: body.kind ?? "custom",
+    status: body.status ?? "active",
+    source: body.source ?? "user",
+    accountId: body.accountId ?? null,
+  };
+  if (row.status === "dismissed") {
+    mockBudgetsState.suggestedGoals = mockBudgetsState.suggestedGoals.filter(
+      (g) => g.name.toLowerCase() !== row.name.toLowerCase() || g.kind !== row.kind,
+    );
+    return row;
+  }
+  mockBudgetsState.goals.push({
+    id: row.id,
+    name: row.name,
+    emoji: row.emoji,
+    color: row.color,
+    target: row.target,
+    current: row.current,
+    deadline: row.deadline,
+    kind: row.kind,
+    status: row.status,
+    source: row.source,
+    accountId: row.accountId,
+  });
+  mockBudgetsState.suggestedGoals = mockBudgetsState.suggestedGoals.filter(
+    (g) => g.name.toLowerCase() !== row.name.toLowerCase() || g.kind !== row.kind,
+  );
+  return row;
+}
+
+export async function patchGoal(goalId: string, body: PatchGoalInput): Promise<GoalRow> {
+  await delay();
+  const idx = mockBudgetsState.goals.findIndex((g) => g.id === goalId);
+  if (idx < 0) throw new Error("Savings goal not found");
+  const current = mockBudgetsState.goals[idx]!;
+  const updated = {
+    ...current,
+    name: body.name ?? current.name,
+    target: body.target != null ? body.target.toFixed(2) : current.target,
+    current: body.current != null ? body.current.toFixed(2) : current.current,
+    deadline: body.deadline !== undefined ? body.deadline : current.deadline,
+    emoji: body.emoji !== undefined ? body.emoji : current.emoji,
+    color: body.color !== undefined ? body.color : current.color,
+    kind: body.kind ?? current.kind,
+    status: body.status ?? current.status,
+    accountId: body.accountId !== undefined ? body.accountId : current.accountId,
+  };
+  mockBudgetsState.goals[idx] = updated;
+  return {
+    id: goalId,
+    name: updated.name,
+    emoji: updated.emoji,
+    color: updated.color,
+    target: updated.target,
+    current: updated.current,
+    deadline: updated.deadline,
+    kind: updated.kind,
+    status: updated.status,
+    source: updated.source,
+    accountId: updated.accountId ?? null,
+  };
+}
+
+export async function deleteGoal(goalId: string): Promise<{ id: string }> {
+  await delay();
+  mockBudgetsState.goals = mockBudgetsState.goals.filter((g) => g.id !== goalId);
+  return { id: goalId };
+}
+
+export async function getRecurring(
+  params: ListQuery = {},
+): Promise<RecurringResponse> {
+  await delay();
+  const raw = recurringData as Omit<RecurringResponse, "subscriptions" | "bills"> & {
+    subscriptions: RecurringResponse["subscriptions"] | RecurringResponse["subscriptions"]["rows"];
+    bills: RecurringResponse["bills"] | RecurringResponse["bills"]["rows"];
+  };
+  const subscriptions = Array.isArray(raw.subscriptions)
+    ? raw.subscriptions
+    : raw.subscriptions.rows;
+  const bills = Array.isArray(raw.bills) ? raw.bills : raw.bills.rows;
+  const activeSubscriptions = subscriptions.filter((s) => s.status !== "lapsed");
+  const monthlyTotal = activeSubscriptions.reduce(
+    (sum, s) => sum + Number.parseFloat(s.amount),
+    0,
+  );
+  const recurringSortKeys: Record<
+    string,
+    (row: RecurringResponse["subscriptions"]["rows"][number]) => number | string
+  > = {
+    merchantName: (r) => r.merchantName.toLowerCase(),
+    amount: (r) => Number.parseFloat(r.amount),
+    category: (r) => r.category.toLowerCase(),
+    nextChargeDate: (r) => r.nextChargeDate ?? "",
+    status: (r) => r.status,
+  };
+  return {
+    ...raw,
+    monthlyTotal: monthlyTotal.toFixed(2),
+    annualTotal: (monthlyTotal * 12).toFixed(2),
+    activeCount: activeSubscriptions.length,
+    priceChanges: activeSubscriptions.filter((s) => s.priceChanged).length,
+    subscriptions: paginateMockRows(
+      subscriptions,
+      params,
+      recurringSortKeys,
+      "amount",
+      (row, needle) =>
+        row.merchantName.toLowerCase().includes(needle) ||
+        row.category.toLowerCase().includes(needle),
+    ),
+    bills: mockListPage(bills, "amount"),
+    timeMachine: mockTimeMachine(raw.leaks?.habits ?? []),
+    isLive: false,
+  };
+}
+
+let mockFireState: FireResponse = buildMockFireResponse({
+  ...(fireData as Omit<FireResponse, "projection">),
+  isDefaultAge: false,
+});
 
 let mockUserProfile: UserProfileResponse = {
   user: {
@@ -1078,34 +1596,43 @@ export async function patchAnalyticsProfile(
   return mockAnalyticsProfile;
 }
 
-export async function getFire(): Promise<FireResponse> {
+export async function getFire(
+  overrides: FireQueryOverrides = {},
+): Promise<FireResponse> {
   await delay();
-  return mockFireState;
+  return buildMockFireResponse(mockFireState, overrides);
 }
 
 export async function patchFire(patch: FireProfilePatch): Promise<FireResponse> {
   await delay();
-  mockFireState = {
+  mockFireState = buildMockFireResponse({
     ...mockFireState,
     ...patch,
     isDefaultAge: patch.currentAge != null ? false : mockFireState.isDefaultAge,
-  };
+  });
   return mockFireState;
 }
 
 export async function getWellness(): Promise<WellnessResponse> {
   await delay();
-  return wellnessData as WellnessResponse;
+  return { ...(wellnessData as WellnessResponse), isLive: false };
 }
 
 export async function getDna(): Promise<DnaResponse> {
   await delay();
-  return dnaData as DnaResponse;
+  return { ...(dnaData as DnaResponse), isLive: false };
 }
 
 export async function getPatterns(): Promise<PatternsResponse> {
   await delay();
-  return patternsData as PatternsResponse;
+  const raw = patternsData as Omit<PatternsResponse, "patterns"> & {
+    patterns: PatternsResponse["patterns"] | PatternsResponse["patterns"]["rows"];
+  };
+  const patterns = Array.isArray(raw.patterns) ? raw.patterns : raw.patterns.rows;
+  return {
+    dayOfWeek: raw.dayOfWeek,
+    patterns: mockListPage(patterns, "value"),
+  };
 }
 
 export async function getBehavioral(): Promise<BehavioralResponse> {
@@ -1113,9 +1640,35 @@ export async function getBehavioral(): Promise<BehavioralResponse> {
   return behavioralData as BehavioralResponse;
 }
 
-export async function getInflation(): Promise<InflationResponse> {
+export async function getInflation(
+  params: ListQuery = {},
+): Promise<InflationResponse> {
   await delay();
-  return inflationData as InflationResponse;
+  const raw = inflationData as Omit<InflationResponse, "categories"> & {
+    categories:
+      | InflationResponse["categories"]
+      | InflationResponse["categories"]["rows"];
+  };
+  const categories = Array.isArray(raw.categories)
+    ? raw.categories
+    : raw.categories.rows;
+  type CatRow = InflationResponse["categories"]["rows"][number];
+  const categorySortKeys: Record<string, (row: CatRow) => number | string> = {
+    name: (r) => r.name.toLowerCase(),
+    share: (r) => r.share,
+    inflation: (r) => r.inflation,
+    severity: (r) => r.severity,
+  };
+  return {
+    ...raw,
+    categories: paginateMockRows(
+      categories,
+      params,
+      categorySortKeys,
+      "share",
+      (row, needle) => row.name.toLowerCase().includes(needle),
+    ),
+  };
 }
 
 export async function getResilience(): Promise<ResilienceResponse> {
@@ -1125,7 +1678,7 @@ export async function getResilience(): Promise<ResilienceResponse> {
 
 export async function getCoach(): Promise<CoachResponse> {
   await delay();
-  return coachData as CoachResponse;
+  return { ...(coachData as CoachResponse), isLive: false };
 }
 
 export async function getWrapped(): Promise<WrappedResponse> {
@@ -1135,7 +1688,15 @@ export async function getWrapped(): Promise<WrappedResponse> {
 
 export async function getMerchants(): Promise<MerchantsResponse> {
   await delay();
-  return { ...(merchantsData as MerchantsResponse), isLive: false };
+  const base = merchantsData as MerchantsResponse;
+  const income = base.income ?? { months: [], primary: [], side: [] };
+  return {
+    ...base,
+    income,
+    incomeSummary:
+      base.incomeSummary ?? mockIncomeSummary(income),
+    isLive: false,
+  };
 }
 
 export async function getMerchantsTable(

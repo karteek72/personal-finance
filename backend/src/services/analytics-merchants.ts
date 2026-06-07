@@ -1,6 +1,6 @@
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
-import { transactions } from "../db/schema.js";
+import { dimMerchant, transactions } from "../db/schema.js";
 import { formatMoneyAmount, roundDecimal, roundPercent } from "../lib/money.js";
 import {
   buildPage,
@@ -102,8 +102,8 @@ function sortKey(column: string): (row: MerchantRow) => number | string {
  * `.slice(0, 6)` cap (defect B-merchants). All ranking/aggregation happens here
  * so web and iOS render identical rows.
  *
- * Merchant identity uses `merchant_name`; richer canonical grouping is deferred to
- * TASK-ANALYTICS-008 (dim_merchant normalization).
+ * Merchant identity uses dim_merchant when merchant_id is set; falls back to
+ * raw merchant_name for legacy rows pending backfill.
  */
 export async function listMerchants(
   userId: string,
@@ -131,11 +131,14 @@ export async function listMerchants(
 
   const rows = await db
     .select({
-      merchant: transactions.merchantName,
+      merchant: sql<string>`coalesce(${dimMerchant.displayName}, ${transactions.merchantName}, ${transactions.name})`.as(
+        "merchant",
+      ),
       amount: transactions.amount,
       date: transactions.date,
     })
     .from(transactions)
+    .leftJoin(dimMerchant, eq(transactions.merchantId, dimMerchant.id))
     .where(and(...conditions));
 
   const allMonths = [...new Set(rows.map((r) => r.date.slice(0, 7)))].sort();

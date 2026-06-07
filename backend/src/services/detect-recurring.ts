@@ -1,15 +1,32 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../db/client.js";
-import { transactions } from "../db/schema.js";
+import { dimMerchant, transactions } from "../db/schema.js";
 import { formatMoneyAmount } from "../lib/money.js";
+import { SUBSCRIPTION_CATEGORIES } from "./analytics-categories.js";
 import {
   drizzleActiveTransactionWhere,
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
 import { categoryMeta } from "./category-meta.js";
+import { normalizeMerchant } from "./merchant-normalizer.js";
+import {
+  applyRecurringLifecycleFields,
+  type RecurringLifecycleStatus,
+} from "./recurring-lifecycle.js";
+import {
+  buildRecurringFlags,
+  buildRecurringSeries,
+  detectFreeTrialJump,
+  detectPriceCreep,
+  markDuplicateFlags,
+  type RecurringFlags,
+} from "./recurring-engine.js";
+
+export type { RecurringFlags };
 
 export interface DetectedRecurringItem {
   merchantName: string;
+  merchantKey: string;
   category: string;
   kind: "subscription" | "bill";
   amount: string;
@@ -18,38 +35,27 @@ export interface DetectedRecurringItem {
   lastChargeDate: string | null;
   previousAmount: string | null;
   priceChanged: boolean;
-  status: string;
+  status: RecurringLifecycleStatus;
   brandColor: string | null;
+  flags: RecurringFlags;
 }
 
-const SUBSCRIPTION_CATEGORIES = new Set([
-  "Subscriptions & Software",
-  "Entertainment",
-]);
-
-function median(values: number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1]! + sorted[mid]!) / 2
-    : sorted[mid]!;
-}
-
-function addDays(isoDate: string, days: number): string {
-  const d = new Date(isoDate);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-function daysBetween(a: string, b: string): number {
-  return Math.round(
-    (new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24),
-  );
+function merchantGroupKey(
+  merchantId: string | null,
+  merchantName: string | null,
+  name: string,
+): { key: string; displayName: string } | null {
+  if (merchantId) {
+    return { key: merchantId, displayName: (merchantName ?? name).trim() };
+  }
+  const normalized = normalizeMerchant(merchantName, name);
+  if (!normalized) return null;
+  return { key: normalized.canonicalKey, displayName: normalized.displayName };
 }
 
 /**
- * Detect recurring merchants from transaction history (≥3 charges at ~monthly cadence).
+ * Detect recurring merchants from transaction history (≥3 charges, all cadences).
+ * Series keyed by dim_merchant id or normalized canonical key.
  */
 export async function detectRecurringFromTransactions(
   userIds: string[],
@@ -63,13 +69,16 @@ export async function detectRecurringFromTransactions(
   const db = getDb();
   const rows = await db
     .select({
+      merchantId: transactions.merchantId,
       merchant: transactions.merchantName,
+      merchantDisplay: dimMerchant.displayName,
       name: transactions.name,
       amount: transactions.amount,
       date: transactions.date,
       category: transactions.category,
     })
     .from(transactions)
+    .leftJoin(dimMerchant, eq(transactions.merchantId, dimMerchant.id))
     .where(
       and(
         drizzleActiveTransactionWhere(userIds, accountIds),
@@ -79,70 +88,93 @@ export async function detectRecurringFromTransactions(
       ),
     );
 
-  interface Charge {
-    date: string;
-    amount: number;
-    category: string;
-  }
-  interface MerchantAgg {
-    displayName: string;
-    charges: Charge[];
-  }
-  const byMerchant = new Map<string, MerchantAgg>();
+  const groups = new Map<
+    string,
+    { displayName: string; charges: Array<{ date: string; amount: number; category: string }> }
+  >();
 
   for (const r of rows) {
-    const displayName = (r.merchant ?? r.name).trim();
-    if (!displayName) continue;
-    const key = displayName.toLowerCase();
-    const entry = byMerchant.get(key) ?? { displayName, charges: [] };
+    const resolved = merchantGroupKey(
+      r.merchantId,
+      r.merchantDisplay ?? r.merchant,
+      r.name,
+    );
+    if (!resolved) continue;
+
+    const entry = groups.get(resolved.key) ?? {
+      displayName: resolved.displayName,
+      charges: [],
+    };
     entry.charges.push({
       date: r.date,
       amount: Math.abs(Number.parseFloat(r.amount)),
       category: r.category,
     });
-    byMerchant.set(key, entry);
+    groups.set(resolved.key, entry);
   }
 
+  const candidates = buildRecurringSeries(groups);
+
+  const zombieKeys = new Set<string>();
+  for (const candidate of candidates) {
+    const last = candidate.charges[candidate.charges.length - 1]!;
+    const lifecycle = applyRecurringLifecycleFields({
+      lastChargeDate: last.date,
+      cadence: candidate.cadence,
+      priceChanged: false,
+    });
+    if (lifecycle.status === "lapsed") {
+      zombieKeys.add(candidate.merchantKey);
+    }
+  }
+
+  const duplicateMap = markDuplicateFlags(candidates, zombieKeys);
   const detected: DetectedRecurringItem[] = [];
 
-  for (const { displayName, charges } of byMerchant.values()) {
-    if (charges.length < 3) continue;
-
-    charges.sort((a, b) => a.date.localeCompare(b.date));
-    const intervals: number[] = [];
-    for (let i = 1; i < charges.length; i++) {
-      intervals.push(daysBetween(charges[i - 1]!.date, charges[i]!.date));
-    }
-    const medInterval = median(intervals);
-    const isMonthly = medInterval >= 25 && medInterval <= 35;
-    const isWeekly = medInterval >= 6 && medInterval <= 8;
-    if (!isMonthly && !isWeekly) continue;
-
-    const amounts = charges.map((c) => c.amount);
-    const medAmount = median(amounts);
+  for (const candidate of candidates) {
+    const charges = candidate.charges;
     const last = charges[charges.length - 1]!;
-    const prev = charges[charges.length - 2]!;
-    const priceChanged =
-      isMonthly &&
-      Math.abs(last.amount - prev.amount) >= 0.5 &&
-      Math.abs(last.amount - prev.amount) / prev.amount >= 0.05;
+    const creep = detectPriceCreep(charges, candidate.cadence);
+    const prev =
+      creep.priceChanged && charges.length >= 2
+        ? charges[charges.length - 2]!
+        : null;
+    const lifecycle = applyRecurringLifecycleFields({
+      lastChargeDate: last.date,
+      cadence: candidate.cadence,
+      priceChanged: creep.priceChanged,
+    });
 
-    const category = last.category;
+    const isZombie = lifecycle.status === "lapsed";
+    const freeTrialJump = detectFreeTrialJump(charges);
+    const flags = buildRecurringFlags({
+      charges,
+      cadence: candidate.cadence,
+      priceChanged: creep.priceChanged,
+      priceCreepPct: creep.priceCreepPct,
+      priceConfidence: creep.confidence,
+      isZombie,
+      isDuplicate: duplicateMap.get(candidate.merchantKey) ?? false,
+      freeTrialJump,
+    });
+
+    const category = candidate.category;
     const meta = categoryMeta(category);
-    const cadence = isMonthly ? "monthly" : "weekly";
 
     detected.push({
-      merchantName: displayName,
+      merchantName: candidate.displayName,
+      merchantKey: candidate.merchantKey,
       category,
       kind: SUBSCRIPTION_CATEGORIES.has(category) ? "subscription" : "bill",
-      amount: formatMoneyAmount(medAmount),
-      cadence,
-      nextChargeDate: addDays(last.date, Math.round(medInterval)),
+      amount: formatMoneyAmount(candidate.medAmount),
+      cadence: candidate.cadence,
+      nextChargeDate: lifecycle.nextChargeDate,
       lastChargeDate: last.date,
-      previousAmount: priceChanged ? formatMoneyAmount(prev.amount) : null,
-      priceChanged,
-      status: "active",
+      previousAmount: prev ? formatMoneyAmount(prev.amount) : null,
+      priceChanged: creep.priceChanged,
+      status: lifecycle.status,
       brandColor: meta.color,
+      flags,
     });
   }
 
@@ -150,3 +182,5 @@ export async function detectRecurringFromTransactions(
     (a, b) => Number.parseFloat(b.amount) - Number.parseFloat(a.amount),
   );
 }
+
+export { daysBetween } from "./recurring-lifecycle.js";

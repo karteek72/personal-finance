@@ -18,6 +18,7 @@ import {
   isNonContributionActivityName,
   shouldReclassifyAsNonContribution,
 } from "./investment-txn-classify.js";
+import { splitBalanceForNetWorth } from "../config/account-types.js";
 import {
   effectiveAssetType,
   holdingMarketValue,
@@ -36,8 +37,10 @@ export interface InvestmentBehavioralAlert {
 export interface InvestmentHistorySummary {
   lookbackYears: number;
   totalContributed: string;
-  estimatedValueToday: string;
+  /** Current holdings market value (not synthesized from contributions). */
   currentPortfolioValue: string;
+  totalCostBasis: string;
+  unrealizedGain: string;
   monthlyAverageInvest: string;
   transactionCount: number;
   buyTransactionCount: number;
@@ -649,18 +652,14 @@ export async function buildInvestmentHistorySummary(
     totalCost += mv.cost;
   }
 
-  const growthMultiple =
-    totalCost > 0 ? Math.max(portfolioValue / totalCost, 1) : 1;
-  const estimatedValueToday =
-    growthMultiple > 1
-      ? totalContributed * growthMultiple
-      : Math.min(totalContributed, portfolioValue);
+  const unrealizedGain = portfolioValue - totalCost;
 
   return {
     lookbackYears,
     totalContributed: formatMoneyAmount(totalContributed),
-    estimatedValueToday: formatMoneyAmount(estimatedValueToday),
     currentPortfolioValue: formatMoneyAmount(portfolioValue),
+    totalCostBasis: formatMoneyAmount(totalCost),
+    unrealizedGain: formatMoneyAmount(unrealizedGain),
     monthlyAverageInvest: formatMoneyAmount(
       totalContributed / (lookbackYears * 12),
     ),
@@ -685,8 +684,9 @@ export async function computeLiveNetWorth(userIds: string[]): Promise<number> {
   let liabilities = 0;
   for (const a of accountRows) {
     const bal = Number.parseFloat(a.balanceCurrent ?? "0");
-    if (a.type === "credit") liabilities += bal;
-    else assets += bal;
+    const split = splitBalanceForNetWorth(a.type, bal);
+    assets += split.assets;
+    liabilities += split.liabilities;
   }
   return assets - liabilities;
 }

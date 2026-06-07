@@ -6,6 +6,10 @@ import { encryptBytes } from "../../lib/field-crypto.js";
 import { importBatches, importFiles } from "../../db/schema.js";
 import { createLogger } from "../../lib/logger.js";
 import { getMerchantCategoryRulesMap } from "../category-rules.js";
+import { backfillTransactionMerchantIds } from "../dim-merchant-store.js";
+import {
+  writeInvestmentSnapshotsForAccount,
+} from "../investment-snapshots.js";
 import {
   resolveOrCreateImportAccount,
 } from "./account-resolver.js";
@@ -143,6 +147,7 @@ async function persistStatementsForFile(
       );
       inserted += invResult.inserted;
       skipped += invResult.skipped;
+      await writeInvestmentSnapshotsForAccount(db, userId, accountId);
     }
   }
 
@@ -585,6 +590,7 @@ export async function confirmImportBatch(
           txnsSkipped: batch.txnsSkipped + txnsSkipped,
         },
       );
+      await backfillTransactionMerchantIds(batch.userId);
     }
 
     void purgeStaleImportBlobs(env).catch((err: unknown) => {

@@ -75,6 +75,16 @@ npm run typecheck
 
 With `NEXT_PUBLIC_USE_MOCKS=true` (default in `.env.example`), all API calls use JSON fixtures in `src/mocks/` via `src/lib/mock-api.ts` (~150ms simulated delay). Set `NEXT_PUBLIC_USE_MOCKS=false` to call the real backend at `NEXT_PUBLIC_API_URL`.
 
+### Production builds (M1)
+
+`NEXT_PUBLIC_*` variables are **inlined at build time**. For production/container images:
+
+- Set `NEXT_PUBLIC_USE_MOCKS=false` (or leave unset) **before** `npm run build`.
+- `npm run build` runs `scripts/verify-production-build.mjs` and **fails** if mocks are enabled.
+- Non-mock production bundles alias `mock-api` to a stub so fixture JSON is not shipped.
+
+Never set `NEXT_PUBLIC_USE_MOCKS=true` in CI/CD for production images.
+
 ---
 
 ## Container notes
