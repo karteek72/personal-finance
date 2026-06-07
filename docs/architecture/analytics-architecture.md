@@ -677,3 +677,62 @@ and the backend must never return mock / inaccurate / other users' data."
 - **Hardening (M3):** add an automated **multi-user isolation test** — seed two households, hit each
   read endpoint as user A, and assert no row/aggregate from user B appears. This locks in the
   current good state and catches any future service that forgets to scope.
+
+---
+
+## 16. FIRE projection accuracy (F-series)
+
+The FIRE number itself is correct: `fireNumber = annual_spend / withdrawal_rate` (the 25× rule;
+`$50,400 / 0.04 = $1,260,000`, `computed-fields.ts:computeFireProjection`). The **time-to-FIRE / FIRE
+age** is what misleads (e.g. "1.9 years" for a 42-year-old). Defects:
+
+| ID | Sev | Where | Symptom → Root cause → Fix |
+|----|-----|-------|----------------------------|
+| **F1** | P1 | `computed-fields.ts:152` + `investment-analytics.ts:computeLiveNetWorth` | Years-to-FIRE seeds the starting portfolio with **total net worth** (`currentNetWorth` = checking + savings + cash + investments − debts) and grows the whole thing at the real return toward the 25× target. The 4%-SWR target assumes a **liquid, invested** portfolio, so including cash buffers / non-retirement assets overstates progress and makes FIRE look far closer than it is. **Fix:** seed the projection with **investable assets** — investment/brokerage/retirement balances (reuse `investmentLiquidityTotals` / holdings) plus, at most, liquid cash **above** the emergency-fund target — not total net worth. Keep total net worth as a separate display number. |
+| **F2** | P1 | `investment-analytics.ts:722` (`DEFAULT_FIRE_AGE = 35`) | When the user has not set their age, the projection uses a **default age of 35**, so `fireAge = currentAge + years` is wrong for anyone older (the user is 42). `isDefaultAge` is already returned. **Fix:** the UI must prompt for age before showing a FIRE age, and copy should say "set your age" until `isDefaultAge` is false; do not present a FIRE age computed off the default. |
+| **F3** | P2 | `investment-analytics.ts:averageMonthlyCashSpending/averageMonthlyInvestment` (3-mo window) | Spend and contributions are trailing **3-month** averages — a short, volatile window that misses lumpy annual costs (insurance, tuition, holidays), usually **understating** annual spend (and thus the FIRE number). **Fix:** use a longer trailing window (12 months) and/or annualize irregular/known-annual categories; surface the basis + a confidence/caveat. |
+| **F4** | P2 | `computed-fields.ts` real-return default 6% | The default **6% real** return is optimistic and is **not surfaced** to the user, who can't tell inflation is already netted out. **Fix:** expose the assumptions (real return, SWR, that figures are in today's dollars) in the UI, default to a more conservative real return (≈4–5%), and let the user adjust. |
+| **F5** | P3 | model scope | **Dependents / future costs** — current dependent spend is captured (it's in trailing transactions) but **future** step-changes (college, pre-Medicare healthcare, mortgage payoff) are not modeled, and there is no spend-in-retirement adjustment. **Fix (later):** optional retirement-spend override and known future cost events; clearly label the projection as a simple model. |
+
+### 16.1 Recommended approach
+**F1 + F2 are the fixes that matter most** for believability: project from investable assets (not
+total net worth) and stop computing a FIRE age off the default 35. F3/F4 then make the inputs and
+assumptions honest (longer window, conservative real return, assumptions shown). All math stays
+server-side so web and iOS agree.
+
+---
+
+## 17. User profile as a shared reference — wiring gaps (P-series)
+
+The profile is **one table** (`fire_profiles`) holding age, withdrawal rate, real return, household
+size, annual gross income, target retirement age, employment status, and risk tolerance. Both
+`/user/profile` and `/user/analytics-profile` read/write it through `user-profile-store.ts`. So the
+**plumbing is unified** — the problem is that most fields are **collected but never consumed**.
+
+### 17.1 What is actually wired
+- **`currentAge`, `withdrawalRate`, `realReturn`** → read by `computeFireProfileInputs` and used by
+  the FIRE projection. Saving age sets `ageUserSet=true`, the API returns `isDefaultAge=false`, and
+  `fire-panel.tsx` switches from "Set your age in Profile" to "Using Age N". **This path works
+  end-to-end.** If a user still sees the default, either the save didn't persist or they are reading
+  the headline **years-to-FIRE**, which does **not** depend on age (only the derived *FIRE age*
+  does); the implausible timeline is **F1** (total-net-worth seed), not age.
+
+### 17.2 Orphaned profile fields (stored, used by nothing)
+A repo-wide search shows `targetRetirementAge`, `householdSize`, `annualGrossIncome`,
+`riskTolerance`, and `employmentStatus` appear **only** in `schema.ts`, `user-profile-store.ts`, and
+`routes/user.ts` — **no analytics/compute service references them.** The user fills them in
+expecting them to matter (dependents, target date, income), and they silently do nothing.
+
+| ID | Sev | Field | Should drive |
+|----|-----|-------|--------------|
+| **P1** | P1 | `targetRetirementAge` | FIRE: compare projected FIRE age vs target → "on track / N years behind" and the **monthly savings required** to hit the target by that age. |
+| **P2** | P2 | `riskTolerance` | Default **real return** bands (conservative/moderate/aggressive) instead of a fixed 6% (ties to F4). |
+| **P3** | P2 | `householdSize` (dependents) | Emergency-fund target months, FIRE/resilience spend expectations, and a sanity check that spend reflects the household; surface in context. |
+| **P4** | P3 | `annualGrossIncome` | Fallback / cross-check for income-derived metrics (savings rate denominator, DTI) when transaction-detected income is incomplete; reconcile the two. |
+| **P5** | P3 | `employmentStatus` | Income-stability assumptions (e.g. self-employed → larger emergency-fund target / lower income-stability score). |
+
+### 17.3 Principle & guard
+**Don't collect what you don't use.** Every field on the profile form should either feed a feature
+or be removed. Add a **regression test** that saving profile age makes FIRE return
+`isDefaultAge=false` / the saved age (locks the one wired path), and an audit checklist so any new
+profile field ships with at least one consumer.

@@ -1956,3 +1956,219 @@ tasks:
       - A test seeds two households and asserts every read endpoint returns only the caller's data
       - The test fails if a service queries transactions without household/account scoping
       - The test runs in CI
+  - id: TASK-FIRE-001
+    title: FIRE projection should start from investable assets, not total net worth (F1)
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/computed-fields.ts
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Defect F1 (analytics-architecture.md section 16). computeFireProjection seeds the starting
+      portfolio with currentNetWorth = computeLiveNetWorth (checking + savings + cash + investments
+      - debts) and grows the whole thing at the real return toward the 25x target. The 4% safe-
+      withdrawal target assumes a liquid INVESTED portfolio, so including cash buffers and non-
+      retirement assets makes years-to-FIRE far too short (e.g. "1.9 years" for a 42-year-old).
+      Fix: compute an "investable assets" figure — investment/brokerage/retirement account balances
+      (reuse investmentLiquidityTotals / holdings) plus at most liquid cash ABOVE the emergency-fund
+      target — and pass THAT as the projection start. Keep total net worth as a separate displayed
+      number (do not change net-worth KPIs). Add a caveat describing what counts as investable.
+    acceptance_criteria:
+      - Years-to-FIRE is computed from investable assets, not total net worth
+      - Cash up to the emergency-fund target is excluded from the FIRE start balance
+      - Total net worth remains available as its own field for display
+      - typecheck passes
+  - id: TASK-FIRE-002
+    title: Do not compute FIRE age off the default age; require user age (F2)
+    status: ready
+    priority: P1
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/fire-panel.tsx
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Defect F2 (analytics-architecture.md section 16). When the user has not set their age the
+      projection uses DEFAULT_FIRE_AGE = 35, so fireAge is wrong for anyone older (user is 42). The
+      API already returns isDefaultAge. Update fire-panel.tsx so that when isDefaultAge is true it
+      prompts the user to set their age and does NOT present a concrete FIRE age (show years-to-FIRE
+      or a "set your age" prompt instead). Once the user sets their age, show the FIRE age.
+    acceptance_criteria:
+      - When isDefaultAge is true the UI prompts for age and hides/labels the FIRE age as unset
+      - After the user sets their age the FIRE age is shown using the real age
+      - No FIRE age is presented as fact while based on the default 35
+  - id: TASK-FIRE-003
+    title: Longer/annualized spend & contribution basis for FIRE inputs (F3)
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Defect F3 (analytics-architecture.md section 16). averageMonthlyCashSpending and
+      averageMonthlyInvestment use a trailing 3-month window, which is volatile and misses lumpy
+      annual costs (insurance, tuition, holidays), usually understating annual spend and thus the
+      FIRE number. Use a 12-month trailing window (fall back gracefully with less history) and/or
+      annualize known-annual categories, and surface the basis + a confidence/caveat in the FIRE
+      response so the user understands the inputs.
+    acceptance_criteria:
+      - FIRE spend/contribution inputs use ~12 months of history (graceful fallback when less)
+      - The FIRE response documents the basis and a confidence/caveat
+      - typecheck passes
+  - id: TASK-FIRE-004
+    title: Surface FIRE assumptions; default to a conservative real return (F4)
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/fire-panel.tsx
+      - backend/src/services/computed-fields.ts
+    description: |
+      Defect F4 (analytics-architecture.md section 16). The 6% real-return default is optimistic and
+      the assumptions (real/inflation-adjusted return, 4% SWR, figures in today's dollars) are not
+      shown, so the user cannot tell inflation is already netted out. Show the assumptions in the
+      FIRE panel, let the user adjust withdrawal rate and real return (overrides already exist on the
+      API), and consider a more conservative default real return (~4-5%). Add a one-line explanation
+      that the FIRE number is in today's dollars and inflation is handled via the real return.
+    acceptance_criteria:
+      - FIRE panel shows the real return, withdrawal rate, and "today's dollars" assumption
+      - User can adjust real return / withdrawal rate and see the projection update
+      - Default real return reviewed (more conservative) with rationale in the doc
+  - id: TASK-PROFILE-001
+    title: Use targetRetirementAge in the FIRE projection (P1)
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/computed-fields.ts
+      - backend/src/services/investment-analytics.ts
+      - backend/src/services/planning-store.ts
+    description: |
+      Defect P1 (analytics-architecture.md section 17). targetRetirementAge is stored on
+      fire_profiles but referenced by no analytics. Wire it into the FIRE projection: compare the
+      projected FIRE age against the user's target, return an on-track/behind status and the gap in
+      years, and compute the additional monthly savings required to reach the FIRE number by the
+      target age. Pass targetRetirementAge through computeFireProfileInputs into the projection and
+      include the new fields in the FIRE response.
+    acceptance_criteria:
+      - FIRE response includes target retirement age, on-track/behind status, and year gap
+      - Required monthly savings to hit the target age is computed and returned
+      - When no target is set, behavior is unchanged
+      - typecheck passes
+  - id: TASK-PROFILE-002
+    title: Map riskTolerance to default real-return bands (P2)
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/user-profile-store.ts
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Defect P2 (analytics-architecture.md section 17). riskTolerance is stored but unused. Use it to
+      derive the default real return when the user has not explicitly overridden it (e.g.
+      conservative ~3-4%, moderate ~4.5-5%, aggressive ~6%). Keep the user override authoritative.
+      Coordinate with TASK-FIRE-004 (assumptions surfaced in the UI).
+    acceptance_criteria:
+      - Default real return is derived from riskTolerance when not user-overridden
+      - User-set real return still wins over the risk-based default
+      - The derived assumption is documented/caveated in the response
+      - typecheck passes
+  - id: TASK-PROFILE-003
+    title: Use householdSize (dependents) in emergency-fund & spend expectations (P3)
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/analytics-resilience.ts
+      - backend/src/services/user-profile-store.ts
+    description: |
+      Defect P3 (analytics-architecture.md section 17). householdSize is stored but unused. Use it to
+      inform the emergency-fund target (more dependents -> lean toward the higher end of 3-6 months)
+      and as a sanity context for FIRE/resilience spend expectations; surface it in the relevant
+      responses. Keep changes conservative and clearly labeled; do not fabricate per-dependent costs.
+    acceptance_criteria:
+      - Emergency-fund target reflects household size within the documented band
+      - Household size is surfaced where it affects a calculation
+      - No fabricated per-dependent dollar amounts; assumptions are caveated
+      - typecheck passes
+  - id: TASK-PROFILE-004
+    title: Use annualGrossIncome as fallback/cross-check for income metrics (P4)
+    status: backlog
+    priority: P3
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/user-profile-store.ts
+      - backend/src/services/compute-wellness.ts
+    description: |
+      Defect P4 (analytics-architecture.md section 17). annualGrossIncome is stored but unused. Use it
+      as a fallback or cross-check for income-derived metrics (savings-rate denominator, DTI) when
+      transaction-detected income is incomplete, and flag large discrepancies between stated income
+      and detected income as a data-quality signal. Detected income remains primary when reliable.
+    acceptance_criteria:
+      - Income-derived metrics fall back to stated gross income when detected income is missing/low
+      - A discrepancy between stated and detected income is surfaced as a caveat/signal
+      - typecheck passes
+  - id: TASK-PROFILE-005
+    title: Regression test + audit that profile fields are consumed (P5)
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/user-profile-store.ts
+      - backend/src/services/investment-analytics.ts
+    description: |
+      Defect P5 (analytics-architecture.md section 17). Lock the one wired path and prevent future
+      orphan fields. Add a test that saving currentAge via updateUserProfile makes getFire /
+      getUserProfile return isDefaultAge=false and the saved age, and that withdrawalRate/realReturn
+      round-trip into the projection. Add an audit checklist item: every profile field must have at
+      least one consumer or be removed from the form. Once P1-P4 land, remove any field that still
+      has no consumer.
+    acceptance_criteria:
+      - Test proves saved age flows into the FIRE projection (isDefaultAge=false, age used)
+      - Test proves withdrawalRate/realReturn round-trip into the projection
+      - Doc/checklist requires every profile field to have a consumer

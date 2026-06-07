@@ -216,6 +216,43 @@ Design: `analytics-architecture.md` §15.
 
 ---
 
+### FIRE projection accuracy
+
+The $1.26M FIRE number (25× spend) is correct, but time-to-FIRE / FIRE age is too optimistic: it
+seeds the portfolio with **total net worth** instead of investable assets, computes a FIRE age off a
+**default age of 35**, uses a short 3-month spend window, and hides an optimistic 6% real-return
+assumption. Design: `analytics-architecture.md` §16.
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-FIRE-001 | backend | FIRE projection from investable assets, not total net worth (F1) | — |
+| TASK-FIRE-002 | ui | Require user age before showing a FIRE age (F2) | — |
+| TASK-FIRE-003 | backend | Longer/annualized spend & contribution basis (F3) | — |
+| TASK-FIRE-004 | ui | Surface FIRE assumptions; conservative real-return default (F4) | — |
+
+**Start with `TASK-FIRE-001` + `TASK-FIRE-002`** — the two that make the date believable.
+
+---
+
+### User profile wiring (orphaned fields)
+
+The profile is one unified table (`fire_profiles`); age / withdrawal rate / real return are wired
+into FIRE end-to-end. But `targetRetirementAge`, `householdSize` (dependents), `annualGrossIncome`,
+`riskTolerance`, and `employmentStatus` are **stored but referenced by no analytics** — collected
+and ignored. Design: `analytics-architecture.md` §17.
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-PROFILE-001 | backend | Use targetRetirementAge in FIRE (on-track/behind + required savings) (P1) | — |
+| TASK-PROFILE-002 | backend | Map riskTolerance to default real-return bands (P2) | — |
+| TASK-PROFILE-003 | backend | Use householdSize in emergency-fund & spend expectations (P3) | — |
+| TASK-PROFILE-004 | backend | annualGrossIncome fallback/cross-check for income metrics (P4) | — |
+| TASK-PROFILE-005 | backend | Regression test + audit that profile fields are consumed (P5) | — |
+
+**Principle:** don't collect what you don't use — every profile field must feed a feature or be removed.
+
+---
+
 ## Recently completed
 
 | ID | Title |
