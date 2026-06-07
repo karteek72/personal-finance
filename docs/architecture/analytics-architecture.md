@@ -513,3 +513,71 @@ Show "why" text on every suggestion so it's meaningful (§ "everything on the UI
   `rationale`, `confidence`), leaving the existing `budgets[]`/`goals[]` as the persisted set.
 
 All math stays server-side (thin-client rule, §10.1) so web and iOS share identical suggestions.
+
+---
+
+## 13. Lifestyle cost-audit engine & subscription lifecycle
+
+### 13.1 Current state (why only ~1 audit shows)
+"Plan → Recurring → Lifestyle cost audit" renders `recurring.leaks.habits`, produced by
+`lifestyle-habits.ts` from **4 hardcoded `HABIT_DEFS`** (coffee, dining, rideshare, subscriptions),
+each gated by a `minMonthly` threshold. Several never match because the category/subcategory
+literals drift from the taxonomy (defect **C15**), so in practice only one or two appear. The
+"Hidden fees" tab is likewise thin: the backend only returns a single **ATM** fee row
+(`planning-store.ts` `leaks.fees`) even though the UI already has copy for overdraft, maintenance,
+late, and FX fees.
+
+### 13.2 Data-driven audit engine (target: 10–20+ audits)
+Replace the fixed habit list with an engine that derives many audits from the user's own data.
+Each audit shares a shape so the UI can render them uniformly and sort by impact:
+
+```jsonc
+{
+  "id": "delivery-premium",
+  "type": "habit | delivery | duplicate_subscription | price_hike | lapsed_subscription |
+           impulse | fee | category_overspend | merchant_frequency",
+  "emoji": "🍔",
+  "title": "Food delivery premium",
+  "monthly": "182.40",            // money strings, 2dp
+  "annual": "2188.80",
+  "opportunityCost10y": "31000.00", // optional FV at a documented rate (move FV math server-side)
+  "rationale": "23 DoorDash/UberEats orders in 90 days; ~35% markup vs grocery spend.",
+  "action": "Batch-cook 2 nights/week to cut ~8 orders/mo.",
+  "savingsEstimate": "70.00",     // est. monthly recoverable
+  "confidence": 0.7
+}
+```
+
+Audit generators (each emits 0..n audits, all from real rows):
+- **Habit/frequency** — for each discretionary subcategory/merchant with recurring spend (coffee,
+  fast food, bars, gaming, streaming, fitness, rideshare, …), derived from the **actual** top
+  discretionary merchants/subcategories, not a fixed list. Use `dim_category`
+  (`TASK-ANALYTICS-005`) for essential/discretionary.
+- **Delivery premium** — DoorDash/UberEats/Grubhub spend and its markup vs grocery spend.
+- **Duplicate / overlapping subscriptions** — multiple services in the same lane (e.g. >1 video or
+  music subscription).
+- **Price-hike** — recurring series with `priceChanged` (what the increase costs annually).
+- **Lapsed / zombie subscription** — see §13.3.
+- **Impulse / frequent small purchases** — many sub-$X charges at one merchant.
+- **Fee audits** — ATM, overdraft, maintenance, late, FX, surcharge (expand beyond ATM-only).
+- **Category overspend** — categories materially above the user's own trailing baseline.
+Sort by `savingsEstimate` (or `annual`) desc; the UI paginates (§10). Move the future-value math
+(currently in `leaks-panel.tsx`) into the engine so iOS gets the same opportunity-cost numbers.
+
+### 13.3 Subscription lifecycle (cancelled / stale detection)
+Today every detected recurring item is `status:"active"` with a `nextChargeDate` that can be in the
+past (defect **C14** / `TASK-CALC-010`). Add a lifecycle:
+- **active** — charged within ~1.0× cadence.
+- **lapsed / possibly-cancelled** — no charge for > ~1.5× cadence (e.g. a monthly sub silent for
+  45+ days). Surface as a positive audit: "No charge from <X> in N months — looks cancelled,
+  saving ~$Y/yr. Confirm?" and stop counting it in active monthly/annual totals.
+- **price-changed** — flagged separately for the price-hike audit.
+Set `nextChargeDate` null when the prediction is already in the past. This both fixes the bogus
+"active" counts and gives the user the "did you cancel this?" check they expect when transactions
+stop appearing.
+
+> Ambiguity: the second user request ("check on already cancelled subscriptions when there are no
+> recent transactions") is read as "the system does **not** do this yet — add it." If the intent
+> was the opposite, only the surfacing copy changes, not the detection.
+
+All audits and lifecycle states are computed server-side (thin-client rule) so web and iOS match.

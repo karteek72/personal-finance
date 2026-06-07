@@ -133,6 +133,21 @@ Add CRUD + smarter, additive suggestions, all server-side. Design: `analytics-ar
 
 **Start with `TASK-PLAN-001`** (CRUD + schema) — everything else builds on it.
 
+### Lifestyle cost-audit engine & subscription lifecycle
+
+"Lifestyle cost audit" shows ~1 item because it comes from 4 hardcoded habit buckets (several
+broken by C15). Replace with a data-driven engine (10-20+ audits), expand hidden-fee detection,
+and add cancelled/lapsed subscription detection. Design: `analytics-architecture.md` §13.
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-AUDIT-001 | backend | Data-driven lifestyle cost-audit engine (10-20+) | — |
+| TASK-AUDIT-002 | backend | Subscription lifecycle: lapsed/cancelled detection | — |
+| TASK-AUDIT-003 | backend | Expand hidden-fee detection beyond ATM-only | — |
+| TASK-UI-AUDIT-001 | ui | Render full audit list + lapsed-subscription cards | AUDIT-001/002 |
+
+Related: `TASK-CALC-010` (C14) and `TASK-CALC-011` (C15) share root causes — coordinate.
+
 ---
 
 ## Recently completed

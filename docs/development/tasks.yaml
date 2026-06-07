@@ -1786,3 +1786,119 @@ tasks:
       - User can add, edit, and delete a savings goal; changes persist and refetch
       - Suggested goals render with rationale and can be accepted, edited, or dismissed
       - Accepted goals become normal editable goals; dismissed ones do not reappear
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Lifestyle cost-audit engine & subscription lifecycle — analytics-architecture.md section 13
+  # The "Lifestyle cost audit" shows ~1 item because it comes from 4 hardcoded habit
+  # buckets (several broken by C15 category-name drift). Replace with a data-driven
+  # engine producing 10-20+ audits, expand hidden-fee detection, and add a
+  # cancelled/lapsed subscription lifecycle. All server-side (thin-client rule).
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: TASK-AUDIT-001
+    title: "Data-driven lifestyle cost-audit engine (10-20+ audits)"
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/lifestyle-habits.ts
+      - backend/src/services/planning-store.ts
+    description: |
+      The lifestyle cost audit (recurring.leaks.habits) is built from 4 hardcoded HABIT_DEFS in
+      lifestyle-habits.ts, gated by minMonthly, with several never matching due to C15 category
+      drift — so the user sees ~1 (Rideshare). Replace it with an engine that derives many audits
+      from real data (section 13.2), each with the uniform audit shape
+      (id, type, emoji, title, monthly, annual, opportunityCost10y?, rationale, action,
+      savingsEstimate, confidence). Generators: habit/frequency (from actual top discretionary
+      merchants/subcategories, not a fixed list), delivery premium, duplicate/overlapping
+      subscriptions, price-hike, impulse/frequent-small-purchases, category overspend vs the
+      user's own baseline. Sort by savingsEstimate desc; the UI paginates (section 10). Move the
+      future-value (opportunity cost) math out of leaks-panel.tsx into this engine so iOS matches.
+      Fix C15 (TASK-CALC-011) or self-contain category lookups so matchers actually fire.
+    acceptance_criteria:
+      - Engine emits many audits (target 10-20 for a typical dataset), not a fixed 4
+      - Audits are derived from the user's actual merchants/subcategories, not hardcoded names
+      - Each audit has rationale, action, savingsEstimate, and confidence
+      - Opportunity-cost (FV) computed server-side; leaks-panel stops computing it
+      - Audits sorted by impact; no matcher silently fails on a missing category name
+
+  - id: TASK-AUDIT-002
+    title: "Subscription lifecycle: detect lapsed/cancelled subscriptions"
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/detect-recurring.ts
+      - backend/src/services/planning-store.ts
+    description: |
+      Recurring items are always status:"active" with possibly-past nextChargeDate (defect C14,
+      TASK-CALC-010). Add a lifecycle (section 13.3): active (charged within ~1.0x cadence),
+      lapsed/possibly-cancelled (no charge for > ~1.5x cadence), price-changed (flagged).
+      When lapsed: surface a positive audit ("No charge from <X> in N months — looks cancelled,
+      saving ~$Y/yr; confirm?"), set nextChargeDate null, and exclude it from active
+      monthly/annual subscription totals. This gives the "did you cancel this?" check the user
+      expects when transactions stop. Coordinate with TASK-CALC-010 (same root cause) and
+      TASK-AUDIT-001 (lapsed_subscription audit type).
+    acceptance_criteria:
+      - Subscriptions silent beyond ~1.5x cadence are marked lapsed/possibly-cancelled, not active
+      - Active monthly/annual totals exclude lapsed items
+      - A lapsed subscription produces a "looks cancelled, confirm?" audit with estimated savings
+      - nextChargeDate is null when it would be in the past
+
+  - id: TASK-AUDIT-003
+    title: "Expand hidden-fee detection beyond ATM-only"
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/planning-store.ts
+      - ui/src/components/preview/panels/leaks-panel.tsx
+    description: |
+      getRecurring returns only a single ATM/overdraft fee row (leaks.fees) even though the UI
+      already renders advice for overdraft, maintenance, late, and FX fees. Detect each fee type
+      from transactions (by subcategory/merchant patterns), with 12-month count + total and the
+      `fixable` flag. Keep the existing fee item shape so the UI lights up the matching advice.
+    acceptance_criteria:
+      - leaks.fees includes ATM, overdraft, maintenance, late, and FX fee types when present
+      - Each fee has a 12-month count + total and a correct fixable flag
+      - The hidden-fees hero total reflects all detected fee types
+
+  - id: TASK-UI-AUDIT-001
+    title: "Render full audit list + lapsed-subscription cards"
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-AUDIT-001
+      - TASK-AUDIT-002
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/leaks-panel.tsx
+    description: |
+      Update leaks-panel.tsx to render the richer audit list from TASK-AUDIT-001: show title,
+      rationale, action, monthly/annual, server-provided opportunity cost, and confidence;
+      group/sort by impact and paginate when long. Surface lapsed/possibly-cancelled
+      subscriptions (TASK-AUDIT-002) as their own "looks cancelled — confirm?" cards. Remove the
+      client-side future-value math (use API values).
+    acceptance_criteria:
+      - The audit tab shows the full ranked list (not capped at the old 4), with rationale + action
+      - Lapsed subscriptions appear as confirm-cancellation cards
+      - No client-side FV/opportunity-cost computation remains in the panel
