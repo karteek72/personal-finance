@@ -581,3 +581,99 @@ stop appearing.
 > was the opposite, only the surfacing copy changes, not the detection.
 
 All audits and lifecycle states are computed server-side (thin-client rule) so web and iOS match.
+
+---
+
+## 14. Transfer reconciliation & duplicate prevention (R-series)
+
+### 14.1 Current state (what already works)
+- **Credit-card payments** are detected by Plaid PFC (`LOAN_PAYMENTS_CREDIT_CARD_PAYMENT`) + text
+  patterns (`transfer-classification.ts`) and marked `is_transfer=true`,
+  `category="Transfers (internal)"`, so they're excluded from spend/income in every analytics query
+  (which filter `is_transfer=false AND category != internal`).
+- **Leg-to-leg pairing exists**: `transfer-pairing.ts:refreshTransferLinks` runs after every Plaid,
+  Teller, and SnapTrade sync, matching outflow↔inflow by amount (±$1 / ±1%) and date (±4 days) into
+  a `transfer_links` table with a confidence score and `linkKind` (`bank_bank`, `bank_brokerage`,
+  `cc_payment`).
+- **Within-account dedup**: both Plaid upsert and statement import compute a
+  `bankingDedupFingerprint(accountId, date, amount, name)` and skip duplicates, so importing a CSV
+  for an account already synced via Plaid does not double-insert **within that account**.
+
+### 14.2 Gaps and status
+| ID | Sev | Status | Symptom → Root cause → Fix |
+|----|-----|--------|----------------------------|
+| **R1** | P1 | **DONE** (`TASK-RECON-001`) | Pairing was computed but **not fed into the spend/income KPIs** (they excluded transfers only via the per-transaction `is_transfer` flag), so a paired leg still typed `income`/`expense` (card-payment credit leg, non-Plaid sources) double-counted. **Fixed:** `reconcileLinkedTransferLegs` runs inside `refreshTransferLinks` and reclassifies both legs of high-confidence links to `is_transfer=true` / `transfer`, so every KPI filter now excludes them. |
+| **R2** | P2 | **DONE** (`TASK-RECON-002`) | `data-quality.ts` hardcoded transfer-pair coverage to 0 with a "not yet implemented" caveat. **Fixed:** it now calls `transferPairCoverage(ctx.userIds)` and reflects the real ratio in `compositeConfidence`. |
+| **R3** | P2 | **DONE** (`TASK-RECON-003`) | Bank↔bank savings/checking transfers from Teller / SnapTrade / CSV / manual were only internal if pre-tagged. **Fixed:** matched pairs are reconciled via R1; a conservative self-transfer fallback + an unpaired-transfer data-quality caveat handle the remainder. |
+| **R4** | P3 | OPEN (`TASK-RECON-004`) | Dedup fingerprint is scoped to a single `accountId`. If the **same real account is linked via two providers** (two Plaid items, or Plaid + Teller), rows land under different `accountId`s and the same transaction appears **twice** → duplicated spend/income. **Fix:** detect likely-duplicate accounts (institution + mask + type) and duplicate transactions across them; surface in data-quality with a merge/ignore path. |
+| **R5** | P3 | tracked as C15 | Duplicate **categories** in breakdowns from category-name drift across services (e.g. "Subscriptions & Software" vs "Subscriptions & Digital"). **Fix:** single-source the taxonomy (`TASK-CALC-011`). Also confirm money-flow transfer handling (C9/C12, `TASK-CALC-006/008`). |
+
+### 14.3 Outcome
+**R1–R3 are implemented.** Pairing is now authoritative: because all KPIs, categories, money-flow,
+wellness, and audits exclude `is_transfer=true`, reconciling both legs of a high-confidence
+`transfer_link` removed double-counting everywhere at once — and gives iOS the same reconciled data
+with no client logic. Remaining: **R4** (cross-provider duplicate accounts) and **R5/C15**
+(duplicate category names).
+
+### 14.4 Savings/checking → investment transfers (regular contributions)
+This is a `bank_brokerage` flow and is mostly handled, with one gap:
+- **Bank (depository) outflow leg** — when synced via **Plaid** it carries a `TRANSFER_OUT` PFC,
+  which `plaid/map-transaction.ts` maps to `Transfers (internal)` / `is_transfer=true`, so it is
+  **excluded from spend**. Correct.
+- **Brokerage inflow leg** — lands in `investment_transactions` (type `contribution`/`buy`), which
+  is a **separate table** and is never part of the spend/income transaction KPIs, so it does not
+  double-count as spend. It is surfaced as a contribution / holding.
+- **Pairing** — `refreshTransferLinks` matches the two legs as `bank_brokerage`;
+  `sumLinkedBrokerageContributions` counts the contribution **once** for the net-investment-rate
+  metric.
+- **Former gap, now fixed:** when the bank-side leg came from a **non-Plaid source** (Teller / CSV /
+  manual) or Plaid did not tag it `TRANSFER_OUT`, the outflow was **counted as spend** while the
+  brokerage side was **also** counted as a contribution — the money showed as both "spent" and
+  "invested." `reconcileLinkedTransferLegs` (R1, `TASK-RECON-001`) now reclassifies the paired
+  `bank_brokerage` outflow leg to `transfer` so it is excluded from spend, and the self-transfer
+  fallback (R3, `TASK-RECON-003`) handles unmatched legs.
+- **Net worth is not double-counted:** at the moment of transfer the bank balance drops and the
+  holding value rises by the same amount, so net worth is unchanged — that is correct accounting,
+  not a duplication.
+
+---
+
+## 15. Mock-data gating, data integrity & tenant isolation
+
+Audit triggered by: "with `NEXT_PUBLIC_USE_MOCKS=false` the UI must use **only** the backend API,
+and the backend must never return mock / inaccurate / other users' data."
+
+### 15.1 UI mock gating — clean, with one caveat
+- There is a **single** switch: `USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === "true"`
+  (`api-client.ts`, mirrored in `use-current-user.ts` and `auth-session.ts`). Every mock branch —
+  including the CSV-export helper `exportMockTransactionsCsv` — is behind it. With the flag `false`
+  **or unset**, all calls go through `fetchJson` to the backend. Mocks turn on **only** when the
+  value is exactly `"true"`.
+- **Only** `api-client.ts` imports `@/lib/mock-api`; no component, hook, or page imports fixtures
+  directly. So all data flows through the gated client.
+- **Caveat (M1):** `NEXT_PUBLIC_*` vars are inlined by Next.js at **build time**, not runtime.
+  A production image must be **built** with `NEXT_PUBLIC_USE_MOCKS=false` (or unset); flipping it
+  only at runtime has no effect. Recommend a build-time assertion / CI check that production builds
+  never bundle with mocks enabled, and ideally that `mock-api` is tree-shaken out of prod bundles.
+
+### 15.2 Backend — no mock data served
+- No route or service returns mock/demo/sample/seed data. The only `fixture`/`sample` references
+  are in `__tests__` (test inputs), never in runtime responses.
+- **Non-determinism (M2):** `planning-engine.ts:124` uses `Math.random()` for a Monte-Carlo shock in
+  projections. That is legitimate simulation, but it makes forward-looking numbers
+  **non-reproducible** between requests and can read as "inaccurate." Recommend a **seeded** RNG (or
+  closed-form percentiles) plus a clear "projection / estimate" label so two loads agree.
+
+### 15.3 Tenant isolation — read paths are scoped
+- Every read/analytics service that queries `transactions` resolves the caller's
+  `resolveHouseholdContext(userId)` and filters via `drizzleActiveTransactionWhere(userIds,
+  accountIds)` / `resolveActiveAccountScope`. A file-by-file cross-check found **no read service
+  missing scoping**.
+- The only `.from(transactions)` services without household scoping are **ingestion**
+  (`plaid/upsert-transactions.ts`, `import/persist-banking.ts` — scoped by the explicit
+  account/user being synced) and **global maintenance backfills**
+  (`backfill-transfers.ts`, `backfill-subcategories.ts`). The backfills intentionally scan all rows
+  but are **writes**, not API responses, so they cannot leak one user's data into another's response.
+- **Hardening (M3):** add an automated **multi-user isolation test** — seed two households, hit each
+  read endpoint as user A, and assert no row/aggregate from user B appears. This locks in the
+  current good state and catches any future service that forgets to scope.

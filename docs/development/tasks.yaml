@@ -1,16 +1,6 @@
-# SpendFlow development task board — machine-readable source of truth.
-# Human dashboard: TASK_BOARD.md
-# CLI: npm run task -- <list|next|claim|release|complete|status> [args]
-#
-# Status: backlog | ready | in_progress | blocked | done | cancelled
-# Priority: P0 (critical) | P1 (high) | P2 (medium) | P3 (low) | P4 (deferred)
-
 version: 1
-updated_at: "2026-06-03"
-
+updated_at: 2026-06-07
 tasks:
-  # ── P0 — Critical gaps (docs claim done but code missing) ─────────────────
-
   - id: TASK-INFRA-001
     title: BullMQ worker + Redis + async Plaid webhook sync
     status: done
@@ -36,7 +26,6 @@ tasks:
       - GET /health reports real Redis connectivity
       - containers/compose.yaml includes redis service
       - backend/.env.example documents REDIS_URL
-
   - id: TASK-API-001
     title: Transaction CSV export endpoint + UI download
     status: done
@@ -57,7 +46,6 @@ tasks:
       - Filters match list endpoint (month, category, account, scope, q, type)
       - UI exposes download on transactions page
       - api-contract.md unchanged (already specified)
-
   - id: TASK-DOCS-001
     title: Sync product-requirements.md with implemented reality
     status: done
@@ -77,9 +65,6 @@ tasks:
       - Completed MVP items marked [x] with accurate status
       - Open items reflect real gaps (BullMQ, CSV, rate limit, etc.)
       - Development Phases section matches README status section
-
-  # ── P1 — High priority (Phase 3 completion) ─────────────────────────────
-
   - id: TASK-SEC-001
     title: Per-user rate limiting (100 req/min)
     status: done
@@ -100,7 +85,6 @@ tasks:
       - Authenticated routes rate-limited per userId
       - Returns HTTP 429 when exceeded
       - Uses Redis when REDIS_URL set; graceful skip in dev without Redis
-
   - id: TASK-INFRA-002
     title: Worker container in Podman compose
     status: done
@@ -119,7 +103,6 @@ tasks:
       - worker service in compose.yaml
       - containers/README.md updated
       - depends_on redis + api
-
   - id: TASK-UI-001
     title: Mobile responsive polish (375px breakpoints)
     status: done
@@ -137,7 +120,6 @@ tasks:
       - Sidebar collapses to mobile-nav without horizontal scroll
       - KPI cards stack cleanly at 375px
       - Transaction table readable (horizontal scroll OK if intentional)
-
   - id: TASK-PLAID-001
     title: Plaid ITEM_ERROR reconnect flow (UI + backend status)
     status: done
@@ -154,9 +136,6 @@ tasks:
       - Webhook sets plaid_items.status = reauth_required
       - Accounts API exposes status
       - UI shows reconnect Plaid Link for affected items
-
-  # ── P2 — Preview → live backend (Phase 3.5) ─────────────────────────────
-
   - id: TASK-PREVIEW-001
     title: Budgets API — real data from transaction aggregates
     status: done
@@ -173,7 +152,6 @@ tasks:
     acceptance_criteria:
       - GET /planning/budgets returns live data when user has transactions
       - UI preview banner removed on Budgets tab when live
-
   - id: TASK-PREVIEW-002
     title: Recurring charges detector (subscription list)
     status: done
@@ -189,7 +167,6 @@ tasks:
     acceptance_criteria:
       - Identifies charges with ≥3 occurrences at ~monthly interval
       - Returns amount, merchant, next expected date
-
   - id: TASK-PREVIEW-003
     title: Financial wellness score endpoint
     status: done
@@ -206,7 +183,6 @@ tasks:
     acceptance_criteria:
       - GET /insights/wellness returns score + dimension breakdown
       - Computed from real user data
-
   - id: TASK-PREVIEW-004
     title: Coach Q&A — RAG over transaction summaries (V2 stub)
     status: done
@@ -222,9 +198,6 @@ tasks:
     acceptance_criteria:
       - POST /coach/ask returns answers from precomputed monthly summaries
       - No API keys required for MVP stub
-
-  # ── P0 — Statement import (current focus) ───────────────────────────────
-
   - id: TASK-IMPORT-001
     title: Import UI + encrypted multipart upload API (Phase A)
     status: done
@@ -246,7 +219,6 @@ tasks:
       - POST /imports/batches stores encrypted files in import_files
       - GET /imports/formats returns limits for client validation
       - No file contents in logs
-
   - id: TASK-IMPORT-002
     title: Day-trade CSV parsers — E*TRADE, Fidelity, Webull + worker parse job
     status: done
@@ -269,7 +241,6 @@ tasks:
       - Worker job processes import_batches; updates status + txn counts
       - Webull filters non-Filled orders
       - Unit tests with sanitized fixture headers
-
   - id: TASK-IMPORT-003
     title: OFX/QFX parser — bank, credit, and investment blocks
     status: done
@@ -290,7 +261,6 @@ tasks:
       - Fidelity QFX invest block maps buy/sell with FITID external_id
     notes: |
       parse-ofx.ts + persist-banking.ts; migration 0010; 8 import tests pass.
-
   - id: TASK-IMPORT-004
     title: Import review UI — detected accounts + confirm before persist
     status: done
@@ -312,7 +282,6 @@ tasks:
       - Confirm triggers final persist (or re-queue job)
     notes: |
       previewImportBatch + confirmImportBatch; ImportReview component; POST /imports/batches/:id/confirm.
-
   - id: TASK-IMPORT-005
     title: Plaid ↔ import account merge + cross-source dedup fingerprint
     status: done
@@ -334,7 +303,6 @@ tasks:
       - Same purchase from import + Plaid not inserted twice
     notes: |
       dedup_fingerprint columns; fingerprint.ts; GET /imports/link-suggestions; POST /imports/accounts/merge; Plaid upsert skips fingerprint dupes.
-
   - id: TASK-IMPORT-006
     title: Import compliance — blob retention, consent_records, audit_events
     status: done
@@ -357,7 +325,6 @@ tasks:
       - audit_events logged without PII or file content
     notes: |
       Migration 0011; import-audit.ts; purge-import-blobs.ts; consent on every upload batch.
-
   - id: TASK-IMPORT-007
     title: Secondary CSV templates — Schwab, Robinhood, Coinbase + SoFi checking
     status: done
@@ -376,7 +343,6 @@ tasks:
       - coinbase-tx-history maps to investment_transactions with assetType crypto
     notes: |
       schwab-transactions, robinhood-activity, coinbase-tx-history, sofi-checking templates + fixtures.
-
   - id: TASK-IMPORT-008
     title: PDF statement plugins — SoFi Invest, brokerage fallbacks
     status: done
@@ -395,7 +361,6 @@ tasks:
       - Generic detection fails gracefully with user-visible warning
     notes: |
       pdf/detect-institution.ts, sofi-invest.ts, parseImportFileAsync; graceful errors for unknown PDFs.
-
   - id: TASK-SEC-002
     title: GDPR JSON data export endpoint
     status: done
@@ -413,9 +378,6 @@ tasks:
       - No secrets in export
     notes: |
       export-user-data.ts; GET /auth/export with attachment; assertExportHasNoSecrets; data_export audit event.
-
-  # ── P4 — iPhone app (deferred — lowest priority) ────────────────────────
-
   - id: TASK-IOS-001
     title: iOS Face ID app unlock
     status: backlog
@@ -434,7 +396,6 @@ tasks:
     acceptance_criteria:
       - Optional toggle in settings
       - Keychain tokens remain; only UI gated
-
   - id: TASK-IOS-002
     title: iOS push notifications (APNs) for alerts
     status: backlog
@@ -453,18 +414,9 @@ tasks:
     acceptance_criteria:
       - Device token stored per user
       - Test push from dev script
-
-  # ══════════════════════════════════════════════════════════════════════════
-  # Analytics intelligence redesign — see docs/architecture/analytics-architecture.md
-  # The first-gen analytics layer shipped fabricated/duplicated/stubbed metrics.
-  # These tasks are scoped for parallel work by independent agents.
-  # ══════════════════════════════════════════════════════════════════════════
-
-  # ── Phase 3.7 — Analytics foundation (P1, must-have) ─────────────────────
-
   - id: TASK-ANALYTICS-001
     title: Canonical signed_amount column + cashflow indexes
-    status: ready
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -483,10 +435,9 @@ tasks:
       - Indexes tx_user_date_idx (user_id,date) and tx_user_cat_date_idx (user_id,category,date)
       - schema.ts reflects the generated column
       - Existing aggregation queries unaffected (column is additive)
-
   - id: TASK-ANALYTICS-002
     title: Metric layer module (services/metrics) + metric envelope type
-    status: backlog
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -508,10 +459,9 @@ tasks:
       - Savings/return rates emitted as 0-1 fraction with unit:"percent"
       - compute-wellness / compute-wrapped / transaction-store reuse the metric layer
       - Unit tests with a golden transaction dataset -> expected values
-
   - id: TASK-ANALYTICS-003
     title: Capture real credit limit from Plaid; real utilization
-    status: ready
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -529,10 +479,9 @@ tasks:
       - credit_limit captured on sync (Plaid) and stored
       - Utilization metric uses real limit; confidence 0 when missing
       - Remove the balance*2.5 estimate from compute-wellness.ts
-
   - id: TASK-ANALYTICS-004
     title: balance_snapshots table + net-worth-month pipeline
-    status: ready
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -550,10 +499,9 @@ tasks:
       - balance_snapshots migration + write on each sync job (upsert by date)
       - Net-worth monthly trend derived from snapshots, not seed-only table
       - getNetWorth.trend returns real history when snapshots exist
-
   - id: TASK-ANALYTICS-005
     title: dim_category spend-class + fixed/variable/discretionary metrics
-    status: backlog
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -573,10 +521,9 @@ tasks:
       - dim_category table + seed for all SPEND_CATEGORIES
       - Metrics for fixed/variable/discretionary and essential vs non-essential
       - Essential burn used as emergency-fund denominator
-
   - id: TASK-ANALYTICS-006
     title: Remove fabricated wellness metrics; rebuild Financial Health score
-    status: backlog
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -598,10 +545,9 @@ tasks:
       - Emergency fund uses trailing essential burn; goal pace is deadline-aware
       - History trend recomputed per-month (no reuse of current balances)
       - Composite confidence surfaced in response
-
   - id: TASK-ANALYTICS-007
     title: Data-quality / confidence / reconciliation endpoint
-    status: backlog
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -619,12 +565,9 @@ tasks:
     acceptance_criteria:
       - GET /analytics/data-quality returns the coverage/freshness/reconciliation metrics
       - Metric envelopes derive confidence from data-quality signals
-
-  # ── Phase 3.8 — Advanced analytics (P2, high-value) ──────────────────────
-
   - id: TASK-ANALYTICS-008
     title: Merchant normalization + dim_merchant
-    status: ready
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -642,10 +585,9 @@ tasks:
       - dim_merchant table + normalizer with unit tests on real-world merchant strings
       - transactions.merchant_id backfilled and set on ingest
       - Merchant concentration (HHI, top-5 share) metric available
-
   - id: TASK-ANALYTICS-009
     title: Recurring engine v2 (creep / zombie / duplicate, all cadences)
-    status: backlog
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -663,10 +605,9 @@ tasks:
       - All four cadences detected; series keyed by canonical merchant
       - priceCreep, zombie, duplicate flags with confidence
       - Powers /analytics/recurring with flags
-
   - id: TASK-ANALYTICS-010
     title: Transfer pairing (transfer_links) + refund/reversal netting
-    status: backlog
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -687,10 +628,9 @@ tasks:
       - Brokerage contributions paired to originating bank ACH
       - Refunds netted from category spend; unmatched credits treated as income/rebate
       - net-investment-rate and true-savings-rate use links
-
   - id: TASK-ANALYTICS-011
     title: Resilience composite score + sub-scores
-    status: backlog
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -710,10 +650,9 @@ tasks:
       - GET /analytics/resilience returns composite + 5 sub-scores + bands + actions
       - Single-income-source penalty caps IncomeStability at 70
       - No hardcoded shock amounts presented as computed
-
   - id: TASK-ANALYTICS-012
     title: Alert rule engine (table-driven)
-    status: backlog
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -733,10 +672,9 @@ tasks:
       - alert_rules table + evaluator run in worker after sync
       - Alerts persisted and exposed to the existing notifications surface
       - Heuristic alerts labeled basis:"heuristic" with confidence
-
   - id: TASK-ANALYTICS-013
     title: Investment snapshots — security_prices + holdings_snapshots on sync
-    status: ready
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -753,10 +691,9 @@ tasks:
       - security_prices + holdings_snapshots migrations
       - Both written per-date on snaptrade/import investment sync
       - mart_portfolio_daily (value, cost) view
-
   - id: TASK-ANALYTICS-014
     title: Tax lots (FIFO) — realized & unrealized P/L
-    status: backlog
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -774,10 +711,9 @@ tasks:
       - tax_lots populated; sells consume lots FIFO
       - Realized/unrealized P/L + short/long-term split exposed via metric layer
       - Wash-sale repurchase (<=30d of a realized loss) flagged
-
   - id: TASK-ANALYTICS-015
     title: XIRR + dividend trend + fee/cash drag
-    status: backlog
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -795,10 +731,9 @@ tasks:
       - XIRR implementation with tests (known cashflow series)
       - Dividend trend + TTM yield from investment_transactions type=dividend
       - Fee drag and cash drag metrics in /analytics/investments/performance
-
   - id: TASK-ANALYTICS-016
     title: Materialized marts + seasonally-adjusted category deltas
-    status: backlog
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -819,10 +754,9 @@ tasks:
       - Materialized views + refresh-marts worker step
       - getCategories returns real seasonally-adjusted deltaVsPriorMonth
       - Current month served live; closed months from marts
-
   - id: TASK-ANALYTICS-017
     title: Personal CPI + nominal vs real spending
-    status: backlog
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -842,12 +776,9 @@ tasks:
       - Personal CPI computed from recurring merchants + fixed bills (basis:factual)
       - Nominal vs real spend series + real savings rate
       - National CPI sourced/marked external (no hardcoded 3.1 presented as fact)
-
-  # ── Phase 3.9 — Advanced intelligence (P3) ───────────────────────────────
-
   - id: TASK-ANALYTICS-018
     title: TWR + benchmark comparison + max drawdown
-    status: backlog
+    status: done
     priority: P3
     area: backend
     phase: 3.9
@@ -865,10 +796,9 @@ tasks:
       - TWR (geometric link) + max drawdown from daily portfolio values
       - Benchmark delta with basis:"external" and source noted
       - Exposed in /analytics/investments/performance
-
   - id: TASK-ANALYTICS-019
     title: Investment behavior heuristics with evidence + confidence
-    status: backlog
+    status: done
     priority: P3
     area: backend
     phase: 3.9
@@ -887,10 +817,9 @@ tasks:
       - Each heuristic returns confidence + evidence trade ids
       - GET /analytics/investments/behavior labels all as heuristic
       - Caveats explain confidence limits
-
   - id: TASK-ANALYTICS-020
     title: Planning engine — runway, payoff, goals, scenarios, surplus
-    status: backlog
+    status: done
     priority: P3
     area: backend
     phase: 3.9
@@ -910,12 +839,9 @@ tasks:
       - /analytics/planning/{runway,payoff,goals,scenarios,calendar}
       - Payoff sim returns ETA + interest saved for avalanche vs snowball
       - Surplus allocation suggestion per the section-3 rule
-
-  # ── Phase 3.7/3.8 — Frontend analytics bug fixes ─────────────────────────
-
   - id: TASK-UI-ANALYTICS-001
     title: Normalize savingsRate scale across views + document contract
-    status: ready
+    status: done
     priority: P1
     area: ui
     phase: 3.7
@@ -932,10 +858,9 @@ tasks:
       - Dashboard, wrapped-banner, and mocks agree on a single savingsRate scale
       - Mock mode shows correct ~26% not ~2585%
       - No remaining double *100 or missing *100
-
   - id: TASK-UI-ANALYTICS-002
     title: Fix UTC off-by-one in analytics date range + date labels
-    status: ready
+    status: done
     priority: P1
     area: ui
     phase: 3.7
@@ -952,10 +877,9 @@ tasks:
       - analyticsDateRange() emits local calendar from/to (no toISOString slice)
       - transaction-row and subscription dates render the same calendar day as stored
       - Unit test around a UTC-negative timezone month boundary
-
   - id: TASK-UI-ANALYTICS-003
     title: Loading/empty guards + divide-by-zero/NaN fixes
-    status: ready
+    status: done
     priority: P2
     area: ui
     phase: 3.7
@@ -972,10 +896,9 @@ tasks:
       - Leaks, subscriptions, cash-flow strips show loader then explicit empty state
       - Runway never renders Infinity/NaN; sparkline handles len<=1
       - No $0/0.00 presented as measured during fetch
-
   - id: TASK-UI-ANALYTICS-004
     title: Surface isLive (computed vs placeholder) on preview panels
-    status: ready
+    status: done
     priority: P2
     area: ui
     phase: 3.7
@@ -992,10 +915,9 @@ tasks:
       - Panels with isLive show a Live vs Preview indicator
       - Indicator consistent and accessible
       - Hook ready to display metric-envelope confidence when available
-
   - id: TASK-UI-ANALYTICS-005
     title: Fix FIRE accelerator math + inflation/time-machine copy
-    status: ready
+    status: done
     priority: P2
     area: ui
     phase: 3.8
@@ -1014,10 +936,9 @@ tasks:
       - FIRE "savings rate" relabeled or computed from income
       - Inflation copy conditional on personal vs national rate
       - Time-machine constant labeled as illustrative, not a backtest
-
   - id: TASK-UI-ANALYTICS-006
     title: Preserve category deltas + chart correctness fixes
-    status: ready
+    status: done
     priority: P2
     area: ui
     phase: 3.8
@@ -1034,10 +955,9 @@ tasks:
       - deltaVsPriorMonth from backend preserved (no zeroing)
       - Area-chart header reflects the active metric (spent/income/net)
       - Bar widths clamp to 100% against a shared max
-
   - id: TASK-UI-ANALYTICS-007
     title: Consolidate money formatters + chart tooltip currency
-    status: ready
+    status: done
     priority: P3
     area: ui
     phase: 3.8
@@ -1054,12 +974,9 @@ tasks:
       - Single shared money formatter used by dashboard and charts
       - Tooltips show currency symbol + 2 decimals consistently
       - Compact formatter respects currency code
-
-  # ── Docs ─────────────────────────────────────────────────────────────────
-
   - id: TASK-DOCS-ANALYTICS-001
     title: Sync api-contract, system-overview, and PRD with analytics redesign
-    status: ready
+    status: done
     priority: P1
     area: docs
     phase: 3.7
@@ -1080,17 +997,9 @@ tasks:
       - api-contract.md documents the metric envelope + /analytics/* request/response shapes
       - system-overview.md describes new tables + mart refresh on sync
       - product-requirements.md lists the analytics KPIs and phases 3.7-3.9
-
-  # ══════════════════════════════════════════════════════════════════════════
-  # Pagination, tabular reports & thin-client — analytics-architecture.md section 10
-  # Many analytics surfaces serve a fixed top-N (e.g. merchants .slice(0,6)) with no
-  # pagination, and clients recompute totals/ranks. Standardize server-side
-  # pagination/sort/filter and move all calculation to the backend so iOS reuses it.
-  # ══════════════════════════════════════════════════════════════════════════
-
   - id: TASK-PAGINATE-001
     title: Standard list/pagination contract in api-contract.md
-    status: ready
+    status: done
     priority: P1
     area: docs
     phase: 3.7
@@ -1110,10 +1019,9 @@ tasks:
       - api-contract.md has a "List & pagination" section with ListQuery + Page<T>
       - Sortable-column whitelisting and 400-on-invalid-sort documented
       - Shared types referenced by backend services and ui/src/types/api.ts
-
   - id: TASK-PAGINATE-002
     title: Merchants endpoint — paginated, sortable, filterable (reference)
-    status: backlog
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -1135,10 +1043,9 @@ tasks:
       - No .slice cap; all merchants reachable via pagination
       - Sort whitelist enforced (400 on invalid); query Zod-validated
       - Top/most-visited/fastest-growing computed server-side in a summary block
-
   - id: TASK-PAGINATE-003
     title: Reusable DataTable component (sort / filter / pagination + URL state)
-    status: ready
+    status: done
     priority: P1
     area: ui
     phase: 3.7
@@ -1157,10 +1064,9 @@ tasks:
       - Sort/filter/page state in URL; TanStack Query keyed by params
       - Loading and empty states; no client-side totals/ranks
       - Money rendered via the shared formatter (2 decimals)
-
   - id: TASK-PAGINATE-004
     title: Merchants page on DataTable + backend pagination (reference)
-    status: backlog
+    status: done
     priority: P1
     area: ui
     phase: 3.7
@@ -1180,10 +1086,9 @@ tasks:
       - Merchants table paginates/sorts/filters via the backend (not top-6)
       - KPI cards use server summary; no client recomputation
       - Sparkline guards len<=1; no NaN
-
   - id: TASK-PAGINATE-005
     title: Remove remaining analytics caps; paginate list endpoints
-    status: backlog
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -1202,10 +1107,9 @@ tasks:
       - money-flow, inflation, patterns, recurring, holdings endpoints accept ListQuery
       - No fixed top-N truncation remains in analytics services
       - Each row fully computed server-side
-
   - id: TASK-PAGINATE-006
     title: Apply DataTable to transactions, holdings, subscriptions, categories
-    status: backlog
+    status: done
     priority: P2
     area: ui
     phase: 3.8
@@ -1224,10 +1128,9 @@ tasks:
       - Holdings, subscriptions, categories use DataTable + backend pagination/sort/filter
       - Transactions sort/filter controls standardized
       - No client-side recomputation of totals/ranks on these pages
-
   - id: TASK-THINCLIENT-001
     title: Move residual UI calculations to backend computed fields
-    status: backlog
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -1246,18 +1149,9 @@ tasks:
       - Each listed value returned pre-computed by the backend
       - UI components drop the corresponding client calculations
       - Values identical across web and (future) iOS because the source is shared
-
-  # ══════════════════════════════════════════════════════════════════════════
-  # Calculation-correctness audit (C-series) — analytics-architecture.md section 11
-  # Wrong NUMBERS shown to the user across shipped features. Each task is scoped to a
-  # single defect with exact file:line, the bad math, and the expected formula so a
-  # small model can implement without re-deriving intent. Verify the amount sign
-  # convention (expense positive?) before assuming it in any fix.
-  # ══════════════════════════════════════════════════════════════════════════
-
   - id: TASK-CALC-001
-    title: "Fix C1 — day-of-week 'average' is a lifetime sum"
-    status: ready
+    title: Fix C1 — day-of-week 'average' is a lifetime sum
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -1286,10 +1180,9 @@ tasks:
       - Division guards against zero occurrences (no NaN/Infinity)
       - Existing filters preserved; UI label matches the metric
       - A unit/integration check with a small fixture confirms the average math
-
   - id: TASK-CALC-002
-    title: "Fix C2 — inverted wellness scores for lower-is-better dimensions"
-    status: ready
+    title: Fix C2 — inverted wellness scores for lower-is-better dimensions
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -1317,10 +1210,9 @@ tasks:
       - Income-to-Expense score decreases as expense ratio rises
       - scoreFromRatio has explicit, documented value/target semantics
       - Unit tests cover both directions with known inputs
-
   - id: TASK-CALC-003
-    title: "Fix C3/C5/C6 — remove fabricated wellness dimensions"
-    status: ready
+    title: Fix C3/C5/C6 — remove fabricated wellness dimensions
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -1347,10 +1239,9 @@ tasks:
       - No dimension uses a fabricated credit limit, savingsScore*0.85, or the point-formula growth score
       - Omitted dimensions are excluded from the weighted composite (weights re-normalized)
       - Any data-gap dimension carries a caveat instead of a fake number
-
   - id: TASK-CALC-004
-    title: "Fix C7 — fabricated investment 'estimated value today'"
-    status: ready
+    title: Fix C7 — fabricated investment 'estimated value today'
+    status: done
     priority: P1
     area: backend
     phase: 3.8
@@ -1372,10 +1263,9 @@ tasks:
       - No metric multiplies contributions by a current-holdings ratio
       - Summary shows market value, cost basis, unrealized gain, and contributions as distinct fields
       - UI labels match what is actually computed
-
   - id: TASK-CALC-005
-    title: "Fix C8 — unify savings-rate definition and scale"
-    status: ready
+    title: Fix C8 — unify savings-rate definition and scale
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -1403,10 +1293,9 @@ tasks:
       - All services return savings rate from one shared definition + representation
       - Documented unit (fraction, unit=percent) in api-contract.md
       - UI multiplies once; the same month shows the same rate everywhere
-
   - id: TASK-CALC-006
-    title: "Fix C9/C10 — money-flow & trends ignore the period; trends mis-ranked"
-    status: ready
+    title: Fix C9/C10 — money-flow & trends ignore the period; trends mis-ranked
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -1428,10 +1317,9 @@ tasks:
       - Money-flow and trends respect from/to (verified: a narrow range returns less than all-time)
       - Trend categories are the top-N by spend, not alphabetical
       - No remaining `void from; void to;` discards in these functions
-
   - id: TASK-CALC-007
-    title: "Fix C11 — category 'vs prior month' delta is hardcoded 0"
-    status: ready
+    title: Fix C11 — category 'vs prior month' delta is hardcoded 0
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -1451,10 +1339,9 @@ tasks:
       - deltaVsPriorMonth reflects the actual change vs the prior period (or the field is removed end-to-end)
       - New-this-period categories handled (prior = 0) without divide-by-zero
       - UI no longer displays a constant 0 delta
-
   - id: TASK-CALC-008
-    title: "Fix C12 — money-flow transfersOut double-counts both legs"
-    status: ready
+    title: Fix C12 — money-flow transfersOut double-counts both legs
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -1474,10 +1361,9 @@ tasks:
     acceptance_criteria:
       - transfersOut counts each transfer once (one leg)
       - A simple two-leg transfer fixture yields the single transfer amount, not 2x
-
   - id: TASK-CALC-009
-    title: "Fix C13 — Wrapped 'no-spend days' counts future days"
-    status: ready
+    title: Fix C13 — Wrapped 'no-spend days' counts future days
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -1496,10 +1382,9 @@ tasks:
       - No-spend days never includes dates after today
       - Past complete years are unaffected
       - Current-year value equals elapsed days minus days with spend
-
   - id: TASK-CALC-010
-    title: "Fix C14 — recurring items always 'active' with stale next-charge dates"
-    status: ready
+    title: Fix C14 — recurring items always 'active' with stale next-charge dates
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -1521,10 +1406,9 @@ tasks:
       - Items with a stale last charge are not labeled active
       - nextChargeDate is null when it would fall in the past
       - Active monthly/weekly items still compute a correct future date
-
   - id: TASK-CALC-011
-    title: "Fix C15 — category/subcategory name drift across services"
-    status: ready
+    title: Fix C15 — category/subcategory name drift across services
+    status: done
     priority: P3
     area: backend
     phase: 3.8
@@ -1548,10 +1432,9 @@ tasks:
       - No analytics service hardcodes a category/subcategory string that isn't in config/categories.ts
       - A test fails if a referenced category/subcategory name is not in the taxonomy
       - Subscription habit/recurring matchers fire against real data
-
   - id: TASK-CALC-012
-    title: "Fix C16 — net worth ignores loan/mortgage liabilities"
-    status: ready
+    title: Fix C16 — net worth ignores loan/mortgage liabilities
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -1572,10 +1455,9 @@ tasks:
       - Loan/mortgage balances reduce net worth, not increase it
       - Account-type classification matches the schema enum (no type silently treated as an asset)
       - A fixture with a mortgage yields assets − all liabilities
-
   - id: TASK-CALC-013
-    title: "Fix C4 — wellness history reuses current balances for past months"
-    status: backlog
+    title: Fix C4 — wellness history reuses current balances for past months
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -1597,10 +1479,9 @@ tasks:
       - Balance-derived dimensions use historical snapshots once available
       - Before snapshots, the history view does not imply month-varying balance metrics
       - No past month silently uses today's balances without a caveat
-
   - id: TASK-UI-CALC-001
-    title: "Fix U1 — Income-by-month chart has no axes, values, or tooltip"
-    status: ready
+    title: Fix U1 — Income-by-month chart has no axes, values, or tooltip
+    status: done
     priority: P2
     area: ui
     phase: 3.7
@@ -1624,18 +1505,9 @@ tasks:
       - X-axis (month) and legend are unambiguous
       - Income stability stays within 0-100 and is explained
       - No values-less bar charts remain on this panel
-
-  # ══════════════════════════════════════════════════════════════════════════
-  # Intelligent budgets & savings goals — analytics-architecture.md section 12
-  # Budgets auto-suggest only when none are configured (top-10, 3-mo mean +10%) and
-  # vanish once one is saved; savings goals are display-only and never auto-created;
-  # /planning/* is read-only so the "+ Add" buttons do nothing. Add CRUD + smarter,
-  # additive suggestions, all computed server-side (thin-client rule).
-  # ══════════════════════════════════════════════════════════════════════════
-
   - id: TASK-PLAN-001
-    title: "Budget & savings-goal CRUD endpoints + schema (source/kind/status)"
-    status: ready
+    title: Budget & savings-goal CRUD endpoints + schema (source/kind/status)
+    status: done
     priority: P1
     area: backend
     phase: 3.7
@@ -1672,10 +1544,9 @@ tasks:
       - All six endpoints exist, validate input, and enforce ownership (404/403 on others' rows)
       - Budget POST upserts on the unique (user,category,period) index
       - Documented in api-contract.md
-
   - id: TASK-PLAN-002
-    title: "Smarter, additive budget suggestions (more categories, robust baseline)"
-    status: ready
+    title: Smarter, additive budget suggestions (more categories, robust baseline)
+    status: done
     priority: P1
     area: backend
     phase: 3.8
@@ -1704,10 +1575,9 @@ tasks:
       - Suggested limits use a robust 6-month baseline (median/trimmed), not a 3-month mean
       - Each suggestion carries source, rationale, and confidence
       - Suggestions persist only when the user accepts (via TASK-PLAN-001 POST)
-
   - id: TASK-PLAN-003
-    title: "Auto-generate suggested savings goals from data"
-    status: ready
+    title: Auto-generate suggested savings goals from data
+    status: done
     priority: P1
     area: backend
     phase: 3.8
@@ -1737,10 +1607,9 @@ tasks:
       - Suggestions are not persisted until accepted; dismissed suggestions don't reappear
       - No suggestion duplicates an existing user goal
       - All amounts computed server-side (no client math)
-
   - id: TASK-UI-PLAN-001
     title: "Wire budgets panel: CRUD + accept suggestions + add-category"
-    status: ready
+    status: done
     priority: P1
     area: ui
     phase: 3.8
@@ -1762,10 +1631,9 @@ tasks:
       - User can add, edit, and delete a category budget; changes persist and refetch
       - Suggested categories are shown and can be accepted (persisted) or dismissed
       - No client-side computation of suggested limits (values come from the API)
-
   - id: TASK-UI-PLAN-002
     title: "Wire savings goals: CRUD + suggested-goals accept/edit/delete"
-    status: ready
+    status: done
     priority: P1
     area: ui
     phase: 3.8
@@ -1786,18 +1654,9 @@ tasks:
       - User can add, edit, and delete a savings goal; changes persist and refetch
       - Suggested goals render with rationale and can be accepted, edited, or dismissed
       - Accepted goals become normal editable goals; dismissed ones do not reappear
-
-  # ══════════════════════════════════════════════════════════════════════════
-  # Lifestyle cost-audit engine & subscription lifecycle — analytics-architecture.md section 13
-  # The "Lifestyle cost audit" shows ~1 item because it comes from 4 hardcoded habit
-  # buckets (several broken by C15 category-name drift). Replace with a data-driven
-  # engine producing 10-20+ audits, expand hidden-fee detection, and add a
-  # cancelled/lapsed subscription lifecycle. All server-side (thin-client rule).
-  # ══════════════════════════════════════════════════════════════════════════
-
   - id: TASK-AUDIT-001
-    title: "Data-driven lifestyle cost-audit engine (10-20+ audits)"
-    status: ready
+    title: Data-driven lifestyle cost-audit engine (10-20+ audits)
+    status: done
     priority: P1
     area: backend
     phase: 3.8
@@ -1826,10 +1685,9 @@ tasks:
       - Each audit has rationale, action, savingsEstimate, and confidence
       - Opportunity-cost (FV) computed server-side; leaks-panel stops computing it
       - Audits sorted by impact; no matcher silently fails on a missing category name
-
   - id: TASK-AUDIT-002
     title: "Subscription lifecycle: detect lapsed/cancelled subscriptions"
-    status: ready
+    status: done
     priority: P1
     area: backend
     phase: 3.8
@@ -1854,10 +1712,9 @@ tasks:
       - Active monthly/annual totals exclude lapsed items
       - A lapsed subscription produces a "looks cancelled, confirm?" audit with estimated savings
       - nextChargeDate is null when it would be in the past
-
   - id: TASK-AUDIT-003
-    title: "Expand hidden-fee detection beyond ATM-only"
-    status: ready
+    title: Expand hidden-fee detection beyond ATM-only
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -1877,10 +1734,9 @@ tasks:
       - leaks.fees includes ATM, overdraft, maintenance, late, and FX fee types when present
       - Each fee has a 12-month count + total and a correct fixable flag
       - The hidden-fees hero total reflects all detected fee types
-
   - id: TASK-UI-AUDIT-001
-    title: "Render full audit list + lapsed-subscription cards"
-    status: ready
+    title: Render full audit list + lapsed-subscription cards
+    status: done
     priority: P2
     area: ui
     phase: 3.8
@@ -1902,3 +1758,201 @@ tasks:
       - The audit tab shows the full ranked list (not capped at the old 4), with rationale + action
       - Lapsed subscriptions appear as confirm-cancellation cards
       - No client-side FV/opportunity-cost computation remains in the panel
+  - id: TASK-RECON-001
+    title: Reconcile paired transfer legs so KPIs stop double-counting (R1)
+    status: done
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transfer-pairing.ts
+      - backend/src/services/transfer-classification.ts
+      - backend/src/services/plaid/sync.ts
+      - backend/src/services/teller/sync.ts
+      - backend/src/services/snaptrade/sync.ts
+    description: |
+      Defect R1 (analytics-architecture.md section 14.2). transfer_links is computed by
+      refreshTransferLinks after every sync, but the spend/income KPIs exclude transfers ONLY via
+      the per-transaction is_transfer flag — transfer_links is consumed only for brokerage
+      contributions. So a transfer whose two legs are paired with high confidence but where one leg
+      is still typed income/expense (the credit-card payment CREDIT leg, and bank<->bank transfers
+      from non-Plaid sources) still double-counts spend or inflates income.
+      Fix: after refreshTransferLinks builds the links, run an idempotent reconcile pass that, for
+      every link above a confidence threshold (e.g. >= 0.6), sets BOTH referenced legs
+      (outflowTxnId and inflowTxnId) to is_transfer=true and transactionType="transfer". Use a
+      category of "Transfers (internal)" with subCategory "Credit Card Payments" for cc_payment
+      links and a sensible bank-transfer subcategory for bank_bank. Do NOT touch the brokerage
+      (investment_transactions) leg. Make it run inside/after refreshTransferLinks so all three sync
+      paths get it, and ensure re-running does not flip-flop values. Because every existing
+      analytics query already filters is_transfer=false, this single change removes double-counting
+      across spend, categories, money-flow, wellness, and audits at once — and gives iOS reconciled
+      data with no client logic.
+    acceptance_criteria:
+      - High-confidence transfer_links cause both transaction legs to be marked is_transfer=true and type transfer
+      - Credit-card payment credit legs and bank<->bank self-transfers no longer appear in spend or income totals
+      - The pass is idempotent (running twice changes nothing) and only runs server-side
+      - The brokerage leg of bank_brokerage links is left unchanged
+      - typecheck passes
+  - id: TASK-RECON-002
+    title: Wire data-quality transfer-pair coverage to the real implementation (R2)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECON-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/data-quality.ts
+      - backend/src/services/transfer-pairing.ts
+    description: |
+      Defect R2 (analytics-architecture.md section 14.2). data-quality.ts hardcodes
+      transferPairRatio = 0 with the caveat "Transfer pairing not yet implemented; coverage reported
+      as 0" (lines ~159-163, 242-250), even though transferPairCoverage(userIds) is implemented in
+      transfer-pairing.ts and pairing runs on every sync. This stale stub wrongly drags down
+      compositeConfidence.
+      Fix: call transferPairCoverage(ctx.userIds), use the returned ratio as the transferPairs
+      signal and the transferPairCoverage envelope value/confidence, and remove the
+      "not yet implemented" caveat (replace with a real caveat only when coverage is low or there
+      are no transfer outflows). Confirm compositeConfidence reflects the real value.
+    acceptance_criteria:
+      - data-quality reports the real transfer-pair coverage ratio, not a hardcoded 0
+      - The "not yet implemented" caveat is removed
+      - compositeConfidence incorporates the real transferPairs signal
+      - typecheck passes
+  - id: TASK-RECON-003
+    title: Self-transfer fallback + unpaired-transfer data-quality signal (R3)
+    status: done
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-RECON-001
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/transfer-classification.ts
+      - backend/src/services/data-quality.ts
+    description: |
+      Defect R3 (analytics-architecture.md section 14.2). Bank<->bank savings/checking transfers
+      from Teller / SnapTrade / CSV / manual sources are only treated as internal when the upstream
+      category is already "Transfers (internal)"; otherwise resolveInternalTransfer catches only
+      credit-card payments, so self-transfers from those sources count as income + expense.
+      TASK-RECON-001 already reclassifies any pair that the pairer matches. This task handles the
+      remainder: (a) add a self-transfer heuristic for legs that look like transfers (opposite-sign,
+      matching amount/date, same owner) but were not matched, and (b) surface the count/$ of still
+      -unpaired transfer-looking outflows as a data-quality caveat rather than silently counting
+      them as spend/income. Keep it conservative to avoid hiding real spend.
+    acceptance_criteria:
+      - Unmatched same-owner opposite-sign amount/date matches are treated as internal transfers
+      - Remaining unpaired transfer-looking outflows are reported as a data-quality caveat
+      - No legitimate external spend is reclassified as a transfer (conservative thresholds)
+      - typecheck passes
+  - id: TASK-RECON-004
+    title: Detect cross-provider duplicate accounts and transactions (R4)
+    status: backlog
+    priority: P3
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/plaid/upsert-transactions.ts
+      - backend/src/services/import/persist-banking.ts
+      - backend/src/services/import/fingerprint.ts
+      - backend/src/services/data-quality.ts
+    description: |
+      Defect R4 (analytics-architecture.md section 14.2). The dedup fingerprint is scoped to a
+      single accountId, so when the SAME real account is linked via two providers (two Plaid items,
+      or Plaid + Teller) the rows land under different accountIds and the same transaction appears
+      twice -> duplicated spend/income. Detect likely-duplicate accounts (institution + mask + type)
+      and duplicate transactions across them (institution, mask, amount, date, name), surface them
+      in data-quality, and provide a way to merge/ignore one side. Do not auto-delete; flag and let
+      the user resolve.
+    acceptance_criteria:
+      - Likely-duplicate accounts across providers are detected and surfaced in data-quality
+      - Cross-account duplicate transactions are flagged (not silently dropped)
+      - A documented path exists to merge/ignore duplicates
+      - typecheck passes
+  - id: TASK-INTEGRITY-001
+    title: Guarantee prod builds never enable UI mocks (M1)
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/lib/api-client.ts
+    description: |
+      M1 (analytics-architecture.md section 15.1). UI mock gating is correct (single
+      USE_MOCKS = NEXT_PUBLIC_USE_MOCKS === "true"; only api-client imports mock-api; everything else
+      goes through fetchJson). BUT NEXT_PUBLIC_* is inlined at BUILD time, so a prod image must be
+      built with the flag false/unset — flipping it at runtime does nothing. Add a build-time/CI
+      guard that fails the production build if NEXT_PUBLIC_USE_MOCKS is "true", and verify (e.g. via
+      a bundle check or by ensuring the import is tree-shaken) that mock fixtures are not shipped in
+      production bundles. Document the deployment requirement in the UI README/STRUCTURE.
+    acceptance_criteria:
+      - Production build fails (or warns loudly in CI) if mocks are enabled
+      - Deployment docs state NEXT_PUBLIC_USE_MOCKS must be set at build time
+      - Confirm mock-api is not executed in a non-mock production bundle
+  - id: TASK-INTEGRITY-002
+    title: Make planning projections reproducible (seeded RNG) (M2)
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/planning-engine.ts
+    description: |
+      M2 (analytics-architecture.md section 15.2). planning-engine.ts:124 uses Math.random() for a
+      Monte-Carlo shock, so projection numbers change between requests and read as "inaccurate" to
+      the user. Replace with a seeded/deterministic RNG (seed derived from userId + period) or a
+      closed-form percentile, so repeated loads agree, and ensure the UI labels these as
+      projections/estimates. Keep the distribution behavior; only remove non-determinism.
+    acceptance_criteria:
+      - Two identical projection requests return identical numbers
+      - The RNG is seeded deterministically (no bare Math.random in projection math)
+      - Projection outputs remain labeled as estimates in the metric envelope/UI
+  - id: TASK-INTEGRITY-003
+    title: Multi-user tenant-isolation test for all read endpoints (M3)
+    status: ready
+    priority: P1
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/household-access.ts
+      - backend/src/services/active-account-scope.ts
+    description: |
+      M3 (analytics-architecture.md section 15.3). Read-path scoping is currently correct (every
+      analytics service resolves household context and filters by active-account scope; ingestion
+      and backfills are writes, not response leaks). Lock this in with an automated isolation test:
+      seed two households (A and B) with distinct accounts/transactions, authenticate as user A, hit
+      every read endpoint (summary, categories, money-flow, trends, merchants, investments, net
+      worth, wellness, patterns, recurring, audits, data-quality, etc.), and assert that no row,
+      total, or aggregate derived from B appears in A's response. Add a lint/check or PR checklist
+      item so new transaction-querying services must go through resolveHouseholdContext +
+      drizzleActiveTransactionWhere.
+    acceptance_criteria:
+      - A test seeds two households and asserts every read endpoint returns only the caller's data
+      - The test fails if a service queries transactions without household/account scoping
+      - The test runs in CI
