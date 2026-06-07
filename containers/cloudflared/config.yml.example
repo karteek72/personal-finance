@@ -1,7 +1,7 @@
 # Only if cloudflared runs with config.yml (NOT --token).
 # Token mode (cloudflared pod with TUNNEL_TOKEN): add hostnames in Zero Trust dashboard instead.
 #
-# Keep StockPulse Kong on 8000 and add SpendFlow on 3000/4000:
+# Keep StockPulse Kong on 8000 and add SpendFlow on 3005/4000 (see SPENDFLOW_UI_PORT in deploy.env):
 
 tunnel: <your-tunnel-id-or-name>
 credentials-file: /etc/cloudflared/<tunnel-id>.json
@@ -10,7 +10,7 @@ ingress:
   - hostname: dev.stockpulse.win
     service: http://192.168.68.100:8000
   - hostname: spendflow.stockpulse.win
-    service: http://192.168.68.100:3000
+    service: http://192.168.68.100:3005
   - hostname: spendflow-api.stockpulse.win
     service: http://192.168.68.100:4000
   - service: http_status:404
