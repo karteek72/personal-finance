@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api-client";
+import { invalidateFinancialQueries } from "@/lib/invalidate-financial-queries";
 
 export function useHousehold() {
   return useQuery({
@@ -22,11 +23,8 @@ export function useHouseholdMutations() {
   const queryClient = useQueryClient();
 
   function invalidate() {
+    invalidateFinancialQueries(queryClient);
     void queryClient.invalidateQueries({ queryKey: ["household"] });
-    void queryClient.invalidateQueries({ queryKey: ["household-insights"] });
-    void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-    void queryClient.invalidateQueries({ queryKey: ["chart-data"] });
-    void queryClient.invalidateQueries({ queryKey: ["transactions"] });
   }
 
   return {

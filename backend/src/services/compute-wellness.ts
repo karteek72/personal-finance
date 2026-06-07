@@ -8,6 +8,9 @@ import {
 } from "./active-account-scope.js";
 import { getAccountMetricsAsOf } from "./balance-snapshots.js";
 import { getCompositeDataQualityConfidence } from "./data-quality.js";
+import {
+  resolveEffectiveMonthlyIncome,
+} from "./effective-income.js";
 import { emptyWellnessResponse, type WellnessResponse } from "./insights-store.js";
 import {
   averageMonthlyInvestment,
@@ -115,6 +118,7 @@ async function spendingVolatility(
 
 async function buildHealthInputs(input: {
   userIds: string[];
+  primaryUserId: string;
   accountIds: string[];
   period: string;
   asOfDate: string;
@@ -128,12 +132,20 @@ async function buildHealthInputs(input: {
     input.accountIds,
     input.period,
   );
+  const effectiveIncome = await resolveEffectiveMonthlyIncome(
+    input.primaryUserId,
+    totals.income,
+  );
+  const incomeForMetrics =
+    effectiveIncome.source === "stated"
+      ? effectiveIncome.monthlyIncome
+      : totals.income;
   const savingsRate = computeSavingsRate({
-    income: totals.income,
+    income: incomeForMetrics,
     expense: totals.expense,
   });
   const freeCashFlow = computeFreeCashFlow({
-    income: totals.income,
+    income: incomeForMetrics,
     essentialOutflow: totals.essentialExpense,
   });
   const emergencyMonths = await resolveEmergencyMonths({
@@ -146,7 +158,7 @@ async function buildHealthInputs(input: {
   const monthlyInvest = await averageMonthlyInvestment(input.userIds, 3);
   const monthlySpend = await averageMonthlyCashSpending(input.userIds, 3);
   const netInvestRate =
-    totals.income > 0 ? monthlyInvest / totals.income : null;
+    incomeForMetrics > 0 ? monthlyInvest / incomeForMetrics : null;
 
   const { discretionary, total } = await discretionaryOutflowForPeriod(
     input.userIds,
@@ -160,10 +172,10 @@ async function buildHealthInputs(input: {
     input.asOfDate,
   );
 
-  return buildWellnessDimensions({
+  const dimensions = buildWellnessDimensions({
     savingsRate,
     freeCashFlow,
-    income: totals.income,
+    income: incomeForMetrics,
     emergencyMonths,
     utilization: input.utilization,
     netInvestRate,
@@ -172,6 +184,20 @@ async function buildHealthInputs(input: {
     goals: input.goals,
     dataQualityConfidence: input.dataQualityConfidence,
   });
+
+  if (effectiveIncome.caveats.length === 0) {
+    return dimensions;
+  }
+
+  const caveatNote = effectiveIncome.caveats.join(" ");
+  return dimensions.map((dimension) =>
+    dimension.name === "Savings"
+      ? {
+          ...dimension,
+          description: `${dimension.description} ${caveatNote}`.trim(),
+        }
+      : dimension,
+  );
 }
 
 /** Compute wellness score from live transactions and accounts. */
@@ -226,6 +252,7 @@ export async function computeWellnessFromTransactions(
     if (snapshot.hasSnapshot) {
       const dims = await buildHealthInputs({
         userIds,
+        primaryUserId,
         accountIds,
         period: mk,
         asOfDate: monthEnd,
@@ -238,6 +265,7 @@ export async function computeWellnessFromTransactions(
     } else {
       const dims = await buildHealthInputs({
         userIds,
+        primaryUserId,
         accountIds,
         period: mk,
         asOfDate: monthEnd,
@@ -266,6 +294,7 @@ export async function computeWellnessFromTransactions(
 
   const dimensions = await buildHealthInputs({
     userIds,
+    primaryUserId,
     accountIds,
     period: latestPeriod,
     asOfDate: today,
@@ -288,6 +317,7 @@ export async function computeWellnessFromTransactions(
     );
     const priorDims = await buildHealthInputs({
       userIds,
+      primaryUserId,
       accountIds,
       period: priorPeriod,
       asOfDate: priorEnd,

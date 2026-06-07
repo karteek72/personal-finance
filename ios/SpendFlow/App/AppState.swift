@@ -6,13 +6,16 @@ import Observation
 final class AppState {
     let authService = AuthService()
     let appLock = AppLockService()
+    let refreshCenter = FinancialRefreshCenter()
     var apiClient: APIClient
     private(set) var plaidLink: PlaidLinkCoordinator
+    private(set) var snapTradeLink: SnapTradeLinkCoordinator
 
     init() {
         let client = APIClient(authService: authService)
         apiClient = client
         plaidLink = PlaidLinkCoordinator(api: client)
+        snapTradeLink = SnapTradeLinkCoordinator(api: client)
     }
 
     func bootstrap() async {
@@ -27,5 +30,6 @@ final class AppState {
     func refreshAPIClient() {
         apiClient = APIClient.makeAuthenticated(authService: authService)
         plaidLink = PlaidLinkCoordinator(api: apiClient)
+        snapTradeLink = SnapTradeLinkCoordinator(api: apiClient)
     }
 }

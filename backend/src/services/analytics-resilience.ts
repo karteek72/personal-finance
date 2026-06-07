@@ -19,6 +19,7 @@ import {
   computeEmergencyMonths,
   trailingEssentialOutflow,
 } from "./metrics/index.js";
+import { resolveEffectiveMonthlyIncome } from "./effective-income.js";
 import { averageMonthlyIncome } from "./protect-analytics.js";
 import {
   buildResilienceComposite,
@@ -284,7 +285,12 @@ export async function getResilienceAnalytics(
   const monthlyIncomes = await monthlyIncomeSeries(ctx.userIds, accountIds, 12);
   const incomeSourceCount = await countIncomeSources(ctx.userIds, accountIds);
   const outflow = await outflowSplit(ctx.userIds, accountIds);
-  const monthlyIncome = await averageMonthlyIncome(ctx.userIds, 12);
+  const detectedIncome = await averageMonthlyIncome(ctx.userIds, 12);
+  const effectiveIncome = await resolveEffectiveMonthlyIncome(
+    userId,
+    detectedIncome,
+  );
+  const monthlyIncome = effectiveIncome.monthlyIncome;
   const debtPayments = await monthlyDebtPayments(ctx.userIds);
   const dti = monthlyIncome > 0 ? debtPayments / monthlyIncome : 0;
   const { liquidInvest, totalInvest } = await investmentLiquidityTotals(

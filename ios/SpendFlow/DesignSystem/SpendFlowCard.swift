@@ -190,6 +190,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     case spend
     case activity
     case wallet
+    case more
 
     var id: String { rawValue }
 
@@ -200,6 +201,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .spend: "Spend"
         case .activity: "Activity"
         case .wallet: "Wallet"
+        case .more: "More"
         }
     }
 
@@ -210,6 +212,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .spend: "circle.grid.3x3.fill"
         case .activity: "list.bullet.rectangle.fill"
         case .wallet: "creditcard.fill"
+        case .more: "square.grid.2x2.fill"
         }
     }
 }

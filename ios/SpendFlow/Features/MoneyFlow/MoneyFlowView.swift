@@ -62,7 +62,7 @@ struct MoneyFlowView: View {
         .refreshable {
             await viewModel.load(api: appState.apiClient)
         }
-        .task {
+        .task(id: appState.refreshCenter.refreshToken) {
             await viewModel.load(api: appState.apiClient)
         }
     }

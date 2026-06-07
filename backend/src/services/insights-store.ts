@@ -183,6 +183,14 @@ export async function getBehavioral(
   const ctx = await resolveHouseholdContext(userId);
   const { accountIds, hasActiveAccounts } =
     await resolveActiveAccountScope(ctx.userIds);
+
+  if (hasActiveAccounts) {
+    const { refreshChallenges } = await import("./challenge-engine.js");
+    const { refreshHabitStreaks } = await import("./habit-streak-engine.js");
+    await refreshHabitStreaks(userId);
+    await refreshChallenges(userId);
+  }
+
   const db = getDb();
 
   if (!hasActiveAccounts) {

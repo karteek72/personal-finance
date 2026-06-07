@@ -1,6 +1,6 @@
 # Development Task Board
 
-**Last updated:** 2026-06-07 (104/105 complete — `TASK-PROFILE-004` backlog)  
+**Last updated:** 2026-06-07 (115/115 complete — all tasks done)  
 **Source of truth:** [`tasks.yaml`](tasks.yaml)  
 **CLI:** `npm run task -- <command>` from repo root
 
@@ -33,7 +33,9 @@
 
 | backend-recon-wave6 | Transfer reconciliation R1–R3 | RECON-001–003 | done |
 
-**Status:** Phase 3.8 wave complete — FIRE/profile fixes (F1–F4, P1–P3/P5), recompute pipeline (RC1–RC4), behavioral engines (B1–B3), wellness chart (W1). **`TASK-PROFILE-004`** (annualGrossIncome fallback) remains backlog.
+**Status:** All tracked tasks complete. Phase 3.8 profile/income (**PROFILE-004**), household (**H1/H2**), and full iOS Phase 4 parity (**IOS-003–011**, **IOS-IMPORT-001**) shipped.
+
+| household-ios-wave | H1/H2 + full iOS parity | HOUSEHOLD-001/002, IOS-001–011, IOS-CHARTS-001, IOS-IMPORT-001, PROFILE-004 | done |
 
 **Rules for agents:** `npm run task -- claim TASK-ID <name>` before coding; `complete` when done; update this table; read `source_docs` per task.
 

@@ -49,11 +49,17 @@ struct AccountsView: View {
     ]
 
     var body: some View {
+        NavigationStack {
+            walletContent
+        }
+    }
+
+    private var walletContent: some View {
         SpendFlowScreen(title: "Wallet", subtitle: "Accounts & balances in one place") {
-            if let status = viewModel.statusMessage ?? appState.plaidLink.statusMessage {
+            if let status = viewModel.statusMessage ?? appState.plaidLink.statusMessage ?? appState.snapTradeLink.statusMessage {
                 statusBanner(status, isSuccess: true)
             }
-            if let error = viewModel.errorMessage ?? appState.plaidLink.errorMessage {
+            if let error = viewModel.errorMessage ?? appState.plaidLink.errorMessage ?? appState.snapTradeLink.errorMessage {
                 statusBanner(error, isSuccess: false)
             }
 
@@ -63,10 +69,35 @@ struct AccountsView: View {
             ) {
                 Task {
                     await appState.plaidLink.startLink {
+                        appState.refreshCenter.bump()
                         await viewModel.load(api: appState.apiClient)
                     }
                 }
             }
+
+            SpendFlowPrimaryButton(
+                title: "Link brokerage (SnapTrade)",
+                isLoading: appState.snapTradeLink.isLoading
+            ) {
+                Task {
+                    await appState.snapTradeLink.startLink {
+                        appState.refreshCenter.bump()
+                        await viewModel.load(api: appState.apiClient)
+                    }
+                }
+            }
+
+            NavigationLink {
+                StatementImportView()
+            } label: {
+                Text("Import statements")
+                    .font(.subheadline.weight(.bold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(SpendFlowTheme.surface, in: Capsule())
+                    .overlay(Capsule().stroke(SpendFlowTheme.border, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
 
             if viewModel.isLoading, viewModel.accounts.isEmpty {
                 LoadingStateView(message: "Loading accounts…")
@@ -95,10 +126,11 @@ struct AccountsView: View {
             }
         }
         .spendFlowPlaidLink(coordinator: appState.plaidLink)
+        .spendFlowSnapTradeLink(coordinator: appState.snapTradeLink)
         .refreshable {
             await viewModel.load(api: appState.apiClient)
         }
-        .task {
+        .task(id: appState.refreshCenter.refreshToken) {
             await viewModel.load(api: appState.apiClient)
         }
     }

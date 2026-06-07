@@ -25,6 +25,7 @@ import {
   drizzleActiveTransactionWhere,
   resolveActiveAccountScope,
 } from "./active-account-scope.js";
+import { resolveEffectiveMonthlyIncome } from "./effective-income.js";
 import { resolveHouseholdContext } from "./household-access.js";
 import { averageMonthlyCashSpending } from "./investment-analytics.js";
 import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
@@ -200,7 +201,9 @@ export async function refreshProtectProfiles(userId: string): Promise<boolean> {
   if (!hasActiveAccounts) return false;
 
   const monthlyBurn = await averageMonthlyCashSpending(ctx.userIds, 3);
-  const monthlyIncome = await averageMonthlyIncome(ctx.userIds, LOOKBACK_MONTHS);
+  const detectedIncome = await averageMonthlyIncome(ctx.userIds, LOOKBACK_MONTHS);
+  const effectiveIncome = await resolveEffectiveMonthlyIncome(userId, detectedIncome);
+  const monthlyIncome = effectiveIncome.monthlyIncome;
   const categoryShares = await categorySpendShares(ctx.userIds, LOOKBACK_MONTHS);
 
   if (monthlyBurn <= 0 && monthlyIncome <= 0 && categoryShares.length === 0) {

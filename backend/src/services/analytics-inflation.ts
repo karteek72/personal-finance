@@ -17,6 +17,7 @@ import {
   NATIONAL_CPI_EXTERNAL,
   nominalToReal,
 } from "./personal-cpi.js";
+import { resolveEffectiveMonthlyIncome } from "./effective-income.js";
 import { averageMonthlyIncome } from "./protect-analytics.js";
 import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
 
@@ -91,9 +92,14 @@ export async function getInflationAnalytics(
   });
 
   const latestMonth = monthlyRows.at(-1);
-  const monthlyIncome = latestMonth
+  const detectedIncome = latestMonth
     ? Number.parseFloat(latestMonth.income ?? "0")
     : await averageMonthlyIncome(ctx.userIds, 1);
+  const effectiveIncome = await resolveEffectiveMonthlyIncome(
+    userId,
+    detectedIncome,
+  );
+  const monthlyIncome = effectiveIncome.monthlyIncome;
   const monthlyExpense = latestMonth
     ? Number.parseFloat(latestMonth.expense ?? "0")
     : 0;
@@ -129,6 +135,7 @@ export async function getInflationAnalytics(
       expense: monthlyExpense,
       asOf,
       confidence: cpi.confidence,
+      caveats: effectiveIncome.caveats,
     }),
     realSavingsRate: buildMetricEnvelope({
       value: realRate,

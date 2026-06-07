@@ -315,8 +315,8 @@ export function BehavioralPanel() {
           <div className="rounded-[var(--radius-sm)] border border-dashed border-border bg-bg px-3 py-4 text-center">
             <p className="text-sm font-semibold text-text">No streaks yet</p>
             <p className="mt-1 text-xs text-text-muted">
-              Streaks appear once you have enough transaction history — e.g. no-spend days or
-              consecutive months under budget.
+              Link accounts and wait for transactions to sync. Streaks track no-spend days,
+              positive savings months, and time since dining spend.
             </p>
           </div>
         ) : (

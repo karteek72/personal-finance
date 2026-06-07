@@ -378,7 +378,7 @@ tasks:
       - No secrets in export
     notes: |
       export-user-data.ts; GET /auth/export with attachment; assertExportHasNoSecrets; data_export audit event.
-  - id: TASK-IOS-001
+  - id: TASK-IOS-FACEID-001
     title: iOS Face ID app unlock
     status: done
     priority: P4
@@ -396,7 +396,7 @@ tasks:
     acceptance_criteria:
       - Optional toggle in settings
       - Keychain tokens remain; only UI gated
-  - id: TASK-IOS-002
+  - id: TASK-IOS-PUSH-002
     title: iOS push notifications (APNs) for alerts
     status: done
     priority: P4
@@ -2128,7 +2128,8 @@ tasks:
       - typecheck passes
   - id: TASK-PROFILE-004
     title: Use annualGrossIncome as fallback/cross-check for income metrics (P4)
-    status: backlog
+    status: done
+    assignee: cursor-agent
     priority: P3
     area: backend
     phase: 3.8
@@ -2407,7 +2408,7 @@ tasks:
       - Streaks/challenges render with clear empty states until populated
   - id: TASK-HOUSEHOLD-001
     title: Household mutations should invalidate the full financial query set (H1)
-    status: ready
+    status: done
     priority: P2
     area: ui
     phase: 3.8
@@ -2432,7 +2433,7 @@ tasks:
       - Uses the shared invalidateFinancialQueries helper (no divergent hand-rolled list)
   - id: TASK-HOUSEHOLD-002
     title: Recompute household analytics when membership changes (H2)
-    status: ready
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -2456,29 +2457,13 @@ tasks:
       - Persisted analytics reflect the new member without waiting for the next sync
       - Recompute is idempotent and does not block the mutation response unduly
       - typecheck passes
-
-  # ------------------------------------------------------------------ #
-  # iOS feature parity (Phase 4, P4)
-  #
-  # Bring the SwiftUI app to parity with the web UI. The backend already
-  # owns all calculations (thin-client rule), so iOS work is mostly:
-  # Codable models + APIClient methods + SwiftUI views reusing the
-  # DesignSystem. iOS currently has: Auth (Google + AppLock), push,
-  # Dashboard, MoneyFlow, Categories, Transactions, Accounts, Settings,
-  # Plaid Link. Endpoints/types live in docs/design/api-contract.md and
-  # ui/src/types/api.ts; mirror the matching web panel for each view.
-  #
-  # NOTE (AGENTS.md): iOS is deferred (P4) "until import path ships on
-  # web." These are queued at the user's direction; confirm the phase
-  # gate before starting implementation.
-  # ------------------------------------------------------------------ #
   - id: TASK-IOS-001
     title: Expand iOS APIClient + Codable models to cover all read endpoints
-    status: ready
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies: []
     source_docs:
@@ -2502,11 +2487,11 @@ tasks:
       - Decoding round-trips against sample payloads from the live API
   - id: TASK-IOS-002
     title: iOS navigation/IA mirroring web (Understand / Wealth / Plan / Protect)
-    status: ready
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-IOS-001
@@ -2526,7 +2511,8 @@ tasks:
       - Placeholder destinations exist for each not-yet-built view
   - id: TASK-IOS-003
     title: iOS Understand — Wellness, DNA, Patterns, Behavioral, Merchants
-    status: backlog
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4
@@ -2555,7 +2541,8 @@ tasks:
       - Confidence/caveats are surfaced; empty states match web behavior
   - id: TASK-IOS-004
     title: iOS Wealth — Net worth, Investments/Holdings, FIRE
-    status: backlog
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4
@@ -2581,7 +2568,8 @@ tasks:
       - Charts use the shared chart component with axes/values
   - id: TASK-IOS-005
     title: iOS Plan — Budgets, Savings goals, Recurring/Subscriptions, Calendar, Forecast, Cost audits
-    status: backlog
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4
@@ -2608,7 +2596,8 @@ tasks:
       - All amounts/opportunity-cost come from the API, not computed on device
   - id: TASK-IOS-006
     title: iOS Protect — Resilience & Inflation (personal CPI)
-    status: backlog
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4
@@ -2630,7 +2619,8 @@ tasks:
       - Sub-scores, scenarios, and real-vs-nominal series render with caveats
   - id: TASK-IOS-007
     title: iOS Debt — credit/debt summary
-    status: backlog
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4
@@ -2649,7 +2639,8 @@ tasks:
       - Matches the web debt page content and states
   - id: TASK-IOS-008
     title: iOS Family — household members, account assignment, invites
-    status: backlog
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4
@@ -2670,7 +2661,8 @@ tasks:
       - Invite/revoke flows work; membership changes refresh all dependent views
   - id: TASK-IOS-009
     title: iOS Profile — user profile wired into analytics
-    status: backlog
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4
@@ -2691,7 +2683,8 @@ tasks:
       - Saving age updates FIRE (no default-age fallback after save)
   - id: TASK-IOS-010
     title: iOS SnapTrade brokerage connection flow
-    status: backlog
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4
@@ -2711,7 +2704,8 @@ tasks:
       - Connection + callback + sync mirror the web flow and handle errors
   - id: TASK-IOS-011
     title: iOS recalculate-all + pull-to-refresh + full state invalidation
-    status: backlog
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4
@@ -2733,7 +2727,7 @@ tasks:
       - After sync/recompute, no stale view remains
   - id: TASK-IOS-CHARTS-001
     title: iOS shared chart + paginated-list components (DesignSystem)
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -2755,7 +2749,8 @@ tasks:
       - Components use design tokens and are reused by the feature views
   - id: TASK-IOS-IMPORT-001
     title: iOS statement import (deferred until web import ships)
-    status: backlog
+    status: done
+    assignee: cursor-agent
     priority: P4
     area: ios
     phase: 4

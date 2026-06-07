@@ -19,6 +19,8 @@ struct MainTabView: View {
                     TransactionsView()
                 case .wallet:
                     AccountsView()
+                case .more:
+                    MoreHubView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -26,27 +28,30 @@ struct MainTabView: View {
             FloatingTabBar(selection: $tab)
         }
         .overlay(alignment: .topTrailing) {
-            Menu {
-                if let user = appState.authService.user {
-                    Text(user.displayName ?? user.email)
-                }
-                Button("Settings") {
-                    showSettings = true
-                }
-                Button("Sign out", role: .destructive) {
-                    Task {
-                        await appState.authService.signOut()
-                        appState.refreshAPIClient()
+            HStack(spacing: 12) {
+                RecalculateButton()
+                Menu {
+                    if let user = appState.authService.user {
+                        Text(user.displayName ?? user.email)
                     }
+                    Button("Settings") {
+                        showSettings = true
+                    }
+                    Button("Sign out", role: .destructive) {
+                        Task {
+                            await appState.authService.signOut()
+                            appState.refreshAPIClient()
+                        }
+                    }
+                } label: {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 26))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(SpendFlowTheme.primary, SpendFlowTheme.primarySoft)
                 }
-            } label: {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 26))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(SpendFlowTheme.primary, SpendFlowTheme.primarySoft)
-                    .padding(.top, 56)
-                    .padding(.trailing, 20)
             }
+            .padding(.top, 56)
+            .padding(.trailing, 20)
         }
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showSettings) {
