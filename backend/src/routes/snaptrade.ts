@@ -8,6 +8,7 @@ import {
   createSnaptradePortalUrl,
   syncSnaptradeForUser,
 } from "../services/snaptrade/sync.js";
+import { toSnaptradeAppError } from "../services/snaptrade/errors.js";
 
 const portalBodySchema = z.object({
   broker: z.string().optional(),
@@ -29,10 +30,9 @@ export const snaptradeRoutes: FastifyPluginAsync = async (app) => {
         reconnectAuthorizationId: body.reconnectAuthorizationId,
       });
     } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw AppError.snaptradeError(
-        "Unable to create SnapTrade connection portal URL",
+      throw toSnaptradeAppError(
         error,
+        "Unable to create SnapTrade connection portal URL",
       );
     }
   });
@@ -80,10 +80,9 @@ export const snaptradeRoutes: FastifyPluginAsync = async (app) => {
         message: "Brokerage accounts connected and synced.",
       };
     } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw AppError.snaptradeSyncError(
-        "Unable to sync SnapTrade accounts after connection",
+      throw toSnaptradeAppError(
         error,
+        "Unable to sync SnapTrade accounts after connection",
       );
     }
   });

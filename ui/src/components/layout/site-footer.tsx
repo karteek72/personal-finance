@@ -19,30 +19,22 @@ export function SiteFooter({ variant = "default", className }: SiteFooterProps) 
   return (
     <footer
       className={clsx(
-        "border-t border-border text-text-muted",
-        variant === "compact" ? "py-4 text-center text-xs" : "mt-10 py-6 text-xs",
+        "border-t border-border text-center text-text-muted",
+        variant === "compact" ? "py-4 text-xs" : "mt-auto py-6 text-xs",
         className,
       )}
       aria-label="Site footer"
     >
-      <p className={variant === "compact" ? undefined : "max-w-2xl"}>
+      <p className="mx-auto max-w-2xl">
         © {year} {COMPANY_LEGAL_NAME}. {PRODUCT_NAME} is a product of{" "}
         {COMPANY_BRAND}.
       </p>
-      <p
-        className={clsx(
-          "text-[11px] leading-relaxed",
-          variant === "compact" ? "mt-1" : "mt-2 max-w-2xl",
-        )}
-      >
+      <p className="mx-auto mt-2 max-w-2xl text-[11px] leading-relaxed">
         {PRODUCT_NAME}™ is a trademark of {COMPANY_LEGAL_NAME}. All rights reserved.
       </p>
       <nav
         aria-label="Legal and company"
-        className={clsx(
-          "flex flex-wrap items-center gap-x-3 gap-y-1",
-          variant === "compact" ? "mt-3 justify-center" : "mt-4",
-        )}
+        className="mx-auto mt-4 flex max-w-2xl flex-wrap items-center justify-center gap-x-3 gap-y-1"
       >
         {LEGAL_LINKS.map((link, index) => (
           <span key={link.href} className="inline-flex items-center gap-3">

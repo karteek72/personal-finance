@@ -20,6 +20,10 @@ export function getSnaptradeClient(env: Env): Snaptrade {
   return snaptradeClient;
 }
 
-export function resolveSnaptradeRedirectUri(env: Env): string | undefined {
-  return env.SNAPTRADE_REDIRECT_URI?.trim() || env.UI_APP_URL;
+export function resolveSnaptradeRedirectUri(env: Env): string {
+  const explicit = env.SNAPTRADE_REDIRECT_URI?.trim();
+  if (explicit) return explicit;
+
+  const base = env.UI_APP_URL.replace(/\/$/, "");
+  return `${base}/accounts/snaptrade/callback`;
 }

@@ -41,10 +41,10 @@ export default function DashboardLayout({
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden pb-20 md:pb-0">
           <TopBar title={title} />
-          <main className="relative flex-1 overflow-x-hidden px-4 py-4 md:px-5 md:py-4">
+          <main className="relative flex flex-1 flex-col overflow-x-hidden px-4 py-4 md:px-5 md:py-4">
             <QueryActivityBar />
-            <div className="animate-fade-in mx-auto w-full min-w-0 max-w-5xl xl:max-w-7xl">
-              {children}
+            <div className="animate-fade-in mx-auto flex w-full min-w-0 max-w-5xl flex-1 flex-col xl:max-w-7xl">
+              <div className="min-h-0 flex-1">{children}</div>
               <SiteFooter />
             </div>
           </main>
