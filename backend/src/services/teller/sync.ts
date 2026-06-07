@@ -13,8 +13,7 @@ import { classifyBankingTransaction } from "../classify-banking-transaction.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
 import { upsertBalanceSnapshotsForAccountIds } from "../balance-snapshots.js";
 import { backfillTransactionMerchantIds } from "../dim-merchant-store.js";
-import { runPostSyncAnalytics } from "../post-sync-analytics.js";
-import { refreshTransferLinks } from "../transfer-pairing.js";
+import { recomputeAllAnalytics } from "../recompute-all-analytics.js";
 import {
   PLAID_TXN_BATCH_SIZE,
   upsertPlaidTransactionBatch,
@@ -233,9 +232,8 @@ export async function syncTellerEnrollment(
     "teller enrollment synced",
   );
 
-  await runPostSyncAnalytics(enrollment.userId);
   await backfillTransactionMerchantIds(enrollment.userId);
-  await refreshTransferLinks(enrollment.userId);
+  await recomputeAllAnalytics(enrollment.userId);
 
   return {
     enrollmentId: enrollment.tellerEnrollmentId,

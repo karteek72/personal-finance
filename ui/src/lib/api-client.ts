@@ -55,8 +55,10 @@ import type {
   PlaidSyncAllResponse,
   PlaidSyncResponse,
   RecurringResponse,
+  RecomputeAnalyticsResponse,
   ResilienceResponse,
   TransactionFilters,
+  TransactionReasonResponse,
   TransactionSummary,
   TrendsResponse,
   UpdateTransactionCategoryResponse,
@@ -1040,6 +1042,44 @@ export const api = {
   getBehavioral(): Promise<BehavioralResponse> {
     if (USE_MOCKS) return mockApi.getBehavioral();
     return fetchJson<BehavioralResponse>("/insights/behavioral");
+  },
+
+  setTransactionReason(
+    transactionId: string,
+    reasonId: string,
+  ): Promise<TransactionReasonResponse> {
+    if (USE_MOCKS) {
+      return mockApi.setTransactionReason(transactionId, reasonId);
+    }
+    return fetchJson<TransactionReasonResponse>(
+      `/transactions/${transactionId}/reason`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reasonId }),
+      },
+    );
+  },
+
+  clearTransactionReason(
+    transactionId: string,
+  ): Promise<TransactionReasonResponse> {
+    if (USE_MOCKS) {
+      return mockApi.clearTransactionReason(transactionId);
+    }
+    return fetchJson<TransactionReasonResponse>(
+      `/transactions/${transactionId}/reason`,
+      { method: "DELETE" },
+    );
+  },
+
+  recomputeAnalytics(): Promise<RecomputeAnalyticsResponse> {
+    if (USE_MOCKS) {
+      return mockApi.recomputeAnalytics();
+    }
+    return fetchJson<RecomputeAnalyticsResponse>("/analytics/recompute", {
+      method: "POST",
+    });
   },
 
   getMerchants(): Promise<MerchantsResponse> {

@@ -1958,7 +1958,7 @@ tasks:
       - The test runs in CI
   - id: TASK-FIRE-001
     title: FIRE projection should start from investable assets, not total net worth (F1)
-    status: ready
+    status: done
     priority: P1
     area: backend
     phase: 3.8
@@ -1986,7 +1986,7 @@ tasks:
       - typecheck passes
   - id: TASK-FIRE-002
     title: Do not compute FIRE age off the default age; require user age (F2)
-    status: ready
+    status: done
     priority: P1
     area: ui
     phase: 3.8
@@ -2009,7 +2009,7 @@ tasks:
       - No FIRE age is presented as fact while based on the default 35
   - id: TASK-FIRE-003
     title: Longer/annualized spend & contribution basis for FIRE inputs (F3)
-    status: ready
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -2032,7 +2032,7 @@ tasks:
       - typecheck passes
   - id: TASK-FIRE-004
     title: Surface FIRE assumptions; default to a conservative real return (F4)
-    status: ready
+    status: done
     priority: P2
     area: ui
     phase: 3.8
@@ -2056,7 +2056,7 @@ tasks:
       - Default real return reviewed (more conservative) with rationale in the doc
   - id: TASK-PROFILE-001
     title: Use targetRetirementAge in the FIRE projection (P1)
-    status: ready
+    status: done
     priority: P1
     area: backend
     phase: 3.8
@@ -2082,7 +2082,7 @@ tasks:
       - typecheck passes
   - id: TASK-PROFILE-002
     title: Map riskTolerance to default real-return bands (P2)
-    status: ready
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -2105,7 +2105,7 @@ tasks:
       - typecheck passes
   - id: TASK-PROFILE-003
     title: Use householdSize (dependents) in emergency-fund & spend expectations (P3)
-    status: ready
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -2150,7 +2150,7 @@ tasks:
       - typecheck passes
   - id: TASK-PROFILE-005
     title: Regression test + audit that profile fields are consumed (P5)
-    status: ready
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -2174,7 +2174,7 @@ tasks:
       - Doc/checklist requires every profile field to have a consumer
   - id: TASK-WELLNESS-UI-001
     title: Wellness score-history chart needs axis, values, and 0-100 scaling (W1)
-    status: ready
+    status: done
     priority: P2
     area: ui
     phase: 3.8
@@ -2199,7 +2199,7 @@ tasks:
       - Bar heights are scaled to 0-100, not the window max
   - id: TASK-RECOMPUTE-001
     title: recomputeAllAnalytics orchestrator + POST /analytics/recompute (RC1)
-    status: ready
+    status: done
     priority: P1
     area: backend
     phase: 3.8
@@ -2229,7 +2229,7 @@ tasks:
       - typecheck passes
   - id: TASK-RECOMPUTE-UI-001
     title: Recalculate-all button that triggers recompute + invalidates caches (RC2)
-    status: ready
+    status: done
     priority: P1
     area: ui
     phase: 3.8
@@ -2252,7 +2252,7 @@ tasks:
       - On success all financial queries are invalidated and metrics refresh
   - id: TASK-RECOMPUTE-002
     title: Idempotency/determinism test for recompute (RC3)
-    status: ready
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -2276,7 +2276,7 @@ tasks:
       - Test runs in CI
   - id: TASK-RECOMPUTE-003
     title: Wire sync to full recompute after reconcile; fix ordering (RC4)
-    status: ready
+    status: done
     priority: P1
     area: backend
     phase: 3.8
@@ -2308,7 +2308,7 @@ tasks:
       - typecheck passes
   - id: TASK-BEHAVIORAL-001
     title: Habit-streak engine — populate habit_streaks from transactions (B1)
-    status: ready
+    status: done
     priority: P1
     area: backend
     phase: 3.8
@@ -2333,7 +2333,7 @@ tasks:
       - typecheck passes
   - id: TASK-BEHAVIORAL-002
     title: Challenge engine — auto-generate challenges with progress (B2)
-    status: ready
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -2358,7 +2358,7 @@ tasks:
       - typecheck passes
   - id: TASK-BEHAVIORAL-003
     title: Transaction reason tagging to populate spend-by-reason (B3a backend)
-    status: ready
+    status: done
     priority: P2
     area: backend
     phase: 3.8
@@ -2383,7 +2383,7 @@ tasks:
       - typecheck passes
   - id: TASK-BEHAVIORAL-UI-001
     title: Reason-tagging UI + behavioral empty states (B3b ui)
-    status: ready
+    status: done
     priority: P2
     area: ui
     phase: 3.8

@@ -161,6 +161,7 @@ export interface BehavioralResponse {
     reasonId: string;
   }>;
   challenges: Array<{
+    id: string;
     title: string;
     goal: string;
     progressPercent: number;
@@ -250,7 +251,12 @@ export async function getBehavioral(
   const challengeRows = await db
     .select()
     .from(challenges)
-    .where(inArray(challenges.userId, ctx.userIds));
+    .where(
+      and(
+        inArray(challenges.userId, ctx.userIds),
+        eq(challenges.dismissed, false),
+      ),
+    );
   const streakRows = await db
     .select()
     .from(habitStreaks)
@@ -278,6 +284,7 @@ export async function getBehavioral(
       reasonId: t.reasonId,
     })),
     challenges: challengeRows.map((c) => ({
+      id: c.id,
       title: c.title,
       goal: c.goal,
       progressPercent: c.progressPercent,

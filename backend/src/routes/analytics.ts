@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { AppError } from "../lib/errors.js";
 import { requireRequestUser } from "../lib/auth-http.js";
 import { parseListQuery } from "../lib/list-query.js";
+import { recomputeAllAnalytics } from "../services/recompute-all-analytics.js";
 import {
   listMerchants,
   MERCHANT_SORTABLE,
@@ -21,6 +22,11 @@ import {
 } from "../services/planning-engine.js";
 
 export const analyticsRoutes: FastifyPluginAsync = async (app) => {
+  app.post("/analytics/recompute", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
+    return recomputeAllAnalytics(user.id);
+  });
+
   app.get("/analytics/merchants", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
     const query = parseListQuery(request.query, {

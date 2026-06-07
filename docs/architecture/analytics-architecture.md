@@ -717,25 +717,23 @@ size, annual gross income, target retirement age, employment status, and risk to
   the headline **years-to-FIRE**, which does **not** depend on age (only the derived *FIRE age*
   does); the implausible timeline is **F1** (total-net-worth seed), not age.
 
-### 17.2 Orphaned profile fields (stored, used by nothing)
-A repo-wide search shows `targetRetirementAge`, `householdSize`, `annualGrossIncome`,
-`riskTolerance`, and `employmentStatus` appear **only** in `schema.ts`, `user-profile-store.ts`, and
-`routes/user.ts` — **no analytics/compute service references them.** The user fills them in
-expecting them to matter (dependents, target date, income), and they silently do nothing.
+### 17.2 Profile field consumers (audit checklist)
+Every profile field must have at least one consumer or be removed from the form.
 
-| ID | Sev | Field | Should drive |
-|----|-----|-------|--------------|
-| **P1** | P1 | `targetRetirementAge` | FIRE: compare projected FIRE age vs target → "on track / N years behind" and the **monthly savings required** to hit the target by that age. |
-| **P2** | P2 | `riskTolerance` | Default **real return** bands (conservative/moderate/aggressive) instead of a fixed 6% (ties to F4). |
-| **P3** | P2 | `householdSize` (dependents) | Emergency-fund target months, FIRE/resilience spend expectations, and a sanity check that spend reflects the household; surface in context. |
-| **P4** | P3 | `annualGrossIncome` | Fallback / cross-check for income-derived metrics (savings rate denominator, DTI) when transaction-detected income is incomplete; reconcile the two. |
-| **P5** | P3 | `employmentStatus` | Income-stability assumptions (e.g. self-employed → larger emergency-fund target / lower income-stability score). |
+| Field | Consumer(s) | Status |
+|-------|-------------|--------|
+| `currentAge` | FIRE projection (`isDefaultAge`, `fireAge`) | wired |
+| `withdrawalRate` / `realReturn` | FIRE projection + panel overrides | wired |
+| `targetRetirementAge` | FIRE on-track/behind + `requiredMonthlySavings` | wired (P1) |
+| `riskTolerance` | Default real-return bands when not user-overridden | wired (P2) |
+| `householdSize` | Emergency-fund target months in resilience analytics | wired (P3) |
+| `annualGrossIncome` | — | backlog (P4 / `TASK-PROFILE-004`) |
+| `employmentStatus` | — | backlog (no task yet) |
 
 ### 17.3 Principle & guard
-**Don't collect what you don't use.** Every field on the profile form should either feed a feature
-or be removed. Add a **regression test** that saving profile age makes FIRE return
-`isDefaultAge=false` / the saved age (locks the one wired path), and an audit checklist so any new
-profile field ships with at least one consumer.
+**Don't collect what you don't use.** Regression coverage lives in
+`backend/src/services/__tests__/profile-fire.test.ts` (risk bands, household size, investable
+FIRE start). Any new profile field must update this checklist before shipping.
 
 ---
 

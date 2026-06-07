@@ -9,6 +9,7 @@ import {
   getWellness,
   PATTERN_SORTABLE,
 } from "../services/insights-store.js";
+import { dismissChallenge } from "../services/challenge-engine.js";
 import { getMerchants } from "../services/coach-store.js";
 
 export const insightRoutesV2: FastifyPluginAsync = async (app) => {
@@ -41,5 +42,12 @@ export const insightRoutesV2: FastifyPluginAsync = async (app) => {
   app.get("/insights/merchants", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
     return getMerchants(user.id);
+  });
+
+  app.post("/insights/challenges/:challengeId/dismiss", async (request) => {
+    const user = await requireRequestUser(request, app.config.env);
+    const { challengeId } = request.params as { challengeId: string };
+    await dismissChallenge(user.id, challengeId);
+    return { ok: true };
   });
 };

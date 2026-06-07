@@ -1,18 +1,16 @@
-import { createLogger } from "../lib/logger.js";
-import { evaluateUserAlerts } from "./alert-engine.js";
-import { refreshProtectProfiles } from "./protect-analytics.js";
-import { refreshAnalyticsMarts } from "./refresh-marts.js";
+export {
+  recomputeAllAnalytics,
+  type RecomputeAllAnalyticsResult,
+  type RecomputeStepResult,
+} from "./recompute-all-analytics.js";
 
-const log = createLogger("analytics.post-sync");
+import { recomputeAllAnalytics } from "./recompute-all-analytics.js";
 
-/** Run analytics refresh steps after account/investment sync completes. */
+/** Run analytics refresh after account/investment sync completes. */
 export async function runPostSyncAnalytics(userId: string): Promise<void> {
-  try {
-    await refreshAnalyticsMarts();
-    await refreshProtectProfiles(userId);
-    await evaluateUserAlerts(userId);
-  } catch (err) {
-    log.error({ err, userId }, "post-sync analytics failed");
-    throw err;
+  const { steps } = await recomputeAllAnalytics(userId);
+  const failed = steps.find((s) => !s.ok);
+  if (failed) {
+    throw new Error(`post-sync analytics failed at ${failed.step}: ${failed.detail ?? ""}`);
   }
 }

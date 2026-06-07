@@ -12,11 +12,9 @@ import { AppError } from "../../lib/errors.js";
 import { formatMoneyAmount, formatOptionPremium } from "../../lib/money.js";
 import { createLogger } from "../../lib/logger.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
-import { upsertBalanceSnapshotsForAccountIds } from "../balance-snapshots.js";
 import { writeInvestmentSnapshotsForAccounts } from "../investment-snapshots.js";
-import { refreshFireProfile, repairNonContributionInvestmentTxns } from "../investment-analytics.js";
-import { runPostSyncAnalytics } from "../post-sync-analytics.js";
-import { refreshTransferLinks } from "../transfer-pairing.js";
+import { repairNonContributionInvestmentTxns } from "../investment-analytics.js";
+import { recomputeAllAnalytics } from "../recompute-all-analytics.js";
 import {
   effectiveAssetType,
   isOccOptionTicker,
@@ -704,17 +702,13 @@ export async function syncSnaptradeForUser(
     await ensureAccountsAssignedToOwner(userId, accountIds);
   }
 
-  await upsertBalanceSnapshotsForAccountIds(syncedAccountIds);
-
   const repairedSecurities = await repairMisclassifiedOptionSecurities(db);
   const repairedHoldings = await repairOptionHoldingsCostBasis(db, userId);
   const repairedTxns = await repairNonContributionInvestmentTxns([userId]);
 
   await writeInvestmentSnapshotsForAccounts(userId, syncedAccountIds);
 
-  await refreshFireProfile(userId);
-  await runPostSyncAnalytics(userId);
-  await refreshTransferLinks(userId);
+  await recomputeAllAnalytics(userId);
 
   log.info(
     {

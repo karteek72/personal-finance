@@ -35,6 +35,11 @@ function scoreLabel(s: number) {
   return "Needs Work";
 }
 
+const SCORE_DOMAIN = 100;
+const HISTORY_CHART_HEIGHT = 96;
+const SCORE_BANDS = [55, 70, 85] as const;
+const HISTORY_Y_TICKS = [0, 25, 50, 75, 100] as const;
+
 function TrendIcon({ trend }: { trend: string }) {
   if (trend === "up")
     return (
@@ -70,7 +75,6 @@ export function WellnessPanel() {
 
   const SCORE = data?.score ?? 0;
   const delta = data?.delta ?? 0;
-  const maxBar = Math.max(...history, 1);
 
   return (
     <div className="space-y-5">
@@ -118,16 +122,58 @@ export function WellnessPanel() {
       {/* History */}
       {history.length > 0 && (
         <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
-          <p className="mb-3 text-sm font-semibold text-text">Score history</p>
-          <div className="flex h-20 items-end gap-1.5">
-            {history.map((s, i) => (
-              <div key={`${months[i]}-${i}`} className="flex flex-1 flex-col items-center gap-1">
-                <div
-                  className="w-full rounded-t-[var(--radius-xs)] bg-primary"
-                  style={{ height: `${(s / maxBar) * 64}px` }}
-                />
-                <span className="text-[9px] text-text-muted">{months[i]}</span>
+          <p className="mb-1 text-sm font-semibold text-text">Score history</p>
+          <p className="mb-3 text-[11px] text-text-muted">
+            Y-axis: 0–100 score · dashed lines at Fair (55), Good (70), Excellent (85)
+          </p>
+          <div className="flex gap-2">
+            <div
+              className="flex w-8 shrink-0 flex-col justify-between py-0.5 text-right text-[10px] tabular-nums text-text-muted"
+              style={{ height: HISTORY_CHART_HEIGHT }}
+            >
+              {[...HISTORY_Y_TICKS].reverse().map((tick) => (
+                <span key={tick}>{tick}</span>
+              ))}
+            </div>
+            <div className="relative min-w-0 flex-1">
+              <div
+                className="flex items-end gap-1.5"
+                style={{ height: HISTORY_CHART_HEIGHT }}
+              >
+                {history.map((s, i) => {
+                  const barHeight = Math.max((s / SCORE_DOMAIN) * HISTORY_CHART_HEIGHT, 2);
+                  return (
+                    <div
+                      key={`${months[i]}-${i}`}
+                      className="flex flex-1 flex-col items-center justify-end gap-0.5"
+                      title={`${months[i]}: score ${s}`}
+                    >
+                      <span className="text-[9px] font-semibold tabular-nums text-text">{s}</span>
+                      <div
+                        className="w-full rounded-t-[var(--radius-xs)] bg-primary"
+                        style={{ height: `${barHeight}px` }}
+                        aria-label={`${months[i]} score ${s}`}
+                      />
+                    </div>
+                  );
+                })}
               </div>
+              {SCORE_BANDS.map((band) => (
+                <div
+                  key={band}
+                  className="pointer-events-none absolute left-0 right-0 border-t border-dashed border-border/70"
+                  style={{ bottom: `${(band / SCORE_DOMAIN) * HISTORY_CHART_HEIGHT}px` }}
+                >
+                  <span className="absolute -top-3.5 right-0 text-[9px] text-text-muted">{band}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-2 flex justify-between pl-10 text-[9px] text-text-muted">
+            {months.map((mo, i) => (
+              <span key={`${mo}-${i}`} className="flex-1 text-center">
+                {mo}
+              </span>
             ))}
           </div>
         </div>

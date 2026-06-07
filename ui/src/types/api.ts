@@ -752,16 +752,42 @@ export interface FireProjection {
   curve: number[];
 }
 
+export interface FireAssumptions {
+  realReturn: number;
+  withdrawalRate: number;
+  /** When true, figures are in today's dollars and inflation is netted via real return. */
+  inflationHandledViaRealReturn: boolean;
+}
+
 export interface FireResponse {
   currentAge: number;
   /** True until the user saves their age (system default is 35). */
   isDefaultAge: boolean;
   currentNetWorth: string;
+  /** Investable balance used as the projection start (may exclude emergency cash). */
+  investableAssets?: string;
   monthlySpend: string;
   monthlyInvest: string;
   withdrawalRate: number;
   realReturn: number;
   projection: FireProjection;
+  targetRetirementAge?: number | null;
+  targetStatus?: "on_track" | "behind" | "ahead" | null;
+  targetGapYears?: number | null;
+  requiredMonthlySavings?: string | null;
+  inputBasis?: string;
+  caveats?: string[];
+  assumptions?: FireAssumptions;
+}
+
+export interface RecomputeAnalyticsResponse {
+  steps: { name: string; status: string }[];
+  message?: string;
+}
+
+export interface TransactionReasonResponse {
+  transactionId: string;
+  reasonId: string | null;
 }
 
 export interface FireQueryOverrides {
@@ -868,6 +894,7 @@ export interface BehavioralResponse {
     reasonId: string;
   }[];
   challenges: {
+    id?: string;
     title: string;
     goal: string;
     progressPercent: number;

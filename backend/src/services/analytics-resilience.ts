@@ -4,6 +4,7 @@ import {
   accounts,
   creditCardLiabilities,
   dimMerchant,
+  fireProfiles,
   holdings,
   transactions,
 } from "../db/schema.js";
@@ -25,6 +26,7 @@ import {
   type ResilienceSubScore,
 } from "./resilience-scoring.js";
 import { INTERNAL_TRANSFER_CATEGORY } from "./transfer-classification.js";
+import { emergencyFundTargetMonths } from "./investment-analytics.js";
 
 export interface ResilienceAnalyticsResponse {
   score: number;
@@ -33,6 +35,8 @@ export interface ResilienceAnalyticsResponse {
   liquidCash: string;
   monthlyBurn: string;
   runwayMonths: number;
+  householdSize: number | null;
+  emergencyFundTargetMonths: number;
   subScores: ResilienceSubScore[];
   scenarios: Array<{
     id: string;
@@ -260,6 +264,15 @@ export async function getResilienceAnalytics(
   );
   if (!hasActiveAccounts) return null;
 
+  const db = getDb();
+  const [profileRow] = await db
+    .select({ householdSize: fireProfiles.householdSize })
+    .from(fireProfiles)
+    .where(eq(fireProfiles.userId, userId))
+    .limit(1);
+  const householdSize = profileRow?.householdSize ?? null;
+  const fundTargetMonths = emergencyFundTargetMonths(householdSize);
+
   const asOf = new Date().toISOString().slice(0, 10);
   const liquidCash = await sumDepositoryCash(ctx.userIds);
   const trailing = await trailingEssentialOutflow(ctx.userIds, accountIds, asOf, 3);
@@ -328,6 +341,8 @@ export async function getResilienceAnalytics(
     liquidCash: formatMoneyAmount(liquidCash),
     monthlyBurn: formatMoneyAmount(burn),
     runwayMonths,
+    householdSize,
+    emergencyFundTargetMonths: fundTargetMonths,
     subScores: composite.subScores,
     scenarios,
     isLive: true,

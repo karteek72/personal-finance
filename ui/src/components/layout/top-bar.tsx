@@ -2,6 +2,7 @@
 
 import { useIsFetching } from "@tanstack/react-query";
 
+import { RecalculateAnalyticsButton } from "@/components/layout/recalculate-analytics-button";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { UserMenu } from "@/components/layout/user-menu";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -67,6 +68,7 @@ export function TopBar({ title }: TopBarProps) {
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
+        <RecalculateAnalyticsButton />
         <NotificationBell />
         <UserMenu />
         <button

@@ -182,6 +182,33 @@ export function computeFireProjection(input: FireProjectionInput): FireProjectio
   };
 }
 
+/** Monthly contribution required to reach target balance within years. */
+export function computeRequiredMonthlySavings(input: {
+  start: number;
+  target: number;
+  years: number;
+  annualReturn: number;
+}): number {
+  if (input.target <= input.start) return 0;
+  if (input.years <= 0) {
+    return roundDecimal(Math.max(0, input.target - input.start), 2);
+  }
+
+  const months = input.years * 12;
+  const monthlyRate = input.annualReturn / 12;
+  if (monthlyRate <= 0) {
+    return roundDecimal(Math.max(0, (input.target - input.start) / months), 2);
+  }
+
+  const factor = (1 + monthlyRate) ** months;
+  const futureFromStart = input.start * factor;
+  if (futureFromStart >= input.target) return 0;
+
+  const payment =
+    ((input.target - futureFromStart) * monthlyRate) / (factor - 1);
+  return roundDecimal(Math.max(0, payment), 2);
+}
+
 export interface FilteredPortfolioTotals {
   portfolioValue: string;
   totalCostBasis: string;

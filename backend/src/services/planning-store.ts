@@ -39,6 +39,7 @@ import {
 import {
   buildTimeMachineSummary,
   computeFireProjection,
+  computeRequiredMonthlySavings,
   type FireProjection,
   type TimeMachineSummary,
 } from "./computed-fields.js";
@@ -503,10 +504,21 @@ export interface FireResponse {
   /** True when age is still the system default (35) — user should set their real age. */
   isDefaultAge: boolean;
   currentNetWorth: string;
+  investableAssets: string;
   monthlySpend: string;
   monthlyInvest: string;
   withdrawalRate: number;
   realReturn: number;
+  householdSize: number | null;
+  targetRetirementAge: number | null;
+  targetStatus: "on_track" | "behind" | null;
+  targetGapYears: number | null;
+  requiredMonthlySavings: string | null;
+  inputBasis: {
+    spendLookbackMonths: number;
+    investLookbackMonths: number;
+  };
+  caveats: string[];
   projection: FireProjection;
 }
 
@@ -556,24 +568,57 @@ export async function getFire(
     Number.parseFloat(live.monthlyInvest);
   const withdrawalRate = overrides?.withdrawalRate ?? live.withdrawalRate;
   const realReturn = overrides?.realReturn ?? live.realReturn;
+  const investableAssets = Number.parseFloat(live.investableAssets);
 
   const projection = computeFireProjection({
     currentAge: live.currentAge,
-    currentNetWorth: Number.parseFloat(live.currentNetWorth),
+    currentNetWorth: investableAssets,
     monthlySpend,
     monthlyInvest,
     withdrawalRate,
     realReturn,
   });
 
+  let targetStatus: FireResponse["targetStatus"] = null;
+  let targetGapYears: number | null = null;
+  let requiredMonthlySavings: string | null = null;
+
+  if (live.targetRetirementAge != null) {
+    const gap = roundDecimal(projection.fireAge - live.targetRetirementAge, 1);
+    targetGapYears = gap;
+    targetStatus = gap <= 0 ? "on_track" : "behind";
+    const yearsToTarget = live.targetRetirementAge - live.currentAge;
+    if (yearsToTarget > 0 && targetStatus === "behind") {
+      const fireNumber = Number.parseFloat(projection.fireNumber);
+      requiredMonthlySavings = formatMoneyAmount(
+        computeRequiredMonthlySavings({
+          start: investableAssets,
+          target: fireNumber,
+          years: yearsToTarget,
+          annualReturn: realReturn / 100,
+        }),
+      );
+    } else if (targetStatus === "on_track") {
+      requiredMonthlySavings = formatMoneyAmount(monthlyInvest);
+    }
+  }
+
   return {
     currentAge: live.currentAge,
     isDefaultAge: live.isDefaultAge,
     currentNetWorth: live.currentNetWorth,
+    investableAssets: live.investableAssets,
     monthlySpend: formatMoneyAmount(monthlySpend),
     monthlyInvest: formatMoneyAmount(monthlyInvest),
     withdrawalRate,
     realReturn,
+    householdSize: live.householdSize,
+    targetRetirementAge: live.targetRetirementAge,
+    targetStatus,
+    targetGapYears,
+    requiredMonthlySavings,
+    inputBasis: live.inputBasis,
+    caveats: live.caveats,
     projection,
   };
 }

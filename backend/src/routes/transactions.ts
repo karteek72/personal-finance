@@ -6,6 +6,11 @@ import { requireRequestUser } from "../lib/auth-http.js";
 import { parseListQuery } from "../lib/list-query.js";
 import { parseBody } from "../lib/validate.js";
 import { updateTransactionCategory } from "../services/category-rules.js";
+import {
+  clearTransactionReason,
+  setTransactionReason,
+  TRANSACTION_REASON_IDS,
+} from "../services/transaction-reasons.js";
 import { resolveHouseholdContext } from "../services/household-access.js";
 import { resolveScopedAccountIdsForContext } from "../services/household-store.js";
 import {
@@ -26,6 +31,10 @@ const patchCategorySchema = z.object({
   category: z.string().min(1),
   subCategory: z.string().min(1).nullable().optional().default(null),
   rememberForMerchant: z.boolean().optional().default(true),
+});
+
+const putReasonSchema = z.object({
+  reasonId: z.enum(TRANSACTION_REASON_IDS),
 });
 
 type ViewScope = "all" | "household" | "personal";
@@ -181,6 +190,23 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
       body.subCategory ?? null,
       body.rememberForMerchant ?? true,
     );
+  });
+
+  app.put("/transactions/:transactionId/reason", async (request) => {
+    const { transactionId } = request.params as { transactionId: string };
+    const body = parseBody(
+      putReasonSchema,
+      request.body,
+      "reasonId is required",
+    );
+    const user = await requireRequestUser(request, app.config.env);
+    return setTransactionReason(user.id, transactionId, body.reasonId);
+  });
+
+  app.delete("/transactions/:transactionId/reason", async (request) => {
+    const { transactionId } = request.params as { transactionId: string };
+    const user = await requireRequestUser(request, app.config.env);
+    return clearTransactionReason(user.id, transactionId);
   });
 };
 

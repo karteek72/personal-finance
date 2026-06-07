@@ -1640,6 +1640,36 @@ export async function getBehavioral(): Promise<BehavioralResponse> {
   return behavioralData as BehavioralResponse;
 }
 
+export async function setTransactionReason(
+  transactionId: string,
+  reasonId: string,
+): Promise<{ transactionId: string; reasonId: string | null }> {
+  await delay();
+  return { transactionId, reasonId };
+}
+
+export async function clearTransactionReason(
+  transactionId: string,
+): Promise<{ transactionId: string; reasonId: string | null }> {
+  await delay();
+  return { transactionId, reasonId: null };
+}
+
+export async function recomputeAnalytics(): Promise<{
+  steps: { name: string; status: string }[];
+  message?: string;
+}> {
+  await delay();
+  return {
+    steps: [
+      { name: "marts", status: "ok" },
+      { name: "protect", status: "ok" },
+      { name: "fire", status: "ok" },
+    ],
+    message: "Mock analytics recalculated.",
+  };
+}
+
 export async function getInflation(
   params: ListQuery = {},
 ): Promise<InflationResponse> {

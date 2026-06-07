@@ -27,6 +27,8 @@ import {
   OPTION_SHARES_PER_CONTRACT,
   resolveOptionMeta,
 } from "./holdings-mapper.js";
+import { trailingEssentialOutflow } from "./metrics/index.js";
+import type { RiskTolerance } from "./user-profile-store.js";
 
 export interface InvestmentBehavioralAlert {
   type: "warning" | "info" | "positive";
@@ -57,13 +59,167 @@ export interface FireProfileInputs {
   currentAge: number;
   isDefaultAge: boolean;
   currentNetWorth: string;
+  investableAssets: string;
   monthlySpend: string;
   monthlyInvest: string;
   withdrawalRate: number;
   realReturn: number;
+  targetRetirementAge: number | null;
+  householdSize: number | null;
+  inputBasis: {
+    spendLookbackMonths: number;
+    investLookbackMonths: number;
+  };
+  caveats: string[];
 }
 
 const DEFAULT_FIRE_AGE = 35;
+const DEFAULT_REAL_RETURN = 4.5;
+const DEFAULT_WITHDRAWAL_RATE = 4;
+const FIRE_LOOKBACK_TARGET_MONTHS = 12;
+
+export function realReturnFromRiskTolerance(
+  riskTolerance: RiskTolerance | null,
+): number {
+  switch (riskTolerance) {
+    case "conservative":
+      return 3.5;
+    case "aggressive":
+      return 6;
+    case "moderate":
+    default:
+      return DEFAULT_REAL_RETURN;
+  }
+}
+
+/** Emergency-fund target months: 3 base + 0.5 per dependent above 1, capped at 6. */
+export function emergencyFundTargetMonths(householdSize: number | null): number {
+  const size = Math.max(1, householdSize ?? 1);
+  const dependents = Math.max(0, size - 1);
+  return Math.min(6, 3 + dependents * 0.5);
+}
+
+async function sumDepositoryCash(userIds: string[]): Promise<number> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      balance: accounts.balanceAvailable,
+      current: accounts.balanceCurrent,
+    })
+    .from(accounts)
+    .where(
+      and(
+        inArray(accounts.userId, userIds),
+        eq(accounts.type, "depository"),
+        eq(accounts.isActive, true),
+      ),
+    );
+
+  let total = 0;
+  for (const row of rows) {
+    total += Number.parseFloat(row.balance ?? row.current ?? "0");
+  }
+  return total;
+}
+
+async function totalInvestmentHoldingsValue(userIds: string[]): Promise<number> {
+  const db = getDb();
+  const investAccounts = await db
+    .select({ id: accounts.id, balance: accounts.balanceCurrent })
+    .from(accounts)
+    .where(
+      and(
+        inArray(accounts.userId, userIds),
+        eq(accounts.isActive, true),
+        sql`${accounts.type} in ('investment', 'brokerage')`,
+      ),
+    );
+
+  if (investAccounts.length === 0) return 0;
+
+  const accountIds = investAccounts.map((a) => a.id);
+  const holdingRows = await db
+    .select({
+      accountId: holdings.accountId,
+      value: holdings.institutionValue,
+      quantity: holdings.quantity,
+      price: holdings.costBasis,
+    })
+    .from(holdings)
+    .where(inArray(holdings.accountId, accountIds));
+
+  const holdingsByAccount = new Map<string, number>();
+  for (const row of holdingRows) {
+    const val = Number.parseFloat(row.value ?? "0");
+    const fallback =
+      Number.parseFloat(row.quantity ?? "0") *
+      Number.parseFloat(row.price ?? "0");
+    const mv = val > 0 ? val : fallback;
+    holdingsByAccount.set(
+      row.accountId,
+      (holdingsByAccount.get(row.accountId) ?? 0) + mv,
+    );
+  }
+
+  let total = 0;
+  for (const account of investAccounts) {
+    const balance = Number.parseFloat(account.balance ?? "0");
+    const invested = holdingsByAccount.get(account.id) ?? 0;
+    total += Math.max(balance, invested);
+  }
+  return total;
+}
+
+/** Investable assets = investment holdings + liquid cash above emergency-fund target. */
+export async function computeInvestableAssets(
+  userIds: string[],
+  householdSize: number | null,
+): Promise<{ investableAssets: number; emergencyReserve: number }> {
+  const { accountIds } = await resolveActiveAccountScope(userIds);
+  const asOf = new Date().toISOString().slice(0, 10);
+  const liquidCash = await sumDepositoryCash(userIds);
+  const investmentTotal = await totalInvestmentHoldingsValue(userIds);
+
+  let emergencyReserve = 0;
+  if (accountIds.length > 0) {
+    const trailing = await trailingEssentialOutflow(userIds, accountIds, asOf, 3);
+    const burn = trailing.total / Math.max(trailing.months, 1);
+    const targetMonths = emergencyFundTargetMonths(householdSize);
+    emergencyReserve = burn * targetMonths;
+  }
+
+  const excessCash = Math.max(0, liquidCash - emergencyReserve);
+  return {
+    investableAssets: investmentTotal + excessCash,
+    emergencyReserve,
+  };
+}
+
+async function resolveFireLookbackMonths(
+  userIds: string[],
+  accountIds: string[],
+): Promise<number> {
+  if (accountIds.length === 0) return 1;
+
+  const db = getDb();
+  const since = monthsAgo(FIRE_LOOKBACK_TARGET_MONTHS);
+  const [row] = await db
+    .select({
+      months: sql<number>`count(distinct to_char(${transactions.date}, 'YYYY-MM'))::int`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        drizzleActiveTransactionWhere(userIds, accountIds),
+        eq(transactions.pending, false),
+        gte(transactions.date, since),
+      ),
+    );
+
+  const available = row?.months ?? 0;
+  if (available <= 0) return 1;
+  return Math.min(FIRE_LOOKBACK_TARGET_MONTHS, available);
+}
 
 function monthsAgo(months: number): string {
   const d = new Date();
@@ -695,7 +851,7 @@ export async function computeFireProfileInputs(
   userId: string,
   userIds: string[],
 ): Promise<FireProfileInputs | null> {
-  const { hasActiveAccounts } = await resolveActiveAccountScope(userIds);
+  const { accountIds, hasActiveAccounts } = await resolveActiveAccountScope(userIds);
   if (!hasActiveAccounts) return null;
 
   const db = getDb();
@@ -704,32 +860,76 @@ export async function computeFireProfileInputs(
       currentAge: fireProfiles.currentAge,
       withdrawalRate: fireProfiles.withdrawalRate,
       realReturn: fireProfiles.realReturn,
+      realReturnUserSet: fireProfiles.realReturnUserSet,
       ageUserSet: fireProfiles.ageUserSet,
+      targetRetirementAge: fireProfiles.targetRetirementAge,
+      householdSize: fireProfiles.householdSize,
+      riskTolerance: fireProfiles.riskTolerance,
     })
     .from(fireProfiles)
     .where(eq(fireProfiles.userId, userId))
     .limit(1);
 
+  const lookbackMonths = await resolveFireLookbackMonths(userIds, accountIds);
   const netWorth = await computeLiveNetWorth(userIds);
-  const monthlySpend = await averageMonthlyCashSpending(userIds, 3);
-  const monthlyInvest = await averageMonthlyInvestment(userIds, 3);
+  const { investableAssets } = await computeInvestableAssets(
+    userIds,
+    existing?.householdSize ?? null,
+  );
+  const monthlySpend = await averageMonthlyCashSpending(userIds, lookbackMonths);
+  const monthlyInvest = await averageMonthlyInvestment(userIds, lookbackMonths);
 
   if (netWorth <= 0 && monthlySpend <= 0 && monthlyInvest <= 0) {
     return null;
   }
 
+  const riskTolerance = (existing?.riskTolerance ?? null) as RiskTolerance | null;
+  const derivedRealReturn = realReturnFromRiskTolerance(riskTolerance);
+  const realReturn = existing?.realReturnUserSet
+    ? roundPercent(Number.parseFloat(existing.realReturn))
+    : derivedRealReturn;
+
+  const caveats: string[] = [];
+  if (lookbackMonths < FIRE_LOOKBACK_TARGET_MONTHS) {
+    caveats.push(
+      `Spend and contribution averages use ${lookbackMonths} month(s) of history (target is ${FIRE_LOOKBACK_TARGET_MONTHS}).`,
+    );
+  } else {
+    caveats.push(
+      `Spend and contribution averages use a trailing ${lookbackMonths}-month window.`,
+    );
+  }
+  if (!existing?.realReturnUserSet && riskTolerance) {
+    caveats.push(
+      `Real return default (${derivedRealReturn}%) follows your ${riskTolerance} risk tolerance.`,
+    );
+  } else if (!existing?.realReturnUserSet) {
+    caveats.push(
+      `Real return default is ${DEFAULT_REAL_RETURN}% (moderate assumption).`,
+    );
+  }
+  caveats.push(
+    "FIRE projection starts from investable assets (investments plus cash above your emergency-fund target).",
+  );
+
   return {
     currentAge: existing?.currentAge ?? DEFAULT_FIRE_AGE,
     isDefaultAge: !existing?.ageUserSet,
     currentNetWorth: formatMoneyAmount(netWorth),
+    investableAssets: formatMoneyAmount(Math.max(investableAssets, 0)),
     monthlySpend: formatMoneyAmount(Math.max(monthlySpend, 0)),
     monthlyInvest: formatMoneyAmount(Math.max(monthlyInvest, 0)),
     withdrawalRate: existing
       ? roundPercent(Number.parseFloat(existing.withdrawalRate))
-      : 4,
-    realReturn: existing
-      ? roundPercent(Number.parseFloat(existing.realReturn))
-      : 6,
+      : DEFAULT_WITHDRAWAL_RATE,
+    realReturn,
+    targetRetirementAge: existing?.targetRetirementAge ?? null,
+    householdSize: existing?.householdSize ?? null,
+    inputBasis: {
+      spendLookbackMonths: lookbackMonths,
+      investLookbackMonths: lookbackMonths,
+    },
+    caveats,
   };
 }
 

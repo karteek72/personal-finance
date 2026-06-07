@@ -655,6 +655,7 @@ export const fireProfiles = pgTable("fire_profiles", {
   }).notNull(),
   withdrawalRate: numeric("withdrawal_rate", { precision: 5, scale: 2 }).notNull(),
   realReturn: numeric("real_return", { precision: 5, scale: 2 }).notNull(),
+  realReturnUserSet: boolean("real_return_user_set").notNull().default(false),
   householdSize: integer("household_size"),
   annualGrossIncome: numeric("annual_gross_income", { precision: 14, scale: 2 }),
   targetRetirementAge: integer("target_retirement_age"),
@@ -740,6 +741,7 @@ export const challenges = pgTable("challenges", {
   progressPercent: integer("progress_percent").notNull().default(0),
   daysRemaining: integer("days_remaining").notNull().default(0),
   complete: boolean("complete").notNull().default(false),
+  dismissed: boolean("dismissed").notNull().default(false),
   color: text("color"),
 });
 

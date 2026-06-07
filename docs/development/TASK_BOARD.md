@@ -1,6 +1,6 @@
 # Development Task Board
 
-**Last updated:** 2026-06-07 (all tasks complete — 87/87)  
+**Last updated:** 2026-06-07 (104/105 complete — `TASK-PROFILE-004` backlog)  
 **Source of truth:** [`tasks.yaml`](tasks.yaml)  
 **CLI:** `npm run task -- <command>` from repo root
 
@@ -33,7 +33,7 @@
 
 | backend-recon-wave6 | Transfer reconciliation R1–R3 | RECON-001–003 | done |
 
-**Status:** All tasks in `tasks.yaml` are **done** (including INTEGRITY M1–M3, RECON-004, iOS Face ID + push).
+**Status:** Phase 3.8 wave complete — FIRE/profile fixes (F1–F4, P1–P3/P5), recompute pipeline (RC1–RC4), behavioral engines (B1–B3), wellness chart (W1). **`TASK-PROFILE-004`** (annualGrossIncome fallback) remains backlog.
 
 **Rules for agents:** `npm run task -- claim TASK-ID <name>` before coding; `complete` when done; update this table; read `source_docs` per task.
 
@@ -43,10 +43,10 @@
 
 | Status | Count |
 |--------|------:|
-| done | 87 |
+| done | 104 |
 | ready | 0 |
 | in_progress | 0 |
-| backlog | 0 |
+| backlog | 1 |
 
 **Statement import + GDPR export: complete.**
 
@@ -56,7 +56,7 @@ analytics layer shipped fabricated/duplicated/stubbed metrics; see
 for the audit, taxonomy, data model, and scoring frameworks. Tasks are scoped for
 **parallel** work by independent agents.
 
-**Next:** iOS at P4 (`TASK-IOS-001`, `TASK-IOS-002`).
+**Next:** `TASK-PROFILE-004` (annualGrossIncome cross-check); `employmentStatus` consumer TBD.
 
 ---
 

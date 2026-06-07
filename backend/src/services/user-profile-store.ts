@@ -30,7 +30,7 @@ export type RiskTolerance = (typeof RISK_TOLERANCE_VALUES)[number];
 
 const DEFAULT_ANALYTICS_AGE = 35;
 const DEFAULT_WITHDRAWAL_RATE = 4;
-const DEFAULT_REAL_RETURN = 6;
+const DEFAULT_REAL_RETURN = 4.5;
 
 export interface UserProfileResponse {
   user: {
@@ -271,6 +271,8 @@ export async function updateUserProfile(
     patch.realReturn ??
       (existing ? Number.parseFloat(existing.realReturn) : DEFAULT_REAL_RETURN),
   );
+  const nextRealReturnUserSet =
+    patch.realReturn != null ? true : (existing?.realReturnUserSet ?? false);
   const nextHouseholdSize =
     patch.householdSize !== undefined
       ? patch.householdSize
@@ -305,6 +307,7 @@ export async function updateUserProfile(
       monthlyInvest: existing?.monthlyInvest ?? "0",
       withdrawalRate: nextWithdrawal,
       realReturn: nextRealReturn,
+      realReturnUserSet: nextRealReturnUserSet,
       householdSize: nextHouseholdSize,
       annualGrossIncome: nextAnnualIncome,
       targetRetirementAge: nextTargetRetirement,
@@ -319,6 +322,7 @@ export async function updateUserProfile(
         ageUserSet: nextAgeUserSet,
         withdrawalRate: nextWithdrawal,
         realReturn: nextRealReturn,
+        realReturnUserSet: nextRealReturnUserSet,
         householdSize: nextHouseholdSize,
         annualGrossIncome: nextAnnualIncome,
         targetRetirementAge: nextTargetRetirement,

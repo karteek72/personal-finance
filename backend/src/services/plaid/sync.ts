@@ -21,8 +21,7 @@ import { classifyBankingTransaction } from "../classify-banking-transaction.js";
 import { ensureAccountsAssignedToOwner } from "../household-store.js";
 import { upsertBalanceSnapshots, type BalanceSnapshotInput } from "../balance-snapshots.js";
 import { backfillTransactionMerchantIds } from "../dim-merchant-store.js";
-import { runPostSyncAnalytics } from "../post-sync-analytics.js";
-import { refreshTransferLinks } from "../transfer-pairing.js";
+import { recomputeAllAnalytics } from "../recompute-all-analytics.js";
 import { mapPlaidTransaction } from "./map-transaction.js";
 import { syncCreditCardLiabilities } from "./sync-liabilities.js";
 import {
@@ -462,9 +461,8 @@ export async function syncPlaidItem(
     durationMs: elapsed(),
   });
 
-  await runPostSyncAnalytics(item.userId);
   await backfillTransactionMerchantIds(item.userId);
-  await refreshTransferLinks(item.userId);
+  await recomputeAllAnalytics(item.userId);
 
   return result;
 }

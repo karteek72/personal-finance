@@ -29,6 +29,7 @@ const MIGRATION_FILES = [
   "0019_dim_category.sql",
   "0020_analytics_wave5.sql",
   "0021_cross_provider_dedup.sql",
+  "0022_behavioral_challenges.sql",
 ];
 
 let migrationPromise: Promise<void> | null = null;
