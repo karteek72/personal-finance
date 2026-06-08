@@ -64,10 +64,16 @@ struct ResilienceView: View {
         HeroGradientCard {
             HStack(alignment: .bottom, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Day-Zero runway")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.7))
-                        .textCase(.uppercase)
+                    HStack {
+                        Text("Day-Zero runway")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .textCase(.uppercase)
+                        Spacer()
+                        if let isLive = data.isLive {
+                            MetricLiveBadge(isLive: isLive)
+                        }
+                    }
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(String(format: "%.1f", data.runwayMonths))
                             .font(.system(size: 44, weight: .heavy, design: .rounded).monospacedDigit())
@@ -95,6 +101,14 @@ struct ResilienceView: View {
                         .textCase(.uppercase)
                 }
             }
+        }
+
+        SpendFlowCard {
+            MetricEnvelopeView(
+                metric: MetricEnvelopeFactory.immunityScore(data),
+                isLive: data.isLive ?? false,
+                valueFormatter: { _ in "\(Int(data.immunityScore.rounded()))" }
+            )
         }
     }
 

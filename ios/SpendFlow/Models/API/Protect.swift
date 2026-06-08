@@ -38,5 +38,8 @@ struct ResilienceResponse: Codable, Sendable {
     let monthlyBurn: String
     let runwayMonths: Double
     let immunityScore: Double
+    let confidence: Double?
+    let caveats: [String]?
+    let isLive: Bool?
     let scenarios: [Scenario]
 }

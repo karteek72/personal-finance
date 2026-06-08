@@ -6,10 +6,12 @@ import Observation
 final class AppState {
     let authService = AuthService()
     let appLock = AppLockService()
+    let analyticsPeriod = AnalyticsPeriodStore()
     let refreshCenter = FinancialRefreshCenter()
     var apiClient: APIClient
     private(set) var plaidLink: PlaidLinkCoordinator
     private(set) var snapTradeLink: SnapTradeLinkCoordinator
+    var pendingInviteToken: String?
 
     init() {
         let client = APIClient(authService: authService)

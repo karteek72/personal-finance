@@ -14,10 +14,13 @@ struct WellnessResponse: Codable, Sendable {
         let weight: Double
         let description: String
         let trend: String
+        let confidence: Double?
+        let caveats: [String]?
     }
 
     let score: Double
     let delta: Double
+    let confidence: Double?
     let history: [HistoryPoint]
     let isLive: Bool
     let dimensions: [Dimension]

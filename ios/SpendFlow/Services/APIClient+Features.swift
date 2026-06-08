@@ -7,8 +7,15 @@ extension APIClient {
         try await send(APIRequest(path: "/wealth/net-worth"))
     }
 
-    func getInvestments(query: ListQuery = ListQuery()) async throws -> InvestmentsResponse {
-        try await send(APIRequest(path: "/wealth/investments", queryItems: query.queryItems()))
+    func getInvestments(
+        accountId: String? = nil,
+        kind: PositionKindFilter? = nil,
+        query: ListQuery = ListQuery()
+    ) async throws -> InvestmentsResponse {
+        var items = query.queryItems()
+        if let accountId { items.append(.init(name: "accountId", value: accountId)) }
+        if let kind { items.append(.init(name: "kind", value: kind.rawValue)) }
+        return try await send(APIRequest(path: "/wealth/investments", queryItems: items))
     }
 
     func getFire(overrides: FireQueryOverrides = FireQueryOverrides()) async throws -> FireResponse {

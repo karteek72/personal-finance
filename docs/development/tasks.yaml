@@ -1,5 +1,5 @@
 version: 1
-updated_at: 2026-06-07
+updated_at: 2026-06-08
 tasks:
   - id: TASK-INFRA-001
     title: BullMQ worker + Redis + async Plaid webhook sync
@@ -2758,10 +2758,6 @@ tasks:
       - Users can upload and import statements from iOS once the web gate lifts
       - Consent + batch status + review mirror the web flow
       - No on-device parsing; all handled by the backend
-
-  # ------------------------------------------------------------------ #
-  # Investments / holdings analytics (analytics-architecture.md §20)
-  # ------------------------------------------------------------------ #
   - id: TASK-INV-001
     title: Filter holdings by account on Wealth → Investments (INV-001)
     status: done
@@ -2903,7 +2899,6 @@ tasks:
       - Allocation donut and winners/losers chart render with axes/labels/values
       - Portfolio-value trend renders when the series is available
       - No client-side recomputation of portfolio metrics
-
   - id: TASK-INV-006
     title: Add a kind (stocks/options) filter to /wealth/investments positions (INV-006)
     status: done
@@ -3007,16 +3002,9 @@ tasks:
       - Caveats/disclaimer are clearly shown
       - Graceful gated state when price history is insufficient
       - No client-side recomputation
-
-  # ------------------------------------------------------------------ #
-  # iOS web-parity, wave 2 (IOS-012..028) — gaps vs current ui/ surface
-  # Audit: web inventory 1a626b10 vs iOS inventory bb61d181. IOS-001..011
-  # (foundation + per-domain screens) are DONE; these close the remaining
-  # feature/report gaps. All P4 (AGENTS.md: iOS deferred), area: ios.
-  # ------------------------------------------------------------------ #
   - id: TASK-IOS-012
     title: iOS Transactions parity — search, filters, sort, scope, member pills, CSV export
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3041,7 +3029,7 @@ tasks:
       - No client-side filtering of a partial page
   - id: TASK-IOS-013
     title: iOS transaction re-categorize (write) + remember-for-merchant
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3059,11 +3047,11 @@ tasks:
       summary, merchants) through FinancialRefreshCenter.
     acceptance_criteria:
       - A transaction's category/subcategory can be changed from iOS via PATCH /transactions/:id/category
-      - "Remember for merchant" option is supported
+      - '"Remember for merchant" option is supported'
       - Dependent screens refresh after a change
   - id: TASK-IOS-014
     title: iOS Dashboard spend-analytics charts + filter bar + drilldown
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3089,7 +3077,7 @@ tasks:
       - Profile-setup nudge appears when the user is on the default age
   - id: TASK-IOS-015
     title: iOS Spend/Categories parity — cash-flow strips + category analytics charts
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3112,7 +3100,7 @@ tasks:
       - Account filter applies to strips + charts
   - id: TASK-IOS-016
     title: iOS Merchants — income-analytics sub-tab
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3134,7 +3122,7 @@ tasks:
       - Data comes from /insights/merchants
   - id: TASK-IOS-017
     title: iOS Investments enrichment parity (KPIs, sector/winners charts, splits, trim-losers)
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3165,7 +3153,7 @@ tasks:
       - Behavioral tab and a Trim-losers what-if card are present
   - id: TASK-IOS-018
     title: iOS Wealth — Time Machine screen
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3187,7 +3175,7 @@ tasks:
       - Charts render with axes/labels/values
   - id: TASK-IOS-019
     title: iOS Forecast visualization parity (weather hero, 7-day strip, balance chart)
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3208,7 +3196,7 @@ tasks:
       - Summary KPIs (stormy/cloudy days, min balance, comfort floor, next clear date) shown
   - id: TASK-IOS-020
     title: iOS Accounts parity — Teller connect, delete, sync-all, Plaid reconnect
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3231,7 +3219,7 @@ tasks:
       - Plaid reconnect handles reauth_required (relink to repair the item)
   - id: TASK-IOS-021
     title: iOS in-app notification center (alerts bell + history)
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3253,7 +3241,7 @@ tasks:
       - State persists across launches
   - id: TASK-IOS-022
     title: iOS Coach interactive Q&A
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3274,7 +3262,7 @@ tasks:
       - Monthly narrative remains available
   - id: TASK-IOS-023
     title: iOS household invite accept (deep link + preview/accept)
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3295,7 +3283,7 @@ tasks:
       - Works for a signed-out user (sign in, then accept)
   - id: TASK-IOS-024
     title: iOS statement import completeness (retry, cancel, account mapping)
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3317,7 +3305,7 @@ tasks:
       - Mirrors the web ImportReview flow
   - id: TASK-IOS-025
     title: iOS user-controlled date/period range across analytics
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3339,7 +3327,7 @@ tasks:
       - Selection persists across launches
   - id: TASK-IOS-026
     title: iOS Settings expansion — profile, notifications, data export, legal
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3360,7 +3348,7 @@ tasks:
       - Legal pages (privacy/terms/trademarks/about) are reachable
   - id: TASK-IOS-027
     title: iOS surface metric envelope (live badge + confidence/caveats)
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4
@@ -3400,7 +3388,7 @@ tasks:
       - Each uses /wealth/fire query overrides; no client-side projection math
   - id: TASK-IOS-DOCS-001
     title: Refresh ios/STRUCTURE.md and README to match the implemented app
-    status: ready
+    status: done
     priority: P4
     area: ios
     phase: 4

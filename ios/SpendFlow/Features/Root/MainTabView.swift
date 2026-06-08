@@ -29,6 +29,7 @@ struct MainTabView: View {
         }
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 12) {
+                NotificationBellButton()
                 RecalculateButton()
                 Menu {
                     if let user = appState.authService.user {

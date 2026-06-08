@@ -75,6 +75,25 @@ final class APIClient: Sendable {
         try await send(APIRequest(path: "/transactions", queryItems: filters.queryItems()))
     }
 
+    func updateTransactionCategory(
+        transactionId: String,
+        category: String,
+        subCategory: String? = nil,
+        rememberForMerchant: Bool = true
+    ) async throws -> UpdateTransactionCategoryResponse {
+        struct Body: Encodable {
+            let category: String
+            let subCategory: String?
+            let rememberForMerchant: Bool
+        }
+        let body = try JSONEncoder.api.encode(
+            Body(category: category, subCategory: subCategory, rememberForMerchant: rememberForMerchant)
+        )
+        return try await send(
+            APIRequest(path: "/transactions/\(transactionId)/category", method: .patch, body: body)
+        )
+    }
+
     func getCategories(from: String? = nil, to: String? = nil) async throws -> CategoriesResponse {
         var query: [URLQueryItem] = []
         if let from { query.append(.init(name: "from", value: from)) }
@@ -102,6 +121,42 @@ final class APIClient: Sendable {
         return try await send(APIRequest(path: "/insights/trends", queryItems: query))
     }
 
+    func getChartData(
+        from: String? = nil,
+        to: String? = nil,
+        accountId: String? = nil,
+        category: String? = nil,
+        scope: ViewScope? = nil,
+        memberId: String? = nil
+    ) async throws -> ChartDataResponse {
+        try await getChartData(
+            filters: ChartDataFilters(
+                from: from,
+                to: to,
+                accountId: accountId,
+                category: category,
+                scope: scope,
+                memberId: memberId
+            )
+        )
+    }
+
+    func getChartData(filters: ChartDataFilters) async throws -> ChartDataResponse {
+        var query: [URLQueryItem] = []
+        if let from = filters.from { query.append(.init(name: "from", value: from)) }
+        if let to = filters.to { query.append(.init(name: "to", value: to)) }
+        if let accountId = filters.accountId { query.append(.init(name: "accountId", value: accountId)) }
+        if let category = filters.category { query.append(.init(name: "category", value: category)) }
+        if let scope = filters.scope { query.append(.init(name: "scope", value: scope.rawValue)) }
+        if let memberId = filters.memberId { query.append(.init(name: "memberId", value: memberId)) }
+        return try await send(APIRequest(path: "/transactions/chart-data", queryItems: query))
+    }
+
+    func exportTransactionsCsv(filters: TransactionFilters = TransactionFilters()) async throws -> Data {
+        let queryItems = filters.queryItems().filter { $0.name != "limit" && $0.name != "cursor" }
+        return try await fetchData(APIRequest(path: "/transactions/export.csv", queryItems: queryItems))
+    }
+
     // MARK: - Accounts & Plaid
 
     func getAccounts() async throws -> AccountsResponse {
@@ -116,13 +171,6 @@ final class APIClient: Sendable {
         try await send(APIRequest(path: "/accounts/\(accountId)/sync", method: .post))
     }
 
-    func createPlaidLinkToken(platform: String = "ios") async throws -> PlaidLinkTokenResponse {
-        let body = try JSONEncoder.api.encode(["platform": platform])
-        return try await send(
-            APIRequest(path: "/plaid/link-token", method: .post, body: body)
-        )
-    }
-
     func exchangePlaidToken(publicToken: String) async throws -> PlaidExchangeResponse {
         let body = try JSONEncoder.api.encode(["publicToken": publicToken])
         return try await send(
@@ -130,7 +178,37 @@ final class APIClient: Sendable {
         )
     }
 
+    func syncAllPlaid() async throws -> PlaidSyncAllResponse {
+        try await send(APIRequest(path: "/plaid/sync", method: .post))
+    }
+
+    func exportUserData() async throws -> Data {
+        try await fetchData(APIRequest(path: "/auth/export"))
+    }
+
     // MARK: - Transport
+
+    func fetchData(_ request: APIRequest, retryOnUnauthorized: Bool = true) async throws -> Data {
+        let token = await MainActor.run {
+            request.requiresAuth ? authService?.accessToken : nil
+        }
+
+        let (data, response) = try await rawSend(request, accessToken: token)
+
+        if response.statusCode == 401, retryOnUnauthorized, request.requiresAuth {
+            try await authService?.refreshAccessToken()
+            return try await fetchData(request, retryOnUnauthorized: false)
+        }
+
+        guard (200 ... 299).contains(response.statusCode) else {
+            if let apiError = try? JSONDecoder.api.decode(APIErrorResponse.self, from: data) {
+                throw APIError.httpStatus(response.statusCode, message: apiError.error.message)
+            }
+            throw APIError.httpStatus(response.statusCode, message: "")
+        }
+
+        return data
+    }
 
     func send<T: Decodable>(
         _ request: APIRequest,

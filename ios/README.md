@@ -2,8 +2,9 @@
 
 Native iPhone app for SpendFlow. Consumes the same backend REST API as the web client.
 
-**Status:** Phase 1 + native Plaid Link — auth, five tabs, bank linking via LinkKit.  
-**Stack:** SwiftUI, Google Sign-In, LinkKit, URLSession
+**Status:** Phase 4 parity shell — 6-tab navigation, Explore hub with 25 feature screens, Swift Charts analytics, Plaid + SnapTrade linking, statement import, household invites, in-app notifications, Coach Q&A, and GDPR export.
+
+**Stack:** SwiftUI, Google Sign-In, LinkKit, URLSession, Swift Charts
 
 ---
 
@@ -25,7 +26,6 @@ xcodegen generate
 
 # Optional: local overrides (device testing, Google client ID)
 cp Config/Local.xcconfig.example Config/Local.xcconfig
-# Edit Config/Local.xcconfig — e.g. Google client ID, or localhost override
 
 open SpendFlow.xcodeproj
 ```
@@ -35,8 +35,6 @@ open SpendFlow.xcodeproj
 Default for Debug and Release builds:
 
 `https://spendflow-api.stockpulse.win/api/v1`
-
-Example endpoint: `https://spendflow-api.stockpulse.win/api/v1/accounts`
 
 To point at a local backend, create `Config/Local.xcconfig`:
 
@@ -53,33 +51,50 @@ Google uses **two** client IDs:
 | `GOOGLE_CLIENT_ID` | iOS | From `GoogleService-Info.plist` — native sign-in + URL scheme |
 | `GOOGLE_SERVER_CLIENT_ID` | Web | Same as backend `GOOGLE_CLIENT_ID` — ID token audience for `/auth/google` |
 
-1. Create an **iOS OAuth client** in Google Cloud with your bundle ID (default: `com.mx.spendflow` in `Config/Debug.xcconfig`; override in `Config/Local.xcconfig`); save plist as `SpendFlow/Resources/GoogleService-Info.plist`.
-2. Use your existing **Web OAuth client** for `GOOGLE_SERVER_CLIENT_ID` in `Config/Debug.xcconfig` (must match `containers/.env` `GOOGLE_CLIENT_ID`).
+1. Create an **iOS OAuth client** in Google Cloud with your bundle ID; save plist as `SpendFlow/Resources/GoogleService-Info.plist`.
+2. Use your existing **Web OAuth client** for `GOOGLE_SERVER_CLIENT_ID` in `Config/Debug.xcconfig`.
 3. Set Info.plist URL scheme to the iOS `REVERSED_CLIENT_ID` from the plist.
-
-The app configures `GIDConfiguration(clientID:serverClientID:)` so tokens sent to the API match what the backend verifies.
-
-`Info.plist` allows local networking when using a localhost override in `Local.xcconfig`.
 
 ### Plaid Link (native)
 
-The **Wallet** tab uses [LinkKit](https://github.com/plaid/plaid-link-ios-spm) (Swift Package Manager, 6.3+):
+The **Wallet** tab uses [LinkKit](https://github.com/plaid/plaid-link-ios-spm):
 
-1. Tap **Link a bank** → app calls `POST /plaid/link-token` with `platform: "ios"`.
-2. LinkKit presents the Plaid UI with the returned `linkToken`.
-3. On success, app calls `POST /plaid/exchange-token` and refreshes accounts.
+1. Tap **Link a bank** → `POST /plaid/link-token` with `platform: "ios"`.
+2. LinkKit presents Plaid UI.
+3. On success → `POST /plaid/exchange-token` and refresh accounts.
 
-Backend Plaid env vars (`PLAID_CLIENT_ID`, `PLAID_SECRET`, etc.) live in `containers/.env` — same as web.
+**Reconnect:** accounts with `reauth_required` show a reconnect button that requests an update-mode link token via `itemId`.
 
-**OAuth banks (Chase, etc.):** require **Associated Domains** on your App ID. The default `SpendFlow.entitlements` is empty so Personal Team builds work out of the box. Plaid Link still works for sandbox institutions that use username/password.
+**Sync all:** `POST /plaid/sync` refreshes all Plaid items in the background.
 
-When you need OAuth banks on device:
+### SnapTrade (brokerages)
 
-1. [Apple Developer](https://developer.apple.com/account) → **Identifiers** → `com.mx.spendflow` → enable **Associated Domains** → Save.
-2. Copy `SpendFlow-OAuth.entitlements.example` → `SpendFlow.entitlements` (or merge the `com.apple.developer.associated-domains` entry).
-3. In Xcode: **Signing & Capabilities** → verify Associated Domains shows `applinks:spendflow.stockpulse.win`. Delete and re-download the provisioning profile if needed (**Product → Clean Build Folder**, then rebuild).
-4. Register `https://spendflow.stockpulse.win/plaid/oauth` in the [Plaid Dashboard](https://dashboard.plaid.com) (same as web `PLAID_REDIRECT_URI`).
-5. Host `https://spendflow.stockpulse.win/.well-known/apple-app-site-association` with your Team ID and bundle ID.
+**Link brokerage (SnapTrade)** opens the SnapTrade portal and completes via `POST /snaptrade/complete`.
+
+### Teller
+
+A **Connect with Teller** button verifies `GET /teller/config` availability. Native Teller Connect enrollment is a placeholder — use the web client to link Teller accounts until the iOS SDK flow ships.
+
+### Deep links
+
+Household invites open via `spendflow://invite?token=…` and present `AcceptInviteView` (preview + accept after sign-in).
+
+---
+
+## App capabilities
+
+| Area | Features |
+|------|----------|
+| **Tabs** | Home dashboard, Money Flow, Categories, Transactions, Wallet, Explore |
+| **Analytics** | Wellness, DNA, Patterns, Behavioral, Merchants (income sub-tab), charts with axes |
+| **Wealth** | Net worth, Investments (KPIs, sector/allocation charts, stocks/options/behavioral tabs, trim-losers), Time Machine, FIRE |
+| **Plan** | Budgets, Recurring, Calendar, Forecast (weather hero + 7-day strip + balance chart) |
+| **Protect** | Resilience (metric envelope), Inflation, Credit & Debt |
+| **Household** | Members, accounts, invite accept deep link |
+| **Import** | QFX/CSV/PDF upload, account mapping, retry/cancel/replace |
+| **Coach** | Monthly narrative + interactive Ask Coach chat |
+| **Settings** | Profile, notifications, Face ID, GDPR export (`GET /auth/export`), legal pages |
+| **Notifications** | In-app bell + history from `/insights/alerts`, read/dismiss persisted in UserDefaults |
 
 ---
 
@@ -91,7 +106,7 @@ See [STRUCTURE.md](STRUCTURE.md).
 
 ## Design
 
-Visual language matches the **web UI** (`ui/src/styles/tokens.css`): purple–pink gradients, lavender background, glass cards, floating bottom nav.
+Visual language matches the web UI: purple–pink gradients, glass cards, floating bottom nav, shared design tokens.
 
 Regenerate the app icon after brand tweaks:
 
@@ -112,17 +127,6 @@ xcodebuild -scheme SpendFlow -destination 'platform=iOS Simulator,name=iPhone 16
 # Unit tests
 xcodebuild -scheme SpendFlow -destination 'platform=iOS Simulator,name=iPhone 16' test
 ```
-
----
-
-## Roadmap
-
-| Phase | Scope | Status |
-|-------|-------|--------|
-| 1 | Auth, Keychain, tab nav, dashboard + read screens | Done |
-| 2 | Plaid Link iOS SDK, re-categorize | **Plaid Link done**; re-categorize planned |
-| 3 | Swift Charts analytics, household/family | Planned |
-| 4 | APNs push, Face ID, App Store | Planned |
 
 ---
 

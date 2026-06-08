@@ -18,7 +18,7 @@ final class PlaidLinkCoordinator {
         self.api = api
     }
 
-    func startLink(onLinked: @escaping () async -> Void) async {
+    func startLink(itemId: String? = nil, onLinked: @escaping () async -> Void) async {
         guard !isLoading else { return }
 
         self.onLinked = onLinked
@@ -28,7 +28,7 @@ final class PlaidLinkCoordinator {
         defer { isLoading = false }
 
         do {
-            let response = try await api.createPlaidLinkToken(platform: "ios")
+            let response = try await api.createPlaidLinkToken(platform: "ios", itemId: itemId)
             var configuration = LinkTokenConfiguration(
                 token: response.linkToken,
                 onSuccess: { [weak self] linkSuccess in
