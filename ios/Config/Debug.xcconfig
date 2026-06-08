@@ -1,6 +1,9 @@
 // Copy to Config/Local.xcconfig and override for local dev or secrets.
 #include? "Local.xcconfig"
 
+// @Observable, Swift Charts, and SwiftUI features require iOS 17+.
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+
 // Personal dev bundle ID — change in Local.xcconfig if needed (must match Google iOS OAuth client).
 PRODUCT_BUNDLE_IDENTIFIER = com.mx.spendflow
 

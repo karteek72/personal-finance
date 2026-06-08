@@ -1,6 +1,6 @@
 import Foundation
 
-final class APIClient: Sendable {
+final class APIClient {
     let baseURL: URL
     let authService: AuthService?
     let urlSession: URLSession
@@ -152,11 +152,6 @@ final class APIClient: Sendable {
         return try await send(APIRequest(path: "/transactions/chart-data", queryItems: query))
     }
 
-    func exportTransactionsCsv(filters: TransactionFilters = TransactionFilters()) async throws -> Data {
-        let queryItems = filters.queryItems().filter { $0.name != "limit" && $0.name != "cursor" }
-        return try await fetchData(APIRequest(path: "/transactions/export.csv", queryItems: queryItems))
-    }
-
     // MARK: - Accounts & Plaid
 
     func getAccounts() async throws -> AccountsResponse {
@@ -176,10 +171,6 @@ final class APIClient: Sendable {
         return try await send(
             APIRequest(path: "/plaid/exchange-token", method: .post, body: body)
         )
-    }
-
-    func syncAllPlaid() async throws -> PlaidSyncAllResponse {
-        try await send(APIRequest(path: "/plaid/sync", method: .post))
     }
 
     func exportUserData() async throws -> Data {

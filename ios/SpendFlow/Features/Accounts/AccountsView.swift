@@ -168,18 +168,6 @@ struct AccountsView: View {
                 }
             }
 
-            NavigationLink {
-                StatementImportView()
-            } label: {
-                Text("Import statements")
-                    .font(.subheadline.weight(.bold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(SpendFlowTheme.surface, in: Capsule())
-                    .overlay(Capsule().stroke(SpendFlowTheme.border, lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-
             if viewModel.isLoading, viewModel.accounts.isEmpty {
                 LoadingStateView(message: "Loading accounts…")
             } else if let error = viewModel.errorMessage, viewModel.accounts.isEmpty {

@@ -1,6 +1,6 @@
 import SwiftUI
 
-private enum InvestmentsTab: String, CaseIterable, Identifiable {
+enum InvestmentsTab: String, CaseIterable, Identifiable {
     case stocks
     case options
     case behavioral
@@ -248,14 +248,12 @@ struct InvestmentsView: View {
             }
 
             if !analytics.sectorAllocation.isEmpty {
-                SpendFlowChartView(
+                SpendFlowDonutChart(
                     title: "Sector allocation",
-                    points: analytics.sectorAllocation.map {
-                        ChartDataPoint(id: $0.sector, label: $0.sector, value: parseAmount($0.value))
-                    },
-                    style: .bar,
-                    yAxisLabel: "Value",
-                    valueFormatter: { MoneyFormatter.format(String(format: "%.0f", $0)) }
+                    subtitle: "By GICS sector",
+                    slices: analytics.sectorAllocation.map(DonutSlice.fromSector),
+                    selectedID: nil,
+                    onSelect: nil
                 )
             }
 

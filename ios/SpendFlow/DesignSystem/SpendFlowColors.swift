@@ -67,28 +67,118 @@ enum SpendFlowColors {
 enum CategoryColor {
     private static let palette: [String: Color] = [
         "food-groceries": Color(hex: "#3B82F6"),
+        "food-&-groceries": Color(hex: "#3B82F6"),
         "dining": Color(hex: "#F97316"),
+        "dining-&-restaurants": Color(hex: "#F97316"),
         "transport": Color(hex: "#6B7280"),
+        "transportation": Color(hex: "#6B7280"),
         "entertainment": Color(hex: "#A855F7"),
         "shopping": Color(hex: "#22C55E"),
+        "shopping-&-retail": Color(hex: "#22C55E"),
         "utilities": Color(hex: "#6366F1"),
+        "utilities-&-bills": Color(hex: "#6366F1"),
         "health": Color(hex: "#EC4899"),
+        "health-&-medical": Color(hex: "#EC4899"),
         "travel": Color(hex: "#14B8A6"),
         "subscriptions": Color(hex: "#EF4444"),
+        "subscriptions-&-software": Color(hex: "#EF4444"),
         "home-rent": Color(hex: "#EAB308"),
+        "housing": Color(hex: "#EAB308"),
+        "housing-&-home": Color(hex: "#EAB308"),
         "education": Color(hex: "#8B5CF6"),
         "personal-care": Color(hex: "#F43F5E"),
         "financial": Color(hex: "#64748B"),
-        "income": Color(hex: "#22C55E"),
-        "transfers": Color(hex: "#7C3AED"),
+        "financial-&-insurance": Color(hex: "#64748B"),
+        "family-kids": Color(hex: "#FB923C"),
+        "pet": Color(hex: "#84CC16"),
+        "gifts-donations": Color(hex: "#E879F9"),
+        "business-professional": Color(hex: "#94A3B8"),
+        "income": Color(hex: "#437A22"),
+        "transfers": Color(hex: "#01696F"),
     ]
 
     static func forCategory(_ name: String) -> Color {
-        let key = name
+        let key = normalizedKey(name)
+        if let color = palette[key] {
+            return color
+        }
+        return ChartPalette.color(at: ChartPalette.stableIndex(for: key))
+    }
+
+    private static func normalizedKey(_ name: String) -> String {
+        name
             .lowercased()
-            .replacingOccurrences(of: " & ", with: "-")
+            .replacingOccurrences(of: " & ", with: "-&-")
             .replacingOccurrences(of: " ", with: "-")
-        return palette[key] ?? SpendFlowTheme.primary
+    }
+}
+
+/// Shared chart colors — mirrors `design-tokens.json` `investments.chartPalette`.
+enum ChartPalette {
+    static let series: [Color] = [
+        Color(hex: "#7C3AED"),
+        Color(hex: "#EC4899"),
+        Color(hex: "#3B82F6"),
+        Color(hex: "#F97316"),
+        Color(hex: "#22C55E"),
+        Color(hex: "#14B8A6"),
+        Color(hex: "#EAB308"),
+        Color(hex: "#EF4444"),
+        Color(hex: "#6366F1"),
+        Color(hex: "#84CC16"),
+        Color(hex: "#F43F5E"),
+        Color(hex: "#0EA5E9"),
+    ]
+
+    private static let semantic: [String: Color] = [
+        "winners": SpendFlowTheme.success,
+        "losers": SpendFlowTheme.danger,
+        "stocks": Color(hex: "#3B82F6"),
+        "stocks-&-etfs": Color(hex: "#3B82F6"),
+        "options": Color(hex: "#8B5CF6"),
+        "other": Color(hex: "#94A3B8"),
+        "crypto": Color(hex: "#F59E0B"),
+        "bonds": Color(hex: "#64748B"),
+        "communication-services": Color(hex: "#6366F1"),
+        "consumer-discretionary": Color(hex: "#F97316"),
+        "consumer-staples": Color(hex: "#22C55E"),
+        "energy": Color(hex: "#EAB308"),
+        "financials": Color(hex: "#64748B"),
+        "health-care": Color(hex: "#EC4899"),
+        "industrials": Color(hex: "#6B7280"),
+        "information-technology": Color(hex: "#3B82F6"),
+        "materials": Color(hex: "#A16207"),
+        "real-estate": Color(hex: "#14B8A6"),
+        "utilities": Color(hex: "#0EA5E9"),
+        "primary": SpendFlowTheme.primary,
+        "side": SpendFlowTheme.success,
+        "income": SpendFlowTheme.success,
+        "expenses": SpendFlowTheme.danger,
+        "spent": SpendFlowTheme.danger,
+        "net": SpendFlowTheme.primary,
+    ]
+
+    static func color(forLabel label: String, index: Int) -> Color {
+        let key = normalizedKey(label)
+        if let color = semantic[key] {
+            return color
+        }
+        return CategoryColor.forCategory(label)
+    }
+
+    static func color(at index: Int) -> Color {
+        series[abs(index) % series.count]
+    }
+
+    static func stableIndex(for key: String) -> Int {
+        abs(key.utf8.reduce(5381) { ($0 &* 33) &+ Int($1) }) % series.count
+    }
+
+    private static func normalizedKey(_ label: String) -> String {
+        label
+            .lowercased()
+            .replacingOccurrences(of: " & ", with: "-&-")
+            .replacingOccurrences(of: " ", with: "-")
     }
 }
 

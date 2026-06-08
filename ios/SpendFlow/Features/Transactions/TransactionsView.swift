@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct TransactionsView: View {
     @Environment(AppState.self) private var appState
@@ -8,8 +7,6 @@ struct TransactionsView: View {
     var body: some View {
         @Bindable var bindableModel = viewModel
         SpendFlowScreen(title: "Activity", subtitle: "Every swipe, every subscription 👀") {
-            exportButton
-
             if !viewModel.householdMembers.isEmpty {
                 memberPills
             }
@@ -68,32 +65,6 @@ struct TransactionsView: View {
                     refresh: appState.refreshCenter
                 )
             }
-        }
-        .sheet(item: $viewModel.shareItem) { item in
-            ActivityShareSheet(items: [item.url])
-        }
-    }
-
-    private var exportButton: some View {
-        HStack {
-            Spacer()
-            Button {
-                Task { await viewModel.exportCsv(api: appState.apiClient) }
-            } label: {
-                HStack(spacing: 6) {
-                    if viewModel.isExporting {
-                        ProgressView().controlSize(.small)
-                    }
-                    Text(viewModel.isExporting ? "Exporting…" : "Export CSV")
-                        .font(.caption.weight(.semibold))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(SpendFlowTheme.surface, in: Capsule())
-                .overlay(Capsule().stroke(SpendFlowTheme.border, lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-            .disabled(viewModel.isExporting)
         }
     }
 
@@ -406,16 +377,6 @@ struct TransactionRow: View {
     }
 }
 
-private struct ActivityShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
 private extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self
@@ -434,7 +395,6 @@ final class TransactionsViewModel {
     var transactions: [Transaction] = []
     var isLoading = false
     var isLoadingMore = false
-    var isExporting = false
     var errorMessage: String?
     var feedbackMessage: String?
     var filter: TransactionTypeFilter = .all
@@ -446,18 +406,12 @@ final class TransactionsViewModel {
     var scope: ViewScope = .all
     var sort: TransactionSort = .dateDesc
     var editingTransaction: Transaction?
-    var shareItem: SharePayload?
 
     var householdMembers: [HouseholdMember] = []
     private var accounts: [Account] = []
     private var categoryNames: [String] = []
     private var nextCursor: String?
     private var searchTask: Task<Void, Never>?
-
-    struct SharePayload: Identifiable {
-        let id = UUID()
-        let url: URL
-    }
 
     struct FilterOption: Identifiable, Hashable {
         let id: String
@@ -627,21 +581,6 @@ final class TransactionsViewModel {
     }
 
     var canLoadMore: Bool { nextCursor != nil }
-
-    func exportCsv(api: APIClient) async {
-        isExporting = true
-        feedbackMessage = nil
-        defer { isExporting = false }
-
-        do {
-            let result = try await api.exportTransactionsCsv(filters: buildFilters())
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(result.filename)
-            try result.data.write(to: tempURL, options: .atomic)
-            shareItem = SharePayload(url: tempURL)
-        } catch {
-            feedbackMessage = error.localizedDescription
-        }
-    }
 
     func saveCategory(
         transaction: Transaction,

@@ -22,6 +22,11 @@ struct SpendFlowChartView: View {
 
     @State private var selected: ChartDataPoint?
 
+    private func color(for point: ChartDataPoint) -> Color {
+        let index = points.firstIndex(where: { $0.id == point.id }) ?? 0
+        return ChartPalette.color(forLabel: point.label, index: index)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let title {
@@ -32,12 +37,15 @@ struct SpendFlowChartView: View {
 
             if let selected {
                 HStack {
+                    Circle()
+                        .fill(color(for: selected))
+                        .frame(width: 8, height: 8)
                     Text(selected.label)
                         .font(.subheadline.weight(.semibold))
                     Spacer()
                     Text(valueFormatter(selected.value))
                         .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(SpendFlowTheme.primary)
+                        .foregroundStyle(color(for: selected))
                 }
                 .padding(.horizontal, 4)
             }
@@ -48,11 +56,8 @@ struct SpendFlowChartView: View {
                         x: .value("Category", point.label),
                         y: .value(yAxisLabel, point.value)
                     )
-                    .foregroundStyle(
-                        selected?.id == point.id
-                            ? SpendFlowTheme.primary
-                            : SpendFlowTheme.primary.opacity(0.65)
-                    )
+                    .foregroundStyle(by: .value("Series", point.label))
+                    .opacity(selected == nil || selected?.id == point.id ? 1 : 0.35)
                     .annotation(position: .top, alignment: .center) {
                         if points.count <= 8 {
                             Text(valueFormatter(point.value))
@@ -61,17 +66,43 @@ struct SpendFlowChartView: View {
                         }
                     }
                 } else {
+                    AreaMark(
+                        x: .value("Category", point.label),
+                        y: .value(yAxisLabel, point.value)
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [SpendFlowTheme.primary.opacity(0.25), SpendFlowTheme.accent.opacity(0.05)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                     LineMark(
                         x: .value("Category", point.label),
                         y: .value(yAxisLabel, point.value)
                     )
-                    .foregroundStyle(SpendFlowTheme.primary)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [SpendFlowTheme.primary, SpendFlowTheme.accent],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
                     PointMark(
                         x: .value("Category", point.label),
                         y: .value(yAxisLabel, point.value)
                     )
-                    .foregroundStyle(SpendFlowTheme.primary)
+                    .foregroundStyle(by: .value("Series", point.label))
+                    .symbolSize(selected?.id == point.id ? 90 : 60)
+                    .opacity(selected == nil || selected?.id == point.id ? 1 : 0.45)
                 }
+            }
+            .chartForegroundStyleScale { label in
+                if let point = points.first(where: { $0.label == label }) {
+                    return color(for: point)
+                }
+                return ChartPalette.color(forLabel: label, index: 0)
             }
             .chartYAxis {
                 AxisMarks(position: .leading) { value in

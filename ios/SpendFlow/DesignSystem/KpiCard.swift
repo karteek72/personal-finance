@@ -11,6 +11,7 @@ struct KpiCard: View {
         case neutral
         case primary
         case success
+        case warning
         case danger
     }
 
@@ -57,6 +58,7 @@ struct KpiCard: View {
         case .neutral: SpendFlowTheme.border
         case .primary: SpendFlowTheme.primary
         case .success: SpendFlowTheme.success
+        case .warning: SpendFlowTheme.warning
         case .danger: SpendFlowTheme.danger
         }
     }

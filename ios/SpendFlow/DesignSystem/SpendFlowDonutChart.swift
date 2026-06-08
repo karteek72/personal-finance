@@ -57,34 +57,14 @@ struct SpendFlowDonutChart: View {
                     .chartLegend(.hidden)
                     .frame(width: 140, height: 140)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(slices.prefix(6)) { slice in
-                            Button {
-                                guard let onSelect else { return }
-                                if activeID == slice.id {
-                                    highlightedID = nil
-                                    onSelect("")
-                                } else {
-                                    highlightedID = slice.id
-                                    onSelect(slice.id)
-                                }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(slice.color)
-                                        .frame(width: 8, height: 8)
-                                    Text(slice.name)
-                                        .font(.caption)
-                                        .foregroundStyle(SpendFlowTheme.text)
-                                        .lineLimit(1)
-                                    Spacer(minLength: 4)
-                                    Text(String(format: "%.0f%%", slice.percentage))
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(SpendFlowTheme.textMuted)
-                                }
+                    Group {
+                        if slices.count > 6 {
+                            ScrollView(showsIndicators: false) {
+                                legendRows
                             }
-                            .buttonStyle(.plain)
-                            .opacity(activeID == nil || activeID == slice.id ? 1 : 0.45)
+                            .frame(maxHeight: 180)
+                        } else {
+                            legendRows
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -99,6 +79,39 @@ struct SpendFlowDonutChart: View {
         )
         .onChange(of: selectedID) { _, newValue in
             highlightedID = newValue
+        }
+    }
+
+    private var legendRows: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(slices) { slice in
+                Button {
+                    guard let onSelect else { return }
+                    if activeID == slice.id {
+                        highlightedID = nil
+                        onSelect("")
+                    } else {
+                        highlightedID = slice.id
+                        onSelect(slice.id)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(slice.color)
+                            .frame(width: 8, height: 8)
+                        Text(slice.name)
+                            .font(.caption)
+                            .foregroundStyle(SpendFlowTheme.text)
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        Text(String(format: "%.0f%%", slice.percentage))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(SpendFlowTheme.textMuted)
+                    }
+                }
+                .buttonStyle(.plain)
+                .opacity(activeID == nil || activeID == slice.id ? 1 : 0.45)
+            }
         }
     }
 }
@@ -121,6 +134,16 @@ extension DonutSlice {
             value: AnalyticsUI.parseAmount(slice.amount),
             percentage: slice.percentage,
             color: Color(hex: slice.color)
+        )
+    }
+
+    static func fromSector(_ slice: PortfolioSectorAllocation) -> DonutSlice {
+        DonutSlice(
+            id: slice.sector,
+            name: slice.sector,
+            value: AnalyticsUI.parseAmount(slice.value),
+            percentage: slice.sharePercent,
+            color: ChartPalette.color(forLabel: slice.sector, index: ChartPalette.stableIndex(for: slice.sector))
         )
     }
 }
