@@ -3007,3 +3007,414 @@ tasks:
       - Caveats/disclaimer are clearly shown
       - Graceful gated state when price history is insufficient
       - No client-side recomputation
+
+  # ------------------------------------------------------------------ #
+  # iOS web-parity, wave 2 (IOS-012..028) — gaps vs current ui/ surface
+  # Audit: web inventory 1a626b10 vs iOS inventory bb61d181. IOS-001..011
+  # (foundation + per-domain screens) are DONE; these close the remaining
+  # feature/report gaps. All P4 (AGENTS.md: iOS deferred), area: ios.
+  # ------------------------------------------------------------------ #
+  - id: TASK-IOS-012
+    title: iOS Transactions parity — search, filters, sort, scope, member pills, CSV export
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/app/(dashboard)/transactions
+      - backend/src/routes/transactions.ts
+    description: |
+      The iOS Transactions screen only has a type filter (all/spent/in/transfer) + cursor pagination.
+      Web has much more on GET /transactions: text search (q), month + account + category filters, 6
+      sort options, view scope (all|household|personal), family-member filter pills, and CSV export
+      (GET /transactions/export.csv). TransactionFilters/TransactionSort/ViewScope already exist in the
+      iOS models — wire them into the UI and pass through to the API. Add a share/export action for the
+      CSV.
+    acceptance_criteria:
+      - Search, month/account/category filters, and all sort options drive GET /transactions
+      - View scope (all/household/personal) and family-member pills filter the list
+      - CSV export is available via a share sheet using /transactions/export.csv
+      - No client-side filtering of a partial page
+  - id: TASK-IOS-013
+    title: iOS transaction re-categorize (write) + remember-for-merchant
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/app/(dashboard)/transactions
+      - backend/src/routes/transactions.ts
+    description: |
+      Web allows per-row category + subcategory editing with a "remember for this merchant" option via
+      PATCH /transactions/:id/category. iOS is display-only today. Add an edit affordance (row tap →
+      category/subcategory picker) that calls the endpoint and refreshes affected views (categories,
+      summary, merchants) through FinancialRefreshCenter.
+    acceptance_criteria:
+      - A transaction's category/subcategory can be changed from iOS via PATCH /transactions/:id/category
+      - "Remember for merchant" option is supported
+      - Dependent screens refresh after a change
+  - id: TASK-IOS-014
+    title: iOS Dashboard spend-analytics charts + filter bar + drilldown
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-CHARTS-001
+    source_docs:
+      - ui/src/app/(dashboard)/page.tsx
+      - ui/src/components/preview/panels/spend-analytics-panel.tsx
+    description: |
+      Web Home has a SpendAnalyticsPanel (monthly area chart, member donut, category donut, account
+      bar) with a ChartFilterBar (view scope Family/Mine/Everything + account/category/member filters)
+      and a DrilldownDrawer that opens a filtered transaction list from any KPI/segment. iOS Dashboard
+      only shows hero KPIs + alerts. Add the charts (GET /transactions/chart-data), the filter bar, and
+      a drilldown to a filtered transaction list. Also add the profile-setup nudge (default age) shown
+      on web Home.
+    acceptance_criteria:
+      - Monthly/category/account (and member, when household) charts render from /transactions/chart-data
+      - A filter bar controls scope/account/category/member and updates the charts
+      - Tapping a KPI/segment opens a filtered transaction list (drilldown parity)
+      - Profile-setup nudge appears when the user is on the default age
+  - id: TASK-IOS-015
+    title: iOS Spend/Categories parity — cash-flow strips + category analytics charts
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-CHARTS-001
+    source_docs:
+      - ui/src/app/(dashboard)/categories
+      - ui/src/components/preview/panels/category-analytics-panel.tsx
+    description: |
+      iOS Categories is a ranked list with MoM deltas. Web adds CashFlowOverviewStrips (yearly + monthly
+      income/expense/net) and a CategoryAnalyticsPanel (category + subcategory donut, area chart,
+      multi-line category trends, breakdown list) with an account filter, from /transactions/chart-data
+      and /transactions/by-category. Add these to the iOS Spend tab.
+    acceptance_criteria:
+      - Yearly + monthly cash-flow strips render from /transactions/chart-data
+      - Category/subcategory donut, area, and multi-line trend charts render with axes/labels
+      - Account filter applies to strips + charts
+  - id: TASK-IOS-016
+    title: iOS Merchants — income-analytics sub-tab
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/components/preview/panels/merchants-panel.tsx
+      - backend/src/routes/insights.ts
+    description: |
+      Web Merchants has two sub-tabs: Merchant analytics (done on iOS) and Income analytics (KPIs: avg
+      income, stability, side income, sources; stacked primary+side bar by month; insight card) backed
+      by GET /insights/merchants. The iOS APIClient already defines getMerchants(/insights/merchants)
+      but no view uses it. Add the income-analytics sub-tab to MerchantsView.
+    acceptance_criteria:
+      - Merchants screen has Merchant + Income sub-tabs
+      - Income tab shows avg income/stability/side income/sources KPIs and a primary+side stacked bar
+      - Data comes from /insights/merchants
+  - id: TASK-IOS-017
+    title: iOS Investments enrichment parity (KPIs, sector/winners charts, splits, trim-losers)
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-CHARTS-001
+      - TASK-INV-003
+      - TASK-INV-006
+      - TASK-INV-008
+    source_docs:
+      - ui/src/components/preview/panels/investments-panel.tsx
+      - ui/src/components/preview/panels/investments-kpi-section.tsx
+      - ui/src/components/preview/panels/holdings-portfolio-section.tsx
+      - ui/src/components/preview/panels/trim-losers-card.tsx
+    description: |
+      Bring iOS Investments to the enriched web surface (INV-series): KPI header (portfolio value,
+      unrealized P/L $/%, cost basis, win rate, gross profit/loss), allocation donut, sector
+      allocation + sector profit/loss charts, winners/losers bar, portfolio-value trend, the
+      Stocks/ETFs vs Options split (kind filter), the Behavioral tab (alerts + monthly deployment
+      KPIs), an account filter (?accountId=), and the TrimLosersCard what-if. Depends on the backend
+      INV tasks landing first.
+    acceptance_criteria:
+      - KPI header shows value, P/L $/%, cost basis, win rate, gross profit/loss
+      - Allocation, sector allocation, sector P/L, and winners/losers charts render with axes/labels
+      - Holdings split into Stocks/ETFs and Options via the kind filter; account filter works
+      - Behavioral tab and a Trim-losers what-if card are present
+  - id: TASK-IOS-018
+    title: iOS Wealth — Time Machine screen
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-CHARTS-001
+    source_docs:
+      - ui/src/components/preview/panels/time-machine-panel.tsx
+    description: |
+      Web Wealth has a Time Machine panel (brokerage history card: contributions/buy count/portfolio
+      value; habit selector toggling recurring spend habits; "if invested instead" hero with missed
+      gain; spent-vs-invested bars; 20-year compound projection) backed by /planning/recurring +
+      /wealth/investments. iOS has no Time Machine screen. Add it under Wealth in the Explore hub.
+    acceptance_criteria:
+      - Time Machine screen shows brokerage history, habit selector, spent-vs-invested, 20y projection
+      - Data comes from /planning/recurring and /wealth/investments
+      - Charts render with axes/labels/values
+  - id: TASK-IOS-019
+    title: iOS Forecast visualization parity (weather hero, 7-day strip, balance chart)
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+      - TASK-IOS-CHARTS-001
+    source_docs:
+      - ui/src/components/preview/panels/forecast-panel.tsx
+    description: |
+      iOS Forecast is KPIs + recommendation + a daily list (no chart). Web has a "weather" today hero,
+      a selectable 7-day strip, summary KPIs, and a balance-projection visualization from
+      /planning/forecast. Add the hero, selectable day strip, and a balance projection chart.
+    acceptance_criteria:
+      - Today weather hero + selectable 7-day strip present
+      - A balance-projection chart renders with axes/labels/values
+      - Summary KPIs (stormy/cloudy days, min balance, comfort floor, next clear date) shown
+  - id: TASK-IOS-020
+    title: iOS Accounts parity — Teller connect, delete, sync-all, Plaid reconnect
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/components/preview/connect-account-button.tsx
+      - backend/src/routes/teller.ts
+      - backend/src/routes/plaid.ts
+    description: |
+      iOS Accounts supports Plaid + SnapTrade link and per-account sync. Web also has: Teller Connect
+      (GET /teller/config, POST /teller/exchange), delete account (DELETE /accounts/:id — already in the
+      iOS client but unused), "sync all" Plaid items (POST /plaid/sync), and a Plaid reconnect/reauth
+      flow for reauth_required. Add these to AccountsView.
+    acceptance_criteria:
+      - Teller connect flow works (config + exchange)
+      - Delete account and "sync all" actions are available
+      - Plaid reconnect handles reauth_required (relink to repair the item)
+  - id: TASK-IOS-021
+    title: iOS in-app notification center (alerts bell + history)
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/components/layout/notification-bell.tsx
+      - backend/src/routes/insights.ts
+    description: |
+      iOS only registers a push token; there is no in-app notification center. Web has a bell + panel
+      that lists backend alerts (GET /insights/alerts) and client events with dismiss / mark-read. Add
+      an in-app notification center fed by /insights/alerts (and local client events) with read/dismiss
+      state.
+    acceptance_criteria:
+      - A bell surfaces unread count and opens a history panel
+      - Alerts come from /insights/alerts; items can be marked read/dismissed
+      - State persists across launches
+  - id: TASK-IOS-022
+    title: iOS Coach interactive Q&A
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/components/preview/coach-assistant.tsx
+      - backend/src/routes/coach.ts
+    description: |
+      Web Coach has an "Ask Coach" chat (starter chips + free-text Q&A) via POST /coach/ask plus the
+      monthly narrative. iOS Coach is read-only narrative; the askCoach call exists but is unused. Add
+      the interactive chat UI (starter chips, message thread) on top of the existing narrative tab.
+    acceptance_criteria:
+      - An Ask Coach chat sends questions to POST /coach/ask and renders answers
+      - Starter chips prefill common questions
+      - Monthly narrative remains available
+  - id: TASK-IOS-023
+    title: iOS household invite accept (deep link + preview/accept)
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/app/(dashboard)/accept-invite
+      - backend/src/routes/household.ts
+    description: |
+      Web has an accept-invite page (GET /household/invites/preview, POST /household/invites/accept).
+      iOS defines these endpoints but has no UI. Add an invite-accept flow (handle an invite link/deep
+      link, show the preview, accept after sign-in) so an invited partner can join from iOS.
+    acceptance_criteria:
+      - An invite link/deep link opens a preview (household name, inviter)
+      - Accept calls /household/invites/accept and joins the household
+      - Works for a signed-out user (sign in, then accept)
+  - id: TASK-IOS-024
+    title: iOS statement import completeness (retry, cancel, account mapping)
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-IMPORT-001
+    source_docs:
+      - ui/src/app/(dashboard)/accounts/import
+      - backend/src/routes/imports.ts
+    description: |
+      iOS import does upload/poll/confirm but lacks the web review depth: per-file retry
+      (.../files/:fileId/retry), retry-failed batch, batch cancel (DELETE /imports/batches/:id), file
+      replace, and the account-mapping step before confirm. The endpoints already exist in the iOS
+      client but are unused. Add the review/mapping UI and the retry/cancel/replace actions.
+    acceptance_criteria:
+      - Review step maps parsed files to accounts before confirm
+      - Per-file retry, retry-failed, replace, and batch cancel are available
+      - Mirrors the web ImportReview flow
+  - id: TASK-IOS-025
+    title: iOS user-controlled date/period range across analytics
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/app/(dashboard)/page.tsx
+      - ios/SpendFlow/App/AnalyticsDateRange.swift
+    description: |
+      iOS hardcodes a rolling 12-month window (AnalyticsDateRange.rolling()) for summary/categories/
+      flow; there is no user control. Web exposes a period/window and labels it. Add a period selector
+      (e.g. this month / 3m / 12m / custom) that drives the analytics windows consistently and shows
+      the active-window label.
+    acceptance_criteria:
+      - A period selector controls the window for summary/categories/flow and analytics
+      - The active window is labelled in the UI
+      - Selection persists across launches
+  - id: TASK-IOS-026
+    title: iOS Settings expansion — profile, notifications, data export, legal
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/app/(dashboard)/layout.tsx
+      - backend/src/routes/auth.ts
+    description: |
+      iOS Settings only has a Face ID toggle. Add: a profile shortcut, notification preferences, a GDPR
+      data export (GET /auth/export — present on web client but no UI), and legal links
+      (privacy/terms/trademarks/about) matching the web footer.
+    acceptance_criteria:
+      - Settings links to Profile and notification preferences
+      - Data export via /auth/export is available
+      - Legal pages (privacy/terms/trademarks/about) are reachable
+  - id: TASK-IOS-027
+    title: iOS surface metric envelope (live badge + confidence/caveats)
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/components/preview/metric-live-badge.tsx
+      - ios/SpendFlow/DesignSystem
+    description: |
+      iOS has a MetricEnvelopeView component but never uses it. Web shows a MetricLiveBadge and
+      surfaces confidence/caveats on several panels. Wire the envelope (asOf, class, confidence,
+      caveats, live badge) into report screens that return MetricEnvelope so users see freshness/
+      caveats. Also evaluate /insights/trends (defined, unused) for any web-equivalent surface.
+    acceptance_criteria:
+      - Report screens that return MetricEnvelope show a live/asOf badge and caveats
+      - Confidence is conveyed where the web shows it
+  - id: TASK-IOS-028
+    title: iOS FIRE scenario-comparison cards
+    status: backlog
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-IOS-001
+    source_docs:
+      - ui/src/components/preview/panels/fire-panel.tsx
+    description: |
+      Web FIRE shows scenario-comparison cards (e.g. invest +$300/mo vs spend -$400/mo) via multiple
+      GET /wealth/fire queries, in addition to the projection chart + editable assumptions that iOS
+      already has. Add equivalent scenario cards to the iOS FIRE screen.
+    acceptance_criteria:
+      - Scenario cards compare invest-more vs spend-less outcomes
+      - Each uses /wealth/fire query overrides; no client-side projection math
+  - id: TASK-IOS-DOCS-001
+    title: Refresh ios/STRUCTURE.md and README to match the implemented app
+    status: ready
+    priority: P4
+    area: ios
+    phase: 4
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - ios/STRUCTURE.md
+      - ios/README.md
+    description: |
+      ios/STRUCTURE.md and ios/README.md are stale — they describe a 5-tab Phase-1 shell, while the app
+      has a 6-tab + Explore hub with 25 screens, charts, pagination, Plaid + SnapTrade, household, and
+      import. Update both docs to reflect the actual structure (tabs, feature folders, DesignSystem
+      components, services, models) so future parity audits use accurate docs.
+    acceptance_criteria:
+      - STRUCTURE.md lists the real tab set, feature folders, DesignSystem, services, and models
+      - README reflects current capabilities (no "planned" items that already shipped)

@@ -338,6 +338,38 @@ feature views in parallel.
 
 ---
 
+### iOS web-parity, wave 2 (IOS-012–028 + DOCS) — P4
+
+Foundation + per-domain screens (IOS-001–011) are **done**. A fresh audit (web inventory vs the
+actual iOS code — STRUCTURE.md is stale) found these remaining gaps vs the current `ui/` surface.
+Design: `analytics-architecture.md` §21.
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-IOS-012 | ios | Transactions: search/filters/sort/scope/member pills/CSV export | IOS-001 |
+| TASK-IOS-013 | ios | Transaction re-categorize (write) + remember-for-merchant | IOS-001 |
+| TASK-IOS-014 | ios | Dashboard spend-analytics charts + filter bar + drilldown | IOS-001, CHARTS-001 |
+| TASK-IOS-015 | ios | Spend/Categories: cash-flow strips + category analytics charts | IOS-001, CHARTS-001 |
+| TASK-IOS-016 | ios | Merchants income-analytics sub-tab (/insights/merchants) | IOS-001 |
+| TASK-IOS-017 | ios | Investments enrichment (KPIs, sector/winners charts, splits, trim-losers) | INV-003/006/008 |
+| TASK-IOS-018 | ios | Wealth Time Machine screen | IOS-001, CHARTS-001 |
+| TASK-IOS-019 | ios | Forecast viz (weather hero, 7-day strip, balance chart) | IOS-001, CHARTS-001 |
+| TASK-IOS-020 | ios | Accounts: Teller connect, delete, sync-all, Plaid reconnect | IOS-001 |
+| TASK-IOS-021 | ios | In-app notification center (alerts bell + history) | IOS-001 |
+| TASK-IOS-022 | ios | Coach interactive Q&A (/coach/ask) | IOS-001 |
+| TASK-IOS-023 | ios | Household invite accept (deep link + preview/accept) | IOS-001 |
+| TASK-IOS-024 | ios | Statement import completeness (retry/cancel/account mapping) | IOS-IMPORT-001 |
+| TASK-IOS-025 | ios | User-controlled date/period range across analytics | IOS-001 |
+| TASK-IOS-026 | ios | Settings expansion (profile/notifications/export/legal) | IOS-001 |
+| TASK-IOS-027 | ios | Surface metric envelope (live badge + confidence/caveats) | IOS-001 |
+| TASK-IOS-028 | ios | FIRE scenario-comparison cards (backlog) | IOS-001 |
+| TASK-IOS-DOCS-001 | ios | Refresh ios/STRUCTURE.md + README to match the app | — |
+
+**Highest user-visible gaps:** transaction filters + re-categorize (IOS-012/013), dashboard/category
+charts (IOS-014/015), and the enriched investments surface (IOS-017).
+
+---
+
 ## Recently completed
 
 | ID | Title |

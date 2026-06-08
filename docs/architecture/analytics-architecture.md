@@ -957,3 +957,45 @@ already exists — `securityPrices` (close price by date → momentum), `holding
   gate gracefully when `securityPrices` history is too thin.
 - **INV-009 (ui):** "Trim losers" optimizer card — cut candidates with momentum, loss, freed capital,
   HARVEST potential, and projected effect, with caveats.
+
+---
+
+## 21. iOS ↔ web feature parity (IOS-series, wave 2)
+
+The SwiftUI app (`ios/`) is **well beyond** its docs — `ios/STRUCTURE.md`/`README.md` still describe a
+5-tab Phase-1 shell, but the app actually ships a 6-tab + Explore hub with ~25 screens, Swift Charts,
+paginated lists, Plaid + SnapTrade, household CRUD, import, and most analytics domains. Tasks
+`IOS-001..011` (foundation + per-domain screens) are **done**. A fresh audit of the current `ui/`
+surface against the real iOS code found the gaps below, queued as `IOS-012..028` + `IOS-DOCS-001`.
+
+> Audit inputs: web feature inventory and iOS implementation inventory (read-only). STRUCTURE.md is
+> stale and must **not** be used as the parity baseline — see IOS-DOCS-001.
+
+### 21.1 Gap matrix (web has it → iOS task)
+| Web feature / report | iOS today | Task |
+|----------------------|-----------|------|
+| Transactions: search, month/account/category filters, 6 sorts, view scope, member pills, CSV export | type filter + cursor paging only | IOS-012 |
+| Per-row re-categorize + remember-for-merchant (PATCH category) | display only | IOS-013 |
+| Home spend-analytics charts + ChartFilterBar + drilldown + profile nudge | hero KPIs + alerts only | IOS-014 |
+| Spend cash-flow strips + category donut/area/multi-line trends + account filter | ranked list + MoM only | IOS-015 |
+| Merchants **income-analytics** sub-tab (/insights/merchants) | merchant table only (endpoint unused) | IOS-016 |
+| Investments enrichment: KPI header, sector + winners/losers + trend charts, stocks/options split, behavioral tab, account filter, trim-losers | portfolio value + allocation bar + holdings | IOS-017 |
+| Wealth **Time Machine** | absent | IOS-018 |
+| Forecast weather hero + 7-day strip + balance chart | KPIs + list only | IOS-019 |
+| Accounts: Teller connect, delete, sync-all, Plaid reconnect | Plaid/SnapTrade link + per-acct sync | IOS-020 |
+| In-app notification center (alerts bell + history) | push token only | IOS-021 |
+| Coach interactive Q&A (/coach/ask) | read-only narrative (call unused) | IOS-022 |
+| Household invite accept (preview/accept deep link) | endpoints defined, no UI | IOS-023 |
+| Import retry/cancel/replace + account-mapping review | upload/poll/confirm only | IOS-024 |
+| User-controlled date/period range | hardcoded rolling 12m | IOS-025 |
+| Settings: profile/notifications/data export/legal | Face ID toggle only | IOS-026 |
+| Metric envelope (live badge, confidence, caveats) | `MetricEnvelopeView` unused | IOS-027 |
+| FIRE scenario-comparison cards | projection + assumptions only | IOS-028 |
+| Accurate iOS docs | STRUCTURE.md/README stale | IOS-DOCS-001 |
+
+### 21.2 Notes
+- All wave-2 tasks are **P4** (AGENTS.md defers iOS) but `ready`/`backlog` so smaller models can pick
+  them up; they assume the thin-client rule (no client-side recompute — pull from backend).
+- IOS-017 depends on the backend INV tasks (INV-003/006/008) landing first.
+- Highest user-visible parity gaps: IOS-012/013 (transactions), IOS-014/015 (charts), IOS-017
+  (investments).
