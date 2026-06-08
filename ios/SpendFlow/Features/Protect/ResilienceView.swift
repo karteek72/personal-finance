@@ -61,54 +61,56 @@ struct ResilienceView: View {
     }
 
     private func runwayHero(_ data: ResilienceResponse) -> some View {
-        HeroGradientCard {
-            HStack(alignment: .bottom, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Day-Zero runway")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .textCase(.uppercase)
-                        Spacer()
-                        if let isLive = data.isLive {
-                            MetricLiveBadge(isLive: isLive)
+        VStack(spacing: 16) {
+            HeroGradientCard {
+                HStack(alignment: .bottom, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Day-Zero runway")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .textCase(.uppercase)
+                            Spacer()
+                            if let isLive = data.isLive {
+                                MetricLiveBadge(isLive: isLive)
+                            }
                         }
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text(String(format: "%.1f", data.runwayMonths))
+                                .font(.system(size: 44, weight: .heavy, design: .rounded).monospacedDigit())
+                            Text("months")
+                                .font(.title2.weight(.bold))
+                        }
+                        .foregroundStyle(.white)
+                        Text("At burn of \(MoneyFormatter.format(data.monthlyBurn))/mo, your \(MoneyFormatter.format(data.liquidCash)) in liquid cash lasts about \(String(format: "%.1f", data.runwayMonths)) months if income stopped today.")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.85))
                     }
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(String(format: "%.1f", data.runwayMonths))
-                            .font(.system(size: 44, weight: .heavy, design: .rounded).monospacedDigit())
-                        Text("months")
-                            .font(.title2.weight(.bold))
+                    VStack(spacing: 6) {
+                        ScoreRingView(
+                            score: data.immunityScore,
+                            lineWidth: 8,
+                            size: 96,
+                            color: .white,
+                            textColor: .white,
+                            mutedTextColor: .white.opacity(0.75),
+                            showLabel: false
+                        )
+                        Text("Immunity score")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.75))
+                            .textCase(.uppercase)
                     }
-                    .foregroundStyle(.white)
-                    Text("At burn of \(MoneyFormatter.format(data.monthlyBurn))/mo, your \(MoneyFormatter.format(data.liquidCash)) in liquid cash lasts about \(String(format: "%.1f", data.runwayMonths)) months if income stopped today.")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.85))
-                }
-                VStack(spacing: 6) {
-                    ScoreRingView(
-                        score: data.immunityScore,
-                        lineWidth: 8,
-                        size: 96,
-                        color: .white,
-                        textColor: .white,
-                        mutedTextColor: .white.opacity(0.75),
-                        showLabel: false
-                    )
-                    Text("Immunity score")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.75))
-                        .textCase(.uppercase)
                 }
             }
-        }
 
-        SpendFlowCard {
-            MetricEnvelopeView(
-                metric: MetricEnvelopeFactory.immunityScore(data),
-                isLive: data.isLive ?? false,
-                valueFormatter: { _ in "\(Int(data.immunityScore.rounded()))" }
-            )
+            SpendFlowCard {
+                MetricEnvelopeView(
+                    metric: MetricEnvelopeFactory.immunityScore(data),
+                    isLive: data.isLive ?? false,
+                    valueFormatter: { _ in "\(Int(data.immunityScore.rounded()))" }
+                )
+            }
         }
     }
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-private struct CoachChatMessage: Identifiable, Sendable {
+struct CoachChatMessage: Identifiable, Sendable {
     let id = UUID()
     let role: Role
     let text: String

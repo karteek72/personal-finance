@@ -44,12 +44,16 @@ final class AuthService {
         try KeychainService.save(Data(session.refreshToken.utf8), for: .refreshToken)
     }
 
+    private func makeUnauthenticatedClient() -> APIClient {
+        APIClient(authService: nil)
+    }
+
     func refreshAccessToken() async throws {
         guard let refreshToken else {
             throw APIError.unauthenticated
         }
 
-        let response = try await unauthenticatedClient.refreshSession(refreshToken: refreshToken)
+        let response = try await makeUnauthenticatedClient().refreshSession(refreshToken: refreshToken)
         accessToken = response.accessToken
         self.refreshToken = response.refreshToken
 
@@ -63,7 +67,7 @@ final class AuthService {
 
     func signOut() async {
         if let accessToken {
-            try? await unauthenticatedClient.signOut(accessToken: accessToken)
+            try? await makeUnauthenticatedClient().signOut(accessToken: accessToken)
         }
         try? KeychainService.clearAll()
         clearInMemorySession()
@@ -75,6 +79,4 @@ final class AuthService {
         refreshToken = nil
         isAuthenticated = false
     }
-
-    private let unauthenticatedClient = APIClient(authService: nil)
 }

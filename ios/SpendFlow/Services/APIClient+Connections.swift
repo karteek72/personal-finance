@@ -15,36 +15,4 @@ extension APIClient {
             APIRequest(path: "/plaid/link-token", method: .post, body: body)
         )
     }
-
-    func getTellerConfig() async throws -> TellerConnectConfig {
-        try await send(APIRequest(path: "/teller/config"))
-    }
-
-    func exchangeTellerToken(
-        accessToken: String,
-        enrollmentId: String,
-        institutionName: String? = nil
-    ) async throws -> TellerExchangeResponse {
-        struct Body: Encodable {
-            let accessToken: String
-            let enrollmentId: String
-            let institutionName: String?
-        }
-        let body = try JSONEncoder.api.encode(
-            Body(accessToken: accessToken, enrollmentId: enrollmentId, institutionName: institutionName)
-        )
-        return try await send(APIRequest(path: "/teller/exchange", method: .post, body: body))
-    }
-
-    func exportUserData() async throws -> Data {
-        let token = await MainActor.run { authService?.accessToken }
-        let (data, response) = try await rawSend(
-            APIRequest(path: "/auth/export"),
-            accessToken: token
-        )
-        guard (200 ... 299).contains(response.statusCode) else {
-            throw APIError.httpStatus(response.statusCode, message: "Export failed")
-        }
-        return data
-    }
 }

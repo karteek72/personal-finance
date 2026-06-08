@@ -346,6 +346,11 @@ struct FireAssumptions: Codable, Sendable {
     let inflationHandledViaRealReturn: Bool
 }
 
+struct FireInputBasis: Codable, Sendable {
+    let spendLookbackMonths: Int
+    let investLookbackMonths: Int
+}
+
 struct FireResponse: Codable, Sendable {
     let currentAge: Int
     let isDefaultAge: Bool
@@ -360,7 +365,7 @@ struct FireResponse: Codable, Sendable {
     let targetStatus: String?
     let targetGapYears: Double?
     let requiredMonthlySavings: String?
-    let inputBasis: String?
+    let inputBasis: FireInputBasis?
     let caveats: [String]?
     let assumptions: FireAssumptions?
 }

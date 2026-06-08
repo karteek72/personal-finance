@@ -44,8 +44,6 @@ enum FeatureRouting {
             CoachView()
         case "wrapped":
             WrappedView()
-        case "import":
-            StatementImportView()
         default:
             Text("Unknown feature: \(destination.title)")
                 .foregroundStyle(SpendFlowTheme.textMuted)

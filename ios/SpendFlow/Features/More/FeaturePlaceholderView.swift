@@ -76,7 +76,6 @@ enum FeatureHubSection: String, CaseIterable, Identifiable, Sendable {
             ]
         case .extras:
             return [
-                .init(id: "import", title: "Import Statements", subtitle: "QFX, CSV, PDF upload", systemImage: "doc.badge.arrow.up"),
                 .init(id: "coach", title: "Coach", subtitle: "Guided insights", systemImage: "bubble.left.and.bubble.right.fill"),
                 .init(id: "wrapped", title: "Wrapped", subtitle: "Year in review", systemImage: "gift.fill"),
             ]
