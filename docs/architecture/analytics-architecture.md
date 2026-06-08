@@ -847,3 +847,155 @@ family member's accounts are included once they exist under that member's user i
 
 Net: new **accounts** flow into all metrics automatically; **member** changes need H1 + H2 so the
 whole dashboard (not just a subset) reflects them without waiting for the next sync.
+
+---
+
+## 20. Investments / holdings analytics (INV-series)
+
+### 20.1 Current state
+`Wealth → Investments` (`investments-panel.tsx`) shows a portfolio-value hero, **a list of investment
+accounts**, then a Holdings table + Behavioral tab (`holdings-portfolio-section.tsx`). The backend
+`getInvestments(userId, q, accountId?)` (`investments-store.ts`) already:
+- accepts an **`accountId` filter** — `scopedPositions` filters by it, and `portfolioValue`,
+  `totalCostBasis`, `totalGainLoss`, `totalGainLossPercent`, `portfolioBreakdown`, `stockAggregates`,
+  and `optionPositions` all honor it. (Only `behavioralAlerts`, `investmentHistory`, and
+  `monthlyActivity` remain household-wide.)
+- returns rich fields the UI **does not currently surface**: `totalGainLoss`, `totalGainLossPercent`,
+  `totalCostBasis`, `portfolioBreakdown` (stocks/options value + share% + counts), per-position
+  `gainLoss`/`gainLossPercent`/`sector`/`assetType`, and `investmentHistory` (contributed, unrealized).
+
+### 20.2 Request 1 — filter holdings by account (INV-001)
+Backend is ready; this is mostly UI. Add an account selector (dropdown of investment accounts from
+`accounts[]`) that passes `accountId` through `useInvestments` → api-client → `/wealth/investments`,
+and have the holdings table **and** the KPI header reflect the selection. Note that behavioral/history
+panels stay household-wide unless we also scope them (optional follow-up).
+
+### 20.3 Request 2 — remove the account list from Investments (INV-002)
+The investment-accounts list (`investments-panel.tsx:63-91`) duplicates what `Wealth → Net Worth`
+already shows. Remove it from the Investments view; keep the portfolio-value hero (now enriched per
+20.4), the Holdings table, and the Behavioral insights. Preserve the "connect a brokerage"
+empty-state when there are no investment accounts.
+
+### 20.4 Request 3 — richer KPIs + charts (INV-003 backend, INV-005 ui)
+Analysis of what is useful for a personal investor, and whether the data already exists:
+
+**KPI header — available now (just surface them):**
+| KPI | Source | Notes |
+|-----|--------|-------|
+| Portfolio value | `portfolioValue` | already shown |
+| Total unrealized gain/loss ($ + %) | `totalGainLoss`, `totalGainLossPercent` | **highest-value missing KPI**; color by sign |
+| Invested (cost basis) | `totalCostBasis` | money-in vs current value |
+| Asset mix | `portfolioBreakdown` | stocks/ETFs vs options share% |
+
+**KPI header — needs small new server aggregation over positions (honor `accountId`):**
+| KPI | Formula |
+|-----|---------|
+| Winners / losers count | count(`gainLoss >= 0`) vs count(`< 0`) |
+| Winners / losers value | Σ value where gain ≥0 vs <0, and each as % of portfolio |
+| Win rate | winners / total positions (%) |
+| Best / worst performer | top + bottom position by `gainLossPercent` (and by `$`) |
+| Concentration | largest position weight, top-5 weight, and HHI (risk signal) |
+
+**Charts (apply the self-explanatory rule — axes, labels, values; see U1/W1):**
+| Chart | Data | Why |
+|-------|------|-----|
+| Asset-allocation donut | `portfolioBreakdown` (+ crypto/bond/cash) | diversification at a glance |
+| Sector-allocation donut/bar | roll up `position.sector` | concentration by sector (needs rollup) |
+| Sector profit/loss bar | roll up `position.gainLoss` by sector | which sectors made/lost money (diverging bar, color by sign) |
+| Winners vs losers diverging bar | per-position `gainLoss` (top N each side) | directly answers "positive/negative holdings" |
+| Top contributors to P/L | per-position `gainLoss` ranked | what's driving the total |
+| Portfolio-value trend (line/area) | investment snapshots (`investment-snapshots.ts`) | growth over time (needs a series field/endpoint) |
+| Cost-basis vs market value bar | `totalCostBasis` vs `portfolioValue` | invested vs current, gain shaded |
+
+**Phase-2 (need `investment_transactions` aggregation):** realized P/L, dividends YTD, fees YTD,
+contributions-over-time bar (partly in `monthlyActivity`). Mark as later.
+
+### 20.5 Recommended split
+- **INV-001 (ui):** account filter (backend ready).
+- **INV-002 (ui):** remove the account list.
+- **INV-003 (backend):** add winners/losers, win rate, best/worst, concentration, and a **sector
+  rollup** to the response, honoring `accountId`; document each formula + confidence/caveats. The
+  sector rollup returns, **per sector**: market value + share%, **and** total unrealized profit/loss
+  ($) + P/L% (Σ `gainLoss` / Σ cost), so the UI can chart both allocation and profit/loss by sector.
+- **INV-004 (backend):** portfolio-value time series from investment snapshots for the trend chart.
+- **INV-005 (ui):** enriched KPI header + the charts above, reusing the shared self-explanatory chart
+  components.
+
+### 20.6 Request 4 — split Holdings into Stocks/ETFs vs Options (INV-006/007)
+The Holdings table currently renders the combined `positions` page for all asset classes. The backend
+already separates classes (`stockAggregates`, `optionPositions`, and `portfolioBreakdown` counts), but
+to keep server-side pagination/sort/filter per asset class (thin-client rule) the cleanest path is a
+**`kind` filter** on `/wealth/investments` (`stocks` | `options` | `all`, default `all`) applied to the
+positions page alongside the existing `accountId`/`q`/sort. The UI then shows two independently
+paginated tables (or sub-tabs): **Stocks & ETFs** and **Options** (option columns surface
+strike/expiry/type via the existing `expirationLabel`/`optionType`/`underlyingTicker`).
+- **INV-006 (backend):** add the `kind` filter to the positions list query (honor `accountId` too).
+- **INV-007 (ui):** two separated tables/sub-tabs driven by `kind`.
+
+### 20.7 Request 5 — total profit value vs total loss value (folded into INV-003)
+Beyond net `totalGainLoss`, surface the **gross split**: total unrealized **profit** = Σ `gainLoss`
+where `> 0`, and total unrealized **loss** = Σ `gainLoss` where `< 0` (they net to `totalGainLoss`).
+Show both in the KPI header, color-coded, with the count of positions on each side. Computed over
+`scopedPositions` so it honors the `accountId`/`kind` filters. (Folded into INV-003 + INV-005.)
+
+### 20.8 Request 6 — "prune the losers" what-if + momentum (INV-008/009)
+A what-if optimizer: *if I exit some losing positions, how could that lift the portfolio?* The data
+already exists — `securityPrices` (close price by date → momentum), `holdingsSnapshots`, and
+`investment-performance.ts` (FIFO tax-lots, realized/unrealized P/L, TWR/XIRR). Design:
+
+1. **Momentum score per holding** from `securityPrices` trailing returns (e.g. 1m/3m/6m and a
+   moving-average trend). Classify losers into **cut candidates** (loss + deteriorating momentum) vs
+   **hold/recover** (loss but improving momentum) so we do not blindly dump every red position.
+2. **What-if (advisory, bounded):** for the selected cut candidates show capital freed (Σ market
+   value), realized loss / **tax-loss-harvest** potential (from FIFO tax lots), and a *projected*
+   uplift if that capital were redeployed into the portfolio's top-momentum holdings — expressed as a
+   range, not a point estimate.
+3. **Strong caveats are mandatory:** not investment advice; momentum is not predictive; ignores
+   wash-sale rules and full tax nuance; projection is illustrative. Surface `confidence`/`caveats` in
+   the metric envelope and the UI card.
+- **INV-008 (backend):** momentum scoring + prune-losers what-if endpoint, honoring `accountId`;
+  gate gracefully when `securityPrices` history is too thin.
+- **INV-009 (ui):** "Trim losers" optimizer card — cut candidates with momentum, loss, freed capital,
+  HARVEST potential, and projected effect, with caveats.
+
+---
+
+## 21. iOS ↔ web feature parity (IOS-series, wave 2)
+
+The SwiftUI app (`ios/`) is **well beyond** its docs — `ios/STRUCTURE.md`/`README.md` still describe a
+5-tab Phase-1 shell, but the app actually ships a 6-tab + Explore hub with ~25 screens, Swift Charts,
+paginated lists, Plaid + SnapTrade, household CRUD, import, and most analytics domains. Tasks
+`IOS-001..011` (foundation + per-domain screens) are **done**. A fresh audit of the current `ui/`
+surface against the real iOS code found the gaps below, queued as `IOS-012..028` + `IOS-DOCS-001`.
+
+> Audit inputs: web feature inventory and iOS implementation inventory (read-only). STRUCTURE.md is
+> stale and must **not** be used as the parity baseline — see IOS-DOCS-001.
+
+### 21.1 Gap matrix (web has it → iOS task)
+| Web feature / report | iOS today | Task |
+|----------------------|-----------|------|
+| Transactions: search, month/account/category filters, 6 sorts, view scope, member pills, CSV export | type filter + cursor paging only | IOS-012 |
+| Per-row re-categorize + remember-for-merchant (PATCH category) | display only | IOS-013 |
+| Home spend-analytics charts + ChartFilterBar + drilldown + profile nudge | hero KPIs + alerts only | IOS-014 |
+| Spend cash-flow strips + category donut/area/multi-line trends + account filter | ranked list + MoM only | IOS-015 |
+| Merchants **income-analytics** sub-tab (/insights/merchants) | merchant table only (endpoint unused) | IOS-016 |
+| Investments enrichment: KPI header, sector + winners/losers + trend charts, stocks/options split, behavioral tab, account filter, trim-losers | portfolio value + allocation bar + holdings | IOS-017 |
+| Wealth **Time Machine** | absent | IOS-018 |
+| Forecast weather hero + 7-day strip + balance chart | KPIs + list only | IOS-019 |
+| Accounts: Teller connect, delete, sync-all, Plaid reconnect | Plaid/SnapTrade link + per-acct sync | IOS-020 |
+| In-app notification center (alerts bell + history) | push token only | IOS-021 |
+| Coach interactive Q&A (/coach/ask) | read-only narrative (call unused) | IOS-022 |
+| Household invite accept (preview/accept deep link) | endpoints defined, no UI | IOS-023 |
+| Import retry/cancel/replace + account-mapping review | upload/poll/confirm only | IOS-024 |
+| User-controlled date/period range | hardcoded rolling 12m | IOS-025 |
+| Settings: profile/notifications/data export/legal | Face ID toggle only | IOS-026 |
+| Metric envelope (live badge, confidence, caveats) | `MetricEnvelopeView` unused | IOS-027 |
+| FIRE scenario-comparison cards | projection + assumptions only | IOS-028 |
+| Accurate iOS docs | STRUCTURE.md/README stale | IOS-DOCS-001 |
+
+### 21.2 Notes
+- All wave-2 tasks are **P4** (AGENTS.md defers iOS) but `ready`/`backlog` so smaller models can pick
+  them up; they assume the thin-client rule (no client-side recompute — pull from backend).
+- IOS-017 depends on the backend INV tasks (INV-003/006/008) landing first.
+- Highest user-visible parity gaps: IOS-012/013 (transactions), IOS-014/015 (charts), IOS-017
+  (investments).

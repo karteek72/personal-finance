@@ -46,6 +46,7 @@ enum FeatureHubSection: String, CaseIterable, Identifiable, Sendable {
             return [
                 .init(id: "net-worth", title: "Net Worth", subtitle: "Assets & liabilities", systemImage: "chart.line.uptrend.xyaxis"),
                 .init(id: "investments", title: "Investments", subtitle: "Holdings & allocation", systemImage: "chart.pie.fill"),
+                .init(id: "time-machine", title: "Time Machine", subtitle: "Spent vs invested habits", systemImage: "clock.arrow.circlepath"),
                 .init(id: "fire", title: "FIRE", subtitle: "Retirement projection", systemImage: "sun.max.fill"),
             ]
         case .plan:

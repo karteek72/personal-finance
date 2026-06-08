@@ -20,6 +20,18 @@ struct SpendFlowApp: App {
                         appState.appLock.resetLockOnBackground()
                     }
                 }
+                .onOpenURL { url in
+                    handleDeepLink(url, appState: appState)
+                }
+        }
+    }
+
+    private func handleDeepLink(_ url: URL, appState: AppState) {
+        guard url.scheme == "spendflow" else { return }
+        if url.host == "invite",
+           let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let token = components.queryItems?.first(where: { $0.name == "token" })?.value {
+            appState.pendingInviteToken = token
         }
     }
 
@@ -53,6 +65,9 @@ struct RootView: View {
             }
         }
         .background(SpendFlowTheme.background.ignoresSafeArea())
+        .sheet(item: inviteTokenBinding) { token in
+            AcceptInviteView(token: token.value)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .didRegisterPushToken)) { note in
             guard let tokenData = note.object as? Data else { return }
             Task {
@@ -63,4 +78,23 @@ struct RootView: View {
             }
         }
     }
+
+    private var inviteTokenBinding: Binding<InviteTokenItem?> {
+        Binding(
+            get: {
+                guard let token = appState.pendingInviteToken else { return nil }
+                return InviteTokenItem(value: token)
+            },
+            set: { newValue in
+                if newValue == nil {
+                    appState.pendingInviteToken = nil
+                }
+            }
+        )
+    }
+}
+
+private struct InviteTokenItem: Identifiable {
+    let value: String
+    var id: String { value }
 }

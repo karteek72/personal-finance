@@ -9,6 +9,9 @@ PKG="${1:?package directory (backend|ui)}"
 SCRIPT="${2:-dev}"
 shift 2
 
+# shellcheck source=podman/lib.sh
+source "${ROOT}/scripts/podman/lib.sh"
+
 if [[ -f "${ROOT}/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -19,8 +22,7 @@ fi
 case "${PKG}" in
   backend)
     export PORT="${PORT:-4000}"
-    export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6380}"
-    export DATABASE_URL="${DATABASE_URL:-postgresql://spendflow:spendflow@localhost:5433/spendflow}"
+    spendflow_apply_host_infra_urls
     ;;
   ui)
     export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-http://localhost:4000/api/v1}"

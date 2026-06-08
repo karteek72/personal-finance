@@ -64,18 +64,23 @@ struct WellnessView: View {
 
     private func scoreHero(_ data: WellnessResponse) -> some View {
         SpendFlowCard {
-            HStack(spacing: 20) {
-                ScoreRingView(score: data.score)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Financial wellness score")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(SpendFlowTheme.textMuted)
-                    Text("\(data.delta >= 0 ? "+" : "")\(Int(data.delta.rounded())) pts vs last month")
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(SpendFlowTheme.text)
-                    Text("Composite of savings, debt, emergency fund, cash flow, inflation beat, investments, and goals.")
-                        .font(.caption)
-                        .foregroundStyle(SpendFlowTheme.textMuted)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Spacer()
+                    MetricLiveBadge(isLive: data.isLive)
+                }
+                HStack(spacing: 20) {
+                    ScoreRingView(score: data.score)
+                    VStack(alignment: .leading, spacing: 8) {
+                        MetricEnvelopeView(
+                            metric: MetricEnvelopeFactory.wellnessScore(data),
+                            isLive: data.isLive,
+                            valueFormatter: { _ in "\(Int(data.score.rounded()))" }
+                        )
+                        Text("Composite of savings, debt, emergency fund, cash flow, and goals.")
+                            .font(.caption)
+                            .foregroundStyle(SpendFlowTheme.textMuted)
+                    }
                 }
             }
         }
@@ -114,13 +119,25 @@ struct WellnessView: View {
                                 Text(dimension.description)
                                     .font(.caption)
                                     .foregroundStyle(SpendFlowTheme.textMuted)
+                                if let caveats = dimension.caveats, !caveats.isEmpty {
+                                    Text(caveats.joined(separator: " "))
+                                        .font(.caption2)
+                                        .foregroundStyle(SpendFlowTheme.warning)
+                                }
                             }
                             Spacer()
-                            HStack(spacing: 4) {
-                                trendIcon(dimension.trend)
-                                Text("\(Int(dimension.score.rounded()))")
-                                    .font(.title3.weight(.bold).monospacedDigit())
-                                    .foregroundStyle(AnalyticsUI.scoreColor(dimension.score))
+                            VStack(alignment: .trailing, spacing: 2) {
+                                if let confidence = dimension.confidence {
+                                    Text("\(Int(confidence * 100))% conf.")
+                                        .font(.caption2)
+                                        .foregroundStyle(SpendFlowTheme.textMuted)
+                                }
+                                HStack(spacing: 4) {
+                                    trendIcon(dimension.trend)
+                                    Text("\(Int(dimension.score.rounded()))")
+                                        .font(.title3.weight(.bold).monospacedDigit())
+                                        .foregroundStyle(AnalyticsUI.scoreColor(dimension.score))
+                                }
                             }
                         }
                         ProgressBarRow(

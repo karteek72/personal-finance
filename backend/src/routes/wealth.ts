@@ -9,6 +9,7 @@ import {
   getNetWorth,
   HOLDING_SORTABLE,
 } from "../services/investments-store.js";
+import { parsePositionKindFilter } from "../services/portfolio-analytics.js";
 import { getFire, updateFireProfile } from "../services/planning-store.js";
 
 const patchFireSchema = z
@@ -45,14 +46,19 @@ export const wealthRoutes: FastifyPluginAsync = async (app) => {
       defaultSort: "value",
       defaultDir: "desc",
     });
+    const queryObj =
+      typeof request.query === "object" && request.query != null
+        ? request.query
+        : {};
     const accountId =
-      typeof request.query === "object" &&
-      request.query != null &&
-      "accountId" in request.query &&
-      typeof request.query.accountId === "string"
-        ? request.query.accountId
+      "accountId" in queryObj && typeof queryObj.accountId === "string"
+        ? queryObj.accountId
         : undefined;
-    return getInvestments(user.id, query, accountId);
+    const kind =
+      "kind" in queryObj && typeof queryObj.kind === "string"
+        ? parsePositionKindFilter(queryObj.kind)
+        : "all";
+    return getInvestments(user.id, query, { accountId, kind });
   });
 
   app.get("/wealth/fire", async (request) => {

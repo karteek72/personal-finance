@@ -168,6 +168,36 @@ struct PlaidSyncResponse: Codable, Sendable {
     let removed: Int
 }
 
+struct PlaidSyncAllResponse: Codable, Sendable {
+    struct Failure: Codable, Sendable {
+        let itemId: String
+        let institutionName: String?
+        let message: String
+    }
+
+    let status: String
+    let itemsSynced: Int
+    let added: Int
+    let modified: Int
+    let removed: Int
+    let message: String?
+    let failures: [Failure]?
+}
+
+struct TellerConnectConfig: Codable, Sendable {
+    let applicationId: String
+    let environment: String
+    let products: [String]
+}
+
+struct TellerExchangeResponse: Codable, Sendable {
+    let enrollmentId: String
+    let institutionName: String
+    let accountsSynced: Int
+    let transactionsAdded: Int
+    let message: String
+}
+
 struct DeleteAccountResponse: Codable, Sendable {
     let id: String
     let name: String

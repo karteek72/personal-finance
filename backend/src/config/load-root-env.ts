@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadDotenv } from "dotenv";
+import { resolveInfraUrlsForHostRuntime } from "./resolve-infra-urls.js";
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +36,7 @@ export function loadRootEnv(): string {
     const envPath = resolve(root, ".env");
     if (existsSync(envPath)) {
       loadDotenv({ path: envPath });
+      resolveInfraUrlsForHostRuntime();
     }
     loaded = true;
   }

@@ -156,6 +156,12 @@ spendflow_load_env() {
   export NEXT_PUBLIC_GOOGLE_CLIENT_ID="${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-${GOOGLE_CLIENT_ID:-}}"
   export NEXT_PUBLIC_USE_MOCKS="${NEXT_PUBLIC_USE_MOCKS:-false}"
 
+  # Backend invite links + SnapTrade callback (override dev localhost when deploy.env sets public URLs).
+  export UI_APP_URL="${UI_APP_URL:-${NEXT_PUBLIC_APP_URL:-${SPENDFLOW_UI_PUBLIC_URL:-http://localhost:3002}}}"
+  if [[ -z "${SNAPTRADE_REDIRECT_URI:-}" ]]; then
+    export SNAPTRADE_REDIRECT_URI="${UI_APP_URL%/}/accounts/snaptrade/callback"
+  fi
+
   spendflow_validate_host
   spendflow_resolve_runtime_cors
 }
@@ -392,22 +398,9 @@ spendflow_prepare_postgres() {
     return 0
   fi
   export SPENDFLOW_COMPOSE_PROFILE=bundled-db
-  export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@postgres:5432/${POSTGRES_DB:-spendflow}"
-  spendflow_write_container_env_var DATABASE_URL "${DATABASE_URL}"
-}
-
-spendflow_write_container_env_var() {
-  local key="$1"
-  local value="$2"
-  local env_file
-  env_file="$(spendflow_root_env_file)"
-
-  touch "${env_file}"
-  if grep -qE "^[[:space:]]*${key}=" "${env_file}" 2>/dev/null; then
-    spendflow_sed_inplace "${env_file}" "s|^[[:space:]]*${key}=.*|${key}=${value}|"
-  else
-    echo "${key}=${value}" >>"${env_file}"
-  fi
+  # Podman DNS resolves compose service names (postgres/redis) to 127.0.0.1 inside
+  # containers; use container_name hostnames from compose.yaml instead.
+  export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@spendflow-postgres:5432/${POSTGRES_DB:-spendflow}"
 }
 
 # Container API/worker must reach Redis on spendflow-net — not localhost from dev .env.
@@ -420,9 +413,14 @@ spendflow_prepare_redis() {
     return 0
   fi
 
-  export REDIS_URL="redis://redis:6379"
-  spendflow_write_container_env_var REDIS_URL "${REDIS_URL}"
+  export REDIS_URL="redis://spendflow-redis:6379"
   echo "info: container REDIS_URL=${REDIS_URL} (host bind port ${REDIS_HOST_PORT:-6380} is for local dev only)" >&2
+}
+
+# Host npm dev: always reach bundled Postgres/Redis via published ports (never mutate .env).
+spendflow_apply_host_infra_urls() {
+  export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@127.0.0.1:${POSTGRES_HOST_PORT:-5433}/${POSTGRES_DB:-spendflow}"
+  export REDIS_URL="redis://127.0.0.1:${REDIS_HOST_PORT:-6380}"
 }
 
 # Values compose substitutes from the shell (see compose.yaml ${VAR} entries).
@@ -437,6 +435,7 @@ spendflow_export_compose_runtime_env() {
   export PLAID_CLIENT_ID PLAID_SECRET PLAID_ENV PLAID_PRODUCTS PLAID_COUNTRY_CODES PLAID_REDIRECT_URI
   export GOOGLE_CLIENT_ID GOOGLE_CLIENT_IDS GOOGLE_SECRET_KEY AUTH_ALLOW_DEV_USER
   export TELLER_APPLICATION_ID TELLER_ENV TELLER_CERT_PATH TELLER_KEY_PATH
+  export UI_APP_URL
   export SNAPTRADE_CLIENT_ID SNAPTRADE_CONSUMER_KEY SNAPTRADE_CLIENT_SECRET SNAPTRADE_REDIRECT_URI
 }
 
@@ -506,8 +505,7 @@ spendflow_load_dev_env() {
   export POSTGRES_HOST_PORT="${POSTGRES_HOST_PORT:-5433}"
   export REDIS_HOST_PORT="${REDIS_HOST_PORT:-6380}"
 
-  export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@127.0.0.1:${POSTGRES_HOST_PORT}/${POSTGRES_DB:-spendflow}"
-  export REDIS_URL="redis://127.0.0.1:${REDIS_HOST_PORT}"
+  spendflow_apply_host_infra_urls
   export PORT="${SPENDFLOW_DEV_API_PORT}"
   export NODE_ENV=development
   export AUTH_ALLOW_DEV_USER="${AUTH_ALLOW_DEV_USER:-true}"
@@ -525,9 +523,8 @@ spendflow_load_dev_env() {
 
 spendflow_dev_start_infra() {
   export SPENDFLOW_COMPOSE_PROFILE=bundled-db
-  # Host API/UI use 127.0.0.1 — do not call spendflow_prepare_postgres (container DNS + .env rewrite).
-  export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@127.0.0.1:${POSTGRES_HOST_PORT}/${POSTGRES_DB:-spendflow}"
-  export REDIS_URL="redis://127.0.0.1:${REDIS_HOST_PORT}"
+  # Host API/UI use 127.0.0.1 — do not call spendflow_prepare_postgres (container DNS).
+  spendflow_apply_host_infra_urls
   echo "==> Starting Postgres + Redis (containers on spendflow-net)"
   echo "    Postgres: 127.0.0.1:${POSTGRES_HOST_PORT} (volume spendflow-pgdata)"
   echo "    Redis:    127.0.0.1:${REDIS_HOST_PORT} (volume spendflow-redisdata)"

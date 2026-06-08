@@ -1,6 +1,6 @@
 # Development Task Board
 
-**Last updated:** 2026-06-07 (115/115 complete — all tasks done)  
+**Last updated:** 2026-06-08 (124/124 complete — all tasks done)  
 **Source of truth:** [`tasks.yaml`](tasks.yaml)  
 **CLI:** `npm run task -- <command>` from repo root
 
@@ -45,10 +45,10 @@
 
 | Status | Count |
 |--------|------:|
-| done | 104 |
+| done | 124 |
 | ready | 0 |
 | in_progress | 0 |
-| backlog | 1 |
+| backlog | 0 |
 
 **Statement import + GDPR export: complete.**
 
@@ -58,7 +58,7 @@ analytics layer shipped fabricated/duplicated/stubbed metrics; see
 for the audit, taxonomy, data model, and scoring frameworks. Tasks are scoped for
 **parallel** work by independent agents.
 
-**Next:** `TASK-PROFILE-004` (annualGrossIncome cross-check); `employmentStatus` consumer TBD.
+**Done:** Investments holdings redesign (`TASK-INV-001`–`009`) — account filter, portfolio analytics, split stocks/options tables, trim-losers what-if.
 
 ---
 
@@ -292,6 +292,22 @@ numbers until the next sync. Design: `analytics-architecture.md` §19.
 
 ---
 
+### Investments / holdings analytics (INV-series) — **complete**
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-INV-001 | ui | Filter holdings by account | — |
+| TASK-INV-002 | ui | Remove duplicate account list from Investments | — |
+| TASK-INV-003 | backend | Winners/losers, win rate, best/worst, concentration, sector value+P/L, profit/loss split | — |
+| TASK-INV-004 | backend | Portfolio-value time series for trend chart | — |
+| TASK-INV-005 | ui | Enriched KPI header + allocation/sector-P/L/winners-losers/trend charts | INV-003 |
+| TASK-INV-006 | backend | `kind` (stocks/options) filter on positions | — |
+| TASK-INV-007 | ui | Split Holdings into Stocks/ETFs + Options tables | INV-006 |
+| TASK-INV-008 | backend | Prune-losers what-if + momentum scoring | — |
+| TASK-INV-009 | ui | "Trim losers" optimizer card | INV-008 |
+
+---
+
 ### iOS feature parity (Phase 4, P4)
 
 The SwiftUI app has the core (Auth + AppLock, push, Dashboard, MoneyFlow, Categories, Transactions,
@@ -322,10 +338,43 @@ feature views in parallel.
 
 ---
 
+### iOS web-parity, wave 2 (IOS-012–028 + DOCS) — P4
+
+Foundation + per-domain screens (IOS-001–011) are **done**. A fresh audit (web inventory vs the
+actual iOS code — STRUCTURE.md is stale) found these remaining gaps vs the current `ui/` surface.
+Design: `analytics-architecture.md` §21.
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-IOS-012 | ios | Transactions: search/filters/sort/scope/member pills/CSV export | IOS-001 |
+| TASK-IOS-013 | ios | Transaction re-categorize (write) + remember-for-merchant | IOS-001 |
+| TASK-IOS-014 | ios | Dashboard spend-analytics charts + filter bar + drilldown | IOS-001, CHARTS-001 |
+| TASK-IOS-015 | ios | Spend/Categories: cash-flow strips + category analytics charts | IOS-001, CHARTS-001 |
+| TASK-IOS-016 | ios | Merchants income-analytics sub-tab (/insights/merchants) | IOS-001 |
+| TASK-IOS-017 | ios | Investments enrichment (KPIs, sector/winners charts, splits, trim-losers) | INV-003/006/008 |
+| TASK-IOS-018 | ios | Wealth Time Machine screen | IOS-001, CHARTS-001 |
+| TASK-IOS-019 | ios | Forecast viz (weather hero, 7-day strip, balance chart) | IOS-001, CHARTS-001 |
+| TASK-IOS-020 | ios | Accounts: Teller connect, delete, sync-all, Plaid reconnect | IOS-001 |
+| TASK-IOS-021 | ios | In-app notification center (alerts bell + history) | IOS-001 |
+| TASK-IOS-022 | ios | Coach interactive Q&A (/coach/ask) | IOS-001 |
+| TASK-IOS-023 | ios | Household invite accept (deep link + preview/accept) | IOS-001 |
+| TASK-IOS-024 | ios | Statement import completeness (retry/cancel/account mapping) | IOS-IMPORT-001 |
+| TASK-IOS-025 | ios | User-controlled date/period range across analytics | IOS-001 |
+| TASK-IOS-026 | ios | Settings expansion (profile/notifications/export/legal) | IOS-001 |
+| TASK-IOS-027 | ios | Surface metric envelope (live badge + confidence/caveats) | IOS-001 |
+| TASK-IOS-028 | ios | FIRE scenario-comparison cards (backlog) | IOS-001 |
+| TASK-IOS-DOCS-001 | ios | Refresh ios/STRUCTURE.md + README to match the app | — |
+
+**Highest user-visible gaps:** transaction filters + re-categorize (IOS-012/013), dashboard/category
+charts (IOS-014/015), and the enriched investments surface (IOS-017).
+
+---
+
 ## Recently completed
 
 | ID | Title |
 |----|-------|
+| TASK-INV-001–009 | Investments holdings redesign — account filter, KPI charts, split tables, trim-losers |
 | TASK-RECON-001 | Reconcile paired transfer legs (R1) |
 | TASK-RECON-002 | Wire data-quality transfer-pair coverage (R2) |
 | TASK-RECON-003 | Self-transfer fallback + unpaired signal (R3) |

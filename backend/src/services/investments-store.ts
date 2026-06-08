@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import {
   accounts,
@@ -28,6 +28,23 @@ import {
 import { resolveHouseholdContext } from "./household-access.js";
 import { getNetWorthTrendFromBalanceSnapshots } from "./balance-snapshots.js";
 import { splitBalanceForNetWorth } from "../config/account-types.js";
+import { getPruneLosersAnalysis } from "./investment-prune.js";
+import {
+  computePortfolioAnalytics,
+  filterPositionsByKind,
+  type PortfolioAnalytics,
+  type PositionKindFilter,
+} from "./portfolio-analytics.js";
+import {
+  buildDbSectorMap,
+  buildPortfolioSectorHints,
+  collectSectorLookupTickers,
+  collectTickersNeedingSectorBackfill,
+} from "./security-sector.js";
+import {
+  getPortfolioValueTrend,
+  type PortfolioValueTrend,
+} from "./portfolio-value-trend.js";
 
 export type {
   InvestmentPosition,
@@ -62,11 +79,18 @@ export const HOLDING_SORTABLE = [
   "costBasis",
 ] as const;
 
+export type { PortfolioAnalytics, PositionKindFilter } from "./portfolio-analytics.js";
+export type { PortfolioValueTrend } from "./portfolio-value-trend.js";
+export type { PruneLosersResponse } from "./investment-prune.js";
+
 export interface InvestmentsResponse {
   portfolioValue: string;
   totalCostBasis: string;
   totalGainLoss: string;
   totalGainLossPercent: number;
+  portfolioAnalytics: PortfolioAnalytics;
+  portfolioValueTrend: PortfolioValueTrend;
+  pruneLosers: import("./investment-prune.js").PruneLosersResponse;
   accounts: Array<{
     accountId: string;
     name: string;
@@ -138,11 +162,25 @@ function holdingSortKey(
   }
 }
 
+async function backfillMissingSecuritySectors(
+  db: ReturnType<typeof getDb>,
+  rows: ReadonlyArray<{ ticker: string; sector: string | null; assetType: string }>,
+): Promise<void> {
+  const updates = collectTickersNeedingSectorBackfill(rows);
+  for (const row of updates) {
+    await db
+      .update(securities)
+      .set({ sector: row.sector })
+      .where(and(eq(securities.ticker, row.ticker), isNull(securities.sector)));
+  }
+}
+
 export async function getInvestments(
   userId: string,
   q: ParsedListQuery,
-  accountId?: string,
+  options: { accountId?: string; kind?: PositionKindFilter } = {},
 ): Promise<InvestmentsResponse> {
+  const { accountId, kind = "all" } = options;
   const ctx = await resolveHouseholdContext(userId);
   const db = getDb();
 
@@ -212,7 +250,9 @@ export async function getInvestments(
     ? positions.filter((p) => p.accountId === accountId)
     : positions;
 
-  const positionsPage = paginateInMemory(scopedPositions, q, {
+  const kindFilteredPositions = filterPositionsByKind(scopedPositions, kind);
+
+  const positionsPage = paginateInMemory(kindFilteredPositions, q, {
     sortKey: holdingSortKey,
     textFilter: (row, needle) =>
       row.ticker.toLowerCase().includes(needle) ||
@@ -248,6 +288,37 @@ export async function getInvestments(
   const displayPortfolioValue =
     portfolioValue > 0 ? portfolioValue : accountBalanceTotal;
 
+  const sectorTickers = collectSectorLookupTickers(scopedPositions);
+  const sectorRows =
+    sectorTickers.length > 0
+      ? await db
+          .select({
+            ticker: securities.ticker,
+            sector: securities.sector,
+            assetType: securities.assetType,
+          })
+          .from(securities)
+          .where(inArray(securities.ticker, sectorTickers))
+      : [];
+  const dbSectors = buildDbSectorMap(sectorRows);
+  void backfillMissingSecuritySectors(db, sectorRows).catch(() => undefined);
+  const portfolioSectorHints = buildPortfolioSectorHints(
+    scopedPositions,
+    dbSectors,
+  );
+
+  const portfolioAnalytics = computePortfolioAnalytics(
+    scopedPositions,
+    displayPortfolioValue,
+    dbSectors,
+    portfolioSectorHints,
+  );
+  const portfolioValueTrend = await getPortfolioValueTrend(
+    ctx.userIds,
+    accountId,
+  );
+  const pruneLosers = await getPruneLosersAnalysis(userId, accountId);
+
   return {
     portfolioValue: formatMoneyAmount(displayPortfolioValue),
     totalCostBasis: formatMoneyAmount(totalCostBasis),
@@ -256,6 +327,9 @@ export async function getInvestments(
       totalCostBasis > 0
         ? roundPercent((totalGainLoss / totalCostBasis) * 100)
         : 0,
+    portfolioAnalytics,
+    portfolioValueTrend,
+    pruneLosers,
     accounts: investmentAccounts.map((a) => ({
       accountId: a.id,
       name: a.name,

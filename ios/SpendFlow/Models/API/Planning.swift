@@ -232,6 +232,25 @@ struct RecurringResponse: Codable, Sendable {
     let subscriptions: Page<RecurringItem>
     let bills: Page<RecurringItem>
     let leaks: Leaks
+    let timeMachine: TimeMachineData?
+
+    struct TimeMachineData: Codable, Sendable {
+        let lookbackYears: Int
+        let investMultiple: Double
+        let investMultipleBasis: String
+        let futureCompoundRate: Double
+        let futureYears: Int
+        let habits: [Habit]
+
+        struct Habit: Codable, Identifiable, Sendable {
+            var id: String
+            let emoji: String?
+            let label: String
+            let spent: String
+            let investedValue: String
+            let yearsAgo: Int
+        }
+    }
 }
 
 struct CalendarResponse: Codable, Sendable {

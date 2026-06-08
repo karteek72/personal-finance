@@ -58,13 +58,36 @@ struct TransactionFilters: Sendable {
     }
 }
 
-enum TransactionSort: String, Sendable {
+enum TransactionSort: String, Sendable, CaseIterable {
     case dateDesc = "date_desc"
     case dateAsc = "date_asc"
     case amountDesc = "amount_desc"
     case amountAsc = "amount_asc"
     case nameAsc = "name_asc"
     case categoryAsc = "category_asc"
+
+    var label: String {
+        switch self {
+        case .dateDesc: "Newest"
+        case .dateAsc: "Oldest"
+        case .amountDesc: "Biggest first"
+        case .amountAsc: "Smallest first"
+        case .nameAsc: "Name A–Z"
+        case .categoryAsc: "Category A–Z"
+        }
+    }
+}
+
+struct UpdateTransactionCategoryResponse: Codable, Sendable {
+    struct TransactionPatch: Codable, Sendable {
+        let id: String
+        let category: String
+        let subCategory: String?
+        let merchantKey: String
+    }
+
+    let transaction: TransactionPatch
+    let merchantTransactionsUpdated: Int
 }
 
 enum ViewScope: String, Codable, Sendable {

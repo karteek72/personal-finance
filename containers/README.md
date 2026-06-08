@@ -97,6 +97,17 @@ cp .env.example .env
 
 Log files: `logs/dev/api.log`, `logs/dev/ui.log`.
 
+### Switching between npm dev and Podman deploy
+
+Both modes share the **same Postgres/Redis volumes** on `127.0.0.1:5433` / `6380`. Set `POSTGRES_PASSWORD` once in repo-root `.env` — it is the single source of truth.
+
+| Mode | Command | DATABASE_URL at runtime |
+|------|---------|-------------------------|
+| npm dev | `npm run dev` / `npm run dev:api` | `127.0.0.1:5433` (auto-rewritten from docker hostnames) |
+| Podman deploy | `./scripts/podman/deploy.sh` | `postgres:5432` inside containers only (shell export, not written to `.env`) |
+
+`deploy.sh` no longer mutates `.env`. If you previously saw `password authentication failed` after deploy, restart npm dev — the backend rewrites `postgres`/`redis` hostnames to localhost when not in a container.
+
 ## Cloudflare Tunnel (existing `cloudflared` pod)
 
 **Do not** add `cloudflared` to SpendFlow compose. Use your running pod (`tunnel --no-autoupdate run --token …`).

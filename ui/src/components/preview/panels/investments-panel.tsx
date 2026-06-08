@@ -1,34 +1,85 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import {
-  FeaturePanelLoading,
-} from "@/components/preview/feature-empty-state";
+import { FeaturePanelLoading } from "@/components/preview/feature-empty-state";
 import { useFeaturePanelGate } from "@/components/preview/use-feature-panel-gate";
-import { HoldingsPortfolioSection } from "@/components/preview/panels/holdings-portfolio-section";
-import { useAccounts } from "@/hooks/use-accounts";
+import { HoldingsTable } from "@/components/preview/panels/holdings-portfolio-section";
+import { InvestmentsKpiSection } from "@/components/preview/panels/investments-kpi-section";
+import { TrimLosersCard } from "@/components/preview/panels/trim-losers-card";
 import { useInvestments } from "@/hooks/use-features";
 
-export function InvestmentsPanel() {
-  const [activeTab, setActiveTab] = useState<"portfolio" | "behavioral">("portfolio");
+type InvestmentsTab = "stocks" | "options" | "behavioral";
+
+function fmt(n: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
+}
+
+function TabButton({
+  active,
+  onClick,
+  label,
+  meta,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  meta?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`border-b-2 px-1 pb-2 text-sm font-semibold transition-colors ${
+        active
+          ? "border-primary text-text"
+          : "border-transparent text-text-muted hover:text-text"
+      }`}
+    >
+      {label}
+      {meta ? (
+        <span className="ml-1.5 text-xs font-normal text-text-muted">{meta}</span>
+      ) : null}
+    </button>
+  );
+}
+
+function InvestmentsPanelContent() {
+  const [activeTab, setActiveTab] = useState<InvestmentsTab>("stocks");
   const gate = useFeaturePanelGate("investments");
-  const { data, isLoading } = useAccounts();
-  const { data: investments } = useInvestments();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const accountId = searchParams.get("accountId") ?? "";
+
+  const { data: investments, isLoading } = useInvestments({
+    accountId: accountId || undefined,
+    page: 1,
+    pageSize: 1,
+    sort: "value",
+    dir: "desc",
+  });
+
+  const setAccountId = useCallback(
+    (next: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (next) params.set("accountId", next);
+      else params.delete("accountId");
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
 
   if (!gate.ready) return gate.node;
-  if (isLoading) return <FeaturePanelLoading />;
+  if (isLoading && !investments) return <FeaturePanelLoading />;
 
-  function fmt(n: number) {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
-  }
-
-  const investmentAccounts = (data?.accounts ?? []).filter((a) => a.type === "investment");
-  const portfolioValue = investments?.portfolioValue
-    ? Number.parseFloat(investments.portfolioValue)
-    : investmentAccounts.reduce((s, a) => s + Number.parseFloat(a.balanceCurrent ?? "0"), 0);
-
+  const investmentAccounts = investments?.accounts ?? [];
   const portfolioBreakdown = investments?.portfolioBreakdown ?? {
     stocksValue: "0",
     optionsValue: "0",
@@ -39,141 +90,202 @@ export function InvestmentsPanel() {
     totalPositionCount: 0,
     otherValue: "0",
   };
-  const hasHoldings =
-    (investments?.positions?.total ?? investments?.positions?.rows.length ?? 0) > 0;
-
+  const hasHoldings = portfolioBreakdown.totalPositionCount > 0;
   const behavioralAlerts = investments?.behavioralAlerts ?? [];
   const monthlyActivity = investments?.monthlyActivity ?? null;
 
+  const stocksMeta = hasHoldings
+    ? `${fmt(Number.parseFloat(portfolioBreakdown.stocksValue))} · ${portfolioBreakdown.stockPositionCount}`
+    : undefined;
+  const optionsMeta = hasHoldings
+    ? `${fmt(Number.parseFloat(portfolioBreakdown.optionsValue))} · ${portfolioBreakdown.optionPositionCount}`
+    : undefined;
+
   return (
     <div className="space-y-5">
-      {/* Portfolio value (real) */}
-      <div className="rounded-[var(--radius-lg)] p-5" style={{ background: "var(--gradient-hero)" }}>
-        <p className="text-sm font-medium text-white/70">Portfolio value</p>
-        <p className="mt-1 text-5xl font-extrabold tracking-tight text-white">
-          {isLoading ? "—" : fmt(portfolioValue)}
-        </p>
-        <p className="mt-2 text-xs text-white/60">
-          {investmentAccounts.length > 0
-            ? `${investmentAccounts.length} investment account${investmentAccounts.length === 1 ? "" : "s"} connected`
-            : "No brokerage connected"}
-        </p>
-      </div>
-
-      {/* Real investment accounts */}
       {investmentAccounts.length > 0 ? (
-        <div className="space-y-2">
-          <p className="px-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Accounts</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            Account
+          </span>
+          <button
+            type="button"
+            onClick={() => setAccountId("")}
+            className={`rounded-[var(--radius-pill)] px-3 py-1.5 text-xs font-semibold ${
+              !accountId
+                ? "bg-primary text-text-inverse"
+                : "bg-surface text-text-muted card-shadow"
+            }`}
+          >
+            All accounts
+          </button>
           {investmentAccounts.map((a) => (
-            <div key={a.id} className="flex items-center justify-between rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3">
-              <div>
-                <p className="text-sm font-semibold text-text">{a.name}</p>
-                <p className="text-xs text-text-muted">{a.institutionName}{a.mask ? ` ····${a.mask}` : ""}</p>
-              </div>
-              <p className="text-sm font-bold text-text">{fmt(Number.parseFloat(a.balanceCurrent ?? "0"))}</p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        !isLoading && (
-          <div className="rounded-[var(--radius-lg)] border border-dashed border-border bg-surface p-6 text-center">
-            <p className="text-sm font-semibold text-text">No investment accounts connected</p>
-            <p className="mt-1 text-xs text-text-muted">Link a brokerage to track your portfolio value here.</p>
-            <Link
-              href="/accounts"
-              className="mt-3 inline-block rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold text-white"
-              style={{ background: "var(--gradient-hero)" }}
-            >
-              Connect a brokerage
-            </Link>
-          </div>
-        )
-      )}
-
-      {/* Holdings & behavioral analysis */}
-      <div className="rounded-[var(--radius-lg)] border border-border bg-surface-raised/40 p-4">
-        <p className="mb-3 text-sm font-bold text-text">Holdings &amp; behavioral insights</p>
-        <div className="mb-3 flex gap-1 rounded-[var(--radius-sm)] bg-surface-raised p-1">
-          {(["portfolio", "behavioral"] as const).map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 rounded-[var(--radius-sm)] py-1.5 text-sm font-semibold transition-all ${
-                activeTab === tab ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"
+              key={a.accountId}
+              type="button"
+              onClick={() => setAccountId(a.accountId)}
+              className={`rounded-[var(--radius-pill)] px-3 py-1.5 text-xs font-semibold ${
+                accountId === a.accountId
+                  ? "bg-primary text-text-inverse"
+                  : "bg-surface text-text-muted card-shadow"
               }`}
             >
-              {tab === "portfolio" ? "Holdings" : "Behavioral Patterns"}
+              {a.name} ({fmt(Number.parseFloat(a.value))})
             </button>
           ))}
         </div>
+      ) : (
+        <div className="rounded-[var(--radius-lg)] border border-dashed border-border bg-surface p-6 text-center">
+          <p className="text-sm font-semibold text-text">No investment accounts connected</p>
+          <p className="mt-1 text-xs text-text-muted">
+            Link a brokerage to track your portfolio value here.
+          </p>
+          <Link
+            href="/accounts"
+            className="mt-3 inline-block rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold text-white"
+            style={{ background: "var(--gradient-hero)" }}
+          >
+            Connect a brokerage
+          </Link>
+        </div>
+      )}
 
-        {activeTab === "portfolio" && (
-          hasHoldings ? (
-            <HoldingsPortfolioSection portfolioBreakdown={portfolioBreakdown} />
+      {investments ? <InvestmentsKpiSection data={investments} /> : null}
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end gap-x-5 gap-y-1 border-b border-border">
+          <TabButton
+            active={activeTab === "stocks"}
+            onClick={() => setActiveTab("stocks")}
+            label="Stocks & ETFs"
+            meta={stocksMeta}
+          />
+          <TabButton
+            active={activeTab === "options"}
+            onClick={() => setActiveTab("options")}
+            label="Options"
+            meta={optionsMeta}
+          />
+          <TabButton
+            active={activeTab === "behavioral"}
+            onClick={() => setActiveTab("behavioral")}
+            label="Behavioral"
+            meta={
+              behavioralAlerts.length > 0
+                ? `${behavioralAlerts.length} alert${behavioralAlerts.length === 1 ? "" : "s"}`
+                : undefined
+            }
+          />
+        </div>
+
+        {activeTab === "stocks" &&
+          (hasHoldings ? (
+            <HoldingsTable
+              kind="stocks"
+              queryPrefix="holdingsStocks"
+              accountId={accountId || undefined}
+            />
           ) : (
-            <p className="px-1 py-4 text-center text-sm text-text-muted">
+            <p className="py-6 text-center text-sm text-text-muted">
               {investmentAccounts.length > 0
-                ? "No positions stored yet. Sync your brokerage from Accounts — holdings appear after sync completes."
-                : "No holdings synced yet. Connect a brokerage and run sync to see positions here."}
+                ? "No positions stored yet. Sync your brokerage from Accounts."
+                : "Connect a brokerage and run sync to see holdings."}
             </p>
-          )
-        )}
+          ))}
+
+        {activeTab === "options" &&
+          (hasHoldings && portfolioBreakdown.optionPositionCount > 0 ? (
+            <HoldingsTable
+              kind="options"
+              queryPrefix="holdingsOptions"
+              accountId={accountId || undefined}
+            />
+          ) : (
+            <p className="py-6 text-center text-sm text-text-muted">
+              {hasHoldings
+                ? "No options in this portfolio."
+                : "No holdings synced yet."}
+            </p>
+          ))}
 
         {activeTab === "behavioral" && (
-          <div className="space-y-3">
+          <div className="space-y-3 pt-1">
             {behavioralAlerts.length === 0 && !monthlyActivity ? (
-              <p className="px-1 py-4 text-center text-sm text-text-muted">
-                No behavioral insights yet. Sync your brokerage to see portfolio health and trading-style patterns.
+              <p className="py-4 text-center text-sm text-text-muted">
+                No behavioral insights yet. Sync your brokerage to see portfolio health patterns.
               </p>
             ) : null}
-            {behavioralAlerts.map((alert, i) => (
-              <div
-                key={i}
-                className={`rounded-[var(--radius-md)] border p-4 ${
-                  alert.type === "warning"
-                    ? "border-warning/30 bg-warning/5"
-                    : alert.type === "positive"
-                    ? "border-primary/30 bg-primary/5"
-                    : "border-border bg-surface"
-                }`}
-              >
-                <p className={`text-sm font-semibold ${
-                  alert.type === "warning" ? "text-warning" : alert.type === "positive" ? "text-primary" : "text-text"
-                }`}>
-                  {alert.title}
-                </p>
-                <p className="mt-1 text-xs text-text-muted leading-relaxed">{alert.desc}</p>
+
+            {behavioralAlerts.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {behavioralAlerts.map((alert, i) => (
+                  <div
+                    key={i}
+                    className={`rounded-[var(--radius-md)] border px-3 py-2.5 ${
+                      alert.type === "warning"
+                        ? "border-warning/30 bg-warning/5"
+                        : alert.type === "positive"
+                          ? "border-primary/30 bg-primary/5"
+                          : "border-border bg-surface"
+                    }`}
+                  >
+                    <p
+                      className={`text-sm font-semibold ${
+                        alert.type === "warning"
+                          ? "text-warning"
+                          : alert.type === "positive"
+                            ? "text-primary"
+                            : "text-text"
+                      }`}
+                    >
+                      {alert.title}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-snug text-text-muted">{alert.desc}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : null}
 
             {monthlyActivity ? (
-              <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
-                <p className="mb-1 text-sm font-semibold text-text">Cash deployed this month</p>
-                <p className="mb-3 text-[10px] text-text-muted">
-                  Transfers in plus new purchases (options at contract cost, not inflated trade notional).
-                </p>
-                <p className="text-2xl font-extrabold text-success">
-                  {fmt(Number.parseFloat(monthlyActivity.totalDeployed))}
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div className="rounded-[var(--radius-sm)] bg-surface-raised p-3">
-                    <p className="text-xs text-text-muted">Contributions</p>
-                    <p className="text-sm font-bold text-text">
-                      {fmt(Number.parseFloat(monthlyActivity.cashContributions))}
-                    </p>
-                  </div>
-                  <div className="rounded-[var(--radius-sm)] bg-surface-raised p-3">
-                    <p className="text-xs text-text-muted">New buys</p>
-                    <p className="text-sm font-bold text-text">
-                      {fmt(Number.parseFloat(monthlyActivity.purchaseDeployments))}
-                    </p>
-                  </div>
+              <div className="flex flex-wrap items-center gap-4 rounded-[var(--radius-md)] border border-border bg-surface px-4 py-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                    Deployed this month
+                  </p>
+                  <p className="text-lg font-extrabold text-success">
+                    {fmt(Number.parseFloat(monthlyActivity.totalDeployed))}
+                  </p>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div>
+                  <p className="text-[10px] text-text-muted">Contributions</p>
+                  <p className="text-sm font-bold text-text">
+                    {fmt(Number.parseFloat(monthlyActivity.cashContributions))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-text-muted">New buys</p>
+                  <p className="text-sm font-bold text-text">
+                    {fmt(Number.parseFloat(monthlyActivity.purchaseDeployments))}
+                  </p>
                 </div>
               </div>
             ) : null}
+
+            {investments?.pruneLosers ? (
+              <TrimLosersCard pruneLosers={investments.pruneLosers} />
+            ) : null}
           </div>
         )}
-      </div>
+      </section>
     </div>
+  );
+}
+
+export function InvestmentsPanel() {
+  return (
+    <Suspense fallback={<FeaturePanelLoading />}>
+      <InvestmentsPanelContent />
+    </Suspense>
   );
 }

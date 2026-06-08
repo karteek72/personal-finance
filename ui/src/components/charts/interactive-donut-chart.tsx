@@ -7,8 +7,16 @@ import { Doughnut } from "react-chartjs-2";
 
 import { ChartShell } from "@/components/charts/chart-shell";
 import { formatCurrency } from "@/lib/chart-utils";
+import {
+  getAssetAllocationColor,
+  getChartPaletteColor,
+  getGicsSectorColor,
+  withAlpha,
+} from "@/lib/chart-colors";
 import { getCategoryColor, getSubCategoryColor } from "@/lib/category-colors";
 import type { ChartCategorySlice } from "@/types/api";
+
+export type DonutColorScheme = "category" | "diverse" | "sector" | "asset";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -18,6 +26,8 @@ interface InteractiveDonutChartProps {
   onSelectCategory: (category: string) => void;
   /** When set, slice colors use shades of this parent category (subcategory drill-down). */
   parentCategory?: string;
+  /** How slice colors are chosen. Default `category` (spending). */
+  colorScheme?: DonutColorScheme;
   title?: string;
   subtitle?: string;
   className?: string;
@@ -28,6 +38,7 @@ export function InteractiveDonutChart({
   selectedCategory,
   onSelectCategory,
   parentCategory,
+  colorScheme = "category",
   title = "By category",
   subtitle = "Click a slice to filter",
   className,
@@ -44,11 +55,26 @@ export function InteractiveDonutChart({
         {
           data: slices.map((slice) => Number.parseFloat(slice.amount)),
           backgroundColor: slices.map((slice, index) => {
-            const color = parentCategory
-              ? getSubCategoryColor(parentCategory, index)
-              : getCategoryColor(slice.name);
+            let color: string;
+            if (parentCategory) {
+              color = getSubCategoryColor(parentCategory, index);
+            } else {
+              switch (colorScheme) {
+                case "asset":
+                  color = getAssetAllocationColor(slice.name, index);
+                  break;
+                case "sector":
+                  color = getGicsSectorColor(slice.name, index);
+                  break;
+                case "diverse":
+                  color = getChartPaletteColor(index);
+                  break;
+                default:
+                  color = getCategoryColor(slice.name);
+              }
+            }
             if (selectedCategory && selectedCategory !== slice.name) {
-              return parentCategory ? `${color}` : `${color}55`;
+              return withAlpha(color, 0.35);
             }
             return color;
           }),
@@ -58,7 +84,7 @@ export function InteractiveDonutChart({
         },
       ],
     }),
-    [slices, selectedCategory, parentCategory],
+    [slices, selectedCategory, parentCategory, colorScheme],
   );
 
   const centerLabel = selectedCategory || "Total spent";

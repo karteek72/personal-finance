@@ -4,23 +4,76 @@ import SwiftUI
 @Observable
 final class CategoriesViewModel {
     var categories: [CategoryTotal] = []
+    var chartData: ChartDataResponse?
+    var accounts: [Account] = []
+    var selectedAccountId = ""
+    var selectedCategory = ""
     var isLoading = false
+    var isChartLoading = false
     var errorMessage: String?
 
-    func load(api: APIClient) async {
+    func load(api: APIClient, period: AnalyticsPeriodStore) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
+        let range = period.dateRange
+
         do {
-            let range = AnalyticsDateRange.rolling()
-            let response = try await api.getCategories(from: range.from, to: range.to)
+            async let categoriesTask = api.getCategories(from: range.from, to: range.to)
+            async let accountsTask = api.getAccounts()
+            let response = try await categoriesTask
+            accounts = try await accountsTask.accounts
             categories = response.categories.sorted { lhs, rhs in
                 (Decimal(string: lhs.amount) ?? 0) > (Decimal(string: rhs.amount) ?? 0)
             }
         } catch {
             errorMessage = error.localizedDescription
         }
+
+        await loadChartData(api: api, period: period)
+    }
+
+    func loadChartData(api: APIClient, period: AnalyticsPeriodStore) async {
+        isChartLoading = true
+        defer { isChartLoading = false }
+
+        let range = period.dateRange
+        var filters = ChartDataFilters(from: range.from, to: range.to)
+        if !selectedAccountId.isEmpty { filters.accountId = selectedAccountId }
+        if !selectedCategory.isEmpty { filters.category = selectedCategory }
+
+        do {
+            chartData = try await api.getChartData(filters: filters)
+        } catch {
+            if errorMessage == nil {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    var displayCategories: [CategoryTotal] {
+        guard let slices = chartData?.byCategory, !slices.isEmpty else {
+            return categories
+        }
+
+        let subMap = Dictionary(uniqueKeysWithValues: categories.map { ($0.name, $0.subcategories ?? []) })
+        let deltaMap = Dictionary(uniqueKeysWithValues: categories.map { ($0.name, $0.deltaVsPriorMonth) })
+
+        return slices.map { slice in
+            CategoryTotal(
+                name: slice.name,
+                amount: slice.amount,
+                percentage: slice.percentage,
+                deltaVsPriorMonth: deltaMap[slice.name] ?? 0,
+                subcategories: subMap[slice.name]
+            )
+        }
+    }
+
+    func clearFilters() {
+        selectedAccountId = ""
+        selectedCategory = ""
     }
 }
 
@@ -30,25 +83,123 @@ struct CategoriesView: View {
 
     var body: some View {
         SpendFlowScreen(title: "Spend", subtitle: "Where your money actually goes") {
-            if viewModel.isLoading, viewModel.categories.isEmpty {
+            if viewModel.isLoading, viewModel.categories.isEmpty, viewModel.chartData == nil {
                 LoadingStateView(message: "Crunching categories…")
-            } else if let error = viewModel.errorMessage, viewModel.categories.isEmpty {
+            } else if let error = viewModel.errorMessage, viewModel.categories.isEmpty, viewModel.chartData == nil {
                 ErrorStateView(message: error) {
-                    Task { await viewModel.load(api: appState.apiClient) }
+                    Task { await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod) }
                 }
             } else {
-                LazyVStack(spacing: 10) {
-                    ForEach(Array(viewModel.categories.enumerated()), id: \.element.id) { index, category in
-                        CategoryRow(category: category, rank: index + 1)
-                    }
+                AnalyticsPeriodPicker(store: appState.analyticsPeriod)
+                accountFilter
+
+                if viewModel.isChartLoading, viewModel.chartData == nil {
+                    LoadingStateView(message: "Loading charts…")
+                } else if let chartData = viewModel.chartData {
+                    CashFlowOverviewStrips(
+                        monthly: chartData.monthly,
+                        yearly: chartData.yearly,
+                        periodTitle: appState.analyticsPeriod.periodLabel,
+                        accountFiltered: !viewModel.selectedAccountId.isEmpty
+                    )
+
+                    categoryCharts(chartData)
                 }
+
+                breakdownList
             }
         }
         .refreshable {
-            await viewModel.load(api: appState.apiClient)
+            await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod)
         }
         .task(id: appState.refreshCenter.refreshToken) {
-            await viewModel.load(api: appState.apiClient)
+            await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod)
+        }
+        .onChange(of: appState.analyticsPeriod.period) { _, _ in
+            Task { await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod) }
+        }
+        .onChange(of: viewModel.selectedAccountId) { _, _ in
+            Task { await viewModel.loadChartData(api: appState.apiClient, period: appState.analyticsPeriod) }
+        }
+        .onChange(of: viewModel.selectedCategory) { _, _ in
+            Task { await viewModel.loadChartData(api: appState.apiClient, period: appState.analyticsPeriod) }
+        }
+    }
+
+    private var accountFilter: some View {
+        AnalyticsFilterBar(
+            accounts: viewModel.accounts,
+            categories: [],
+            selectedAccountId: $viewModel.selectedAccountId,
+            selectedCategory: $viewModel.selectedCategory,
+            selectedMemberId: .constant(""),
+            scope: .constant(.all),
+            showScope: false,
+            showMembers: false,
+            showCategories: false,
+            onClear: { viewModel.clearFilters() }
+        )
+    }
+
+    @ViewBuilder
+    private func categoryCharts(_ data: ChartDataResponse) -> some View {
+        SpendFlowDonutChart(
+            title: "By category",
+            subtitle: "Tap a slice to drill down",
+            slices: data.byCategory.map(DonutSlice.fromCategory),
+            selectedID: viewModel.selectedCategory.isEmpty ? nil : viewModel.selectedCategory,
+            onSelect: { category in
+                viewModel.selectedCategory = category
+            }
+        )
+
+        if !viewModel.selectedCategory.isEmpty, !data.bySubCategory.isEmpty {
+            SpendFlowDonutChart(
+                title: "\(viewModel.selectedCategory) breakdown",
+                subtitle: "Subcategories",
+                slices: data.bySubCategory.map(DonutSlice.fromCategory),
+                selectedID: nil,
+                onSelect: nil
+            )
+        }
+
+        SpendFlowChartView(
+            title: "Monthly cash flow",
+            points: data.monthly.map { point in
+                ChartDataPoint(
+                    id: point.month,
+                    label: AnalyticsUI.shortMonth(point.month),
+                    value: AnalyticsUI.parseAmount(point.expenses)
+                )
+            },
+            style: .line,
+            yAxisLabel: "Spent",
+            valueFormatter: { MoneyFormatter.format(String(format: "%.2f", $0)) }
+        )
+
+        SpendFlowTrendChart(
+            title: "Category trends",
+            subtitle: "Filters apply to all charts above",
+            trends: data.categoryTrends,
+            highlightedCategory: viewModel.selectedCategory.isEmpty ? nil : viewModel.selectedCategory,
+            onSelectCategory: { category in
+                viewModel.selectedCategory = category
+            }
+        )
+    }
+
+    private var breakdownList: some View {
+        LazyVStack(spacing: 10) {
+            ForEach(Array(viewModel.displayCategories.enumerated()), id: \.element.id) { index, category in
+                CategoryRow(
+                    category: category,
+                    rank: index + 1,
+                    isSelected: viewModel.selectedCategory == category.name
+                )
+                .onTapGesture {
+                    viewModel.selectedCategory = viewModel.selectedCategory == category.name ? "" : category.name
+                }
+            }
         }
     }
 }
@@ -56,6 +207,7 @@ struct CategoriesView: View {
 private struct CategoryRow: View {
     let category: CategoryTotal
     let rank: Int
+    var isSelected = false
 
     var body: some View {
         HStack(spacing: 14) {
@@ -85,11 +237,14 @@ private struct CategoryRow: View {
         .padding(14)
         .background {
             RoundedRectangle(cornerRadius: SpendFlowTheme.radiusCard, style: .continuous)
-                .fill(SpendFlowTheme.surface)
+                .fill(isSelected ? SpendFlowTheme.primarySoft : SpendFlowTheme.surface)
         }
         .overlay(
             RoundedRectangle(cornerRadius: SpendFlowTheme.radiusCard, style: .continuous)
-                .stroke(SpendFlowTheme.border.opacity(0.7), lineWidth: 1)
+                .stroke(
+                    isSelected ? SpendFlowTheme.primary.opacity(0.5) : SpendFlowTheme.border.opacity(0.7),
+                    lineWidth: 1
+                )
         )
     }
 

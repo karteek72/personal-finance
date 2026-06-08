@@ -20,6 +20,8 @@ enum FeatureRouting {
             InvestmentsView()
         case "fire":
             FireView()
+        case "time-machine":
+            TimeMachineView()
         case "budgets":
             BudgetsView()
         case "recurring", "audits":

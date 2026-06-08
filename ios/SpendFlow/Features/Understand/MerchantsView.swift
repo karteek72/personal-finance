@@ -1,14 +1,30 @@
 import SwiftUI
 
+private enum MerchantsTab: String, CaseIterable, Identifiable {
+    case merchants
+    case income
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .merchants: "Merchants"
+        case .income: "Income"
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class MerchantsViewModel {
     var rows: [MerchantRow] = []
     var summary: MerchantsSummary?
+    var incomeData: MerchantsResponse?
     var page = 1
     var totalPages = 1
     var query = ListQuery(page: 1, pageSize: 10, sort: "total", dir: .desc)
     var isLoading = false
+    var isLoadingIncome = false
     var errorMessage: String?
 
     func load(api: APIClient) async {
@@ -22,6 +38,17 @@ final class MerchantsViewModel {
             summary = response.summary
             page = response.page
             totalPages = response.totalPages
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func loadIncome(api: APIClient) async {
+        isLoadingIncome = true
+        defer { isLoadingIncome = false }
+
+        do {
+            incomeData = try await api.getMerchants()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -56,21 +83,54 @@ final class MerchantsViewModel {
 struct MerchantsView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel = MerchantsViewModel()
+    @State private var tab: MerchantsTab = .merchants
 
     var body: some View {
-        SpendFlowScreen(title: "Merchants", subtitle: "Top spend by merchant") {
-            content
+        SpendFlowScreen(title: "Merchants", subtitle: "Top spend & income analytics") {
+            tabPicker
+            switch tab {
+            case .merchants:
+                merchantsContent
+            case .income:
+                incomeContent
+            }
         }
         .refreshable {
-            await viewModel.load(api: appState.apiClient)
+            await reloadCurrentTab()
         }
         .task(id: appState.refreshCenter.refreshToken) {
             await viewModel.load(api: appState.apiClient)
+            await viewModel.loadIncome(api: appState.apiClient)
+        }
+    }
+
+    private var tabPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(MerchantsTab.allCases) { item in
+                let selected = tab == item
+                Button {
+                    tab = item
+                    Task { await reloadCurrentTab() }
+                } label: {
+                    Text(item.label)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(selected ? SpendFlowTheme.primary : SpendFlowTheme.surface, in: Capsule())
+                        .foregroundStyle(selected ? .white : SpendFlowTheme.textMuted)
+                        .overlay(Capsule().stroke(selected ? Color.clear : SpendFlowTheme.border))
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+            if tab == .income, let isLive = viewModel.incomeData?.isLive {
+                MetricLiveBadge(isLive: isLive)
+            }
         }
     }
 
     @ViewBuilder
-    private var content: some View {
+    private var merchantsContent: some View {
         if viewModel.isLoading, viewModel.rows.isEmpty, viewModel.summary == nil {
             LoadingStateView(message: "Loading merchants…")
         } else if let error = viewModel.errorMessage, viewModel.rows.isEmpty {
@@ -83,6 +143,118 @@ struct MerchantsView: View {
             }
             sortBar
             merchantsList
+        }
+    }
+
+    @ViewBuilder
+    private var incomeContent: some View {
+        if viewModel.isLoadingIncome, viewModel.incomeData == nil {
+            LoadingStateView(message: "Loading income…")
+        } else if let data = viewModel.incomeData {
+            if data.income.primary.isEmpty {
+                FeatureEmptyCard(
+                    title: "No income data yet",
+                    message: "Link accounts and sync transactions to see income analytics."
+                )
+            } else {
+                incomeKpis(data)
+                incomeStackedChart(data)
+                incomeInsightCard(data)
+            }
+        }
+    }
+
+    private func incomeKpis(_ data: MerchantsResponse) -> some View {
+        let summary = data.incomeSummary
+        let stability = summary.incomeStability
+        return VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                KpiCard(label: "Avg income", value: MoneyFormatter.format(summary.avgMonthlyIncome), emoji: "💰", tone: .primary)
+                KpiCard(
+                    label: "Stability",
+                    value: "\(Int(stability))%",
+                    emoji: "📊",
+                    tone: stability >= 90 ? .success : .warning
+                )
+            }
+            HStack(spacing: 12) {
+                KpiCard(label: "Side income", value: MoneyFormatter.format(summary.sideIncomeTotal), emoji: "✨", tone: .success)
+                KpiCard(label: "Sources", value: "\(data.incomeSources)", emoji: "🏦", tone: .neutral)
+            }
+        }
+    }
+
+    private func incomeStackedChart(_ data: MerchantsResponse) -> some View {
+        let months = data.income.months
+        let primary = data.income.primary
+        let side = data.income.side
+        let maxTotal = max(data.incomeSummary.maxBarTotal, 1)
+
+        return GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Income by month")
+                    .font(.headline)
+                Text("Primary salary + side income")
+                    .font(.caption)
+                    .foregroundStyle(SpendFlowTheme.textMuted)
+
+                HStack(alignment: .bottom, spacing: 8) {
+                    ForEach(Array(months.enumerated()), id: \.offset) { index, month in
+                        let p = primary.indices.contains(index) ? primary[index] : 0
+                        let s = side.indices.contains(index) ? side[index] : 0
+                        VStack(spacing: 4) {
+                            VStack(spacing: 0) {
+                                Rectangle()
+                                    .fill(SpendFlowTheme.success.opacity(0.85))
+                                    .frame(height: CGFloat(s / maxTotal) * 120)
+                                Rectangle()
+                                    .fill(SpendFlowTheme.primary.opacity(0.85))
+                                    .frame(height: CGFloat(p / maxTotal) * 120)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            Text(AnalyticsUI.shortMonth(month))
+                                .font(.caption2)
+                                .foregroundStyle(SpendFlowTheme.textMuted)
+                        }
+                    }
+                }
+                .frame(height: 150)
+
+                HStack(spacing: 16) {
+                    Label("Primary", systemImage: "circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(SpendFlowTheme.primary)
+                    Label("Side", systemImage: "circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(SpendFlowTheme.success)
+                }
+            }
+        }
+    }
+
+    private func incomeInsightCard(_ data: MerchantsResponse) -> some View {
+        let sideTotal = data.incomeSummary.sideIncomeTotal
+        let sideAmount = AnalyticsUI.parseAmount(sideTotal)
+        guard sideAmount > 0 else { return AnyView(EmptyView()) }
+
+        return AnyView(
+            GlassCard {
+                Label(
+                    "Side income contributed \(MoneyFormatter.format(sideTotal)) over the last 6 months across \(data.incomeSources) sources.",
+                    systemImage: "lightbulb.fill"
+                )
+                .font(.caption)
+            }
+        )
+    }
+
+    private func reloadCurrentTab() async {
+        switch tab {
+        case .merchants:
+            await viewModel.load(api: appState.apiClient)
+        case .income:
+            await viewModel.loadIncome(api: appState.apiClient)
         }
     }
 

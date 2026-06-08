@@ -28,7 +28,9 @@ export function useNetWorth() {
   return useQuery({ queryKey: ["net-worth"], queryFn: () => api.getNetWorth() });
 }
 
-export function useInvestments(params: ListQuery & { accountId?: string } = {}) {
+export function useInvestments(
+  params: ListQuery & { accountId?: string; kind?: import("@/types/api").PositionKindFilter } = {},
+) {
   return useQuery({
     queryKey: ["investments", params],
     queryFn: () => api.getInvestments(params),

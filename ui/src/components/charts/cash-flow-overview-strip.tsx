@@ -173,7 +173,7 @@ export function MonthlyCashFlowOverviewStrip({
       accountId={accountId}
       ariaLabel="Monthly cash flow overview"
       title={analyticsPeriodLabel()}
-      points={data.monthly.map((m: ChartMonthlyPoint) => ({
+      points={data.monthlyOverview.map((m: ChartMonthlyPoint) => ({
         key: m.month,
         label: shortMonth(m.month),
         income: m.income,
@@ -188,7 +188,7 @@ export function YearlyCashFlowOverviewStrip({
   accountId,
 }: OverviewStripsProps) {
   const { data, isLoading } = useChartData({ accountId: accountId || undefined });
-  const yearly = data?.yearly ?? [];
+  const yearly = data?.yearlyOverview ?? [];
 
   if (isLoading) {
     return <SectionLoader message="Loading yearly cash flow" />;
@@ -198,8 +198,9 @@ export function YearlyCashFlowOverviewStrip({
     return null;
   }
 
-  const firstYear = yearly[0]!.year;
-  const lastYear = yearly[yearly.length - 1]!.year;
+  const sortedYears = [...(data?.yearly ?? [])].map((y) => y.year).sort();
+  const firstYear = sortedYears[0]!;
+  const lastYear = sortedYears[sortedYears.length - 1]!;
   const title =
     firstYear === lastYear ? firstYear : `${firstYear}–${lastYear}`;
 

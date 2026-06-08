@@ -7,13 +7,13 @@ final class MoneyFlowViewModel {
     var isLoading = false
     var errorMessage: String?
 
-    func load(api: APIClient) async {
+    func load(api: APIClient, period: AnalyticsPeriodStore) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
         do {
-            let range = AnalyticsDateRange.rolling()
+            let range = period.dateRange
             flow = try await api.getMoneyFlow(from: range.from, to: range.to)
         } catch {
             errorMessage = error.localizedDescription
@@ -27,11 +27,12 @@ struct MoneyFlowView: View {
 
     var body: some View {
         SpendFlowScreen(title: "Flow", subtitle: "Income in, money out — the full picture") {
+            AnalyticsPeriodPicker(store: appState.analyticsPeriod)
             if viewModel.isLoading, viewModel.flow == nil {
                 LoadingStateView(message: "Mapping your flow…")
             } else if let error = viewModel.errorMessage, viewModel.flow == nil {
                 ErrorStateView(message: error) {
-                    Task { await viewModel.load(api: appState.apiClient) }
+                    Task { await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod) }
                 }
             } else if let flow = viewModel.flow {
                 flowColumn(
@@ -61,10 +62,13 @@ struct MoneyFlowView: View {
             }
         }
         .refreshable {
-            await viewModel.load(api: appState.apiClient)
+            await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod)
         }
         .task(id: appState.refreshCenter.refreshToken) {
-            await viewModel.load(api: appState.apiClient)
+            await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod)
+        }
+        .onChange(of: appState.analyticsPeriod.period) { _, _ in
+            Task { await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod) }
         }
     }
 

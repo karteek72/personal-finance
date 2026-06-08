@@ -54,6 +54,21 @@ extension APIClient {
         )
     }
 
+    func replaceImportFile(
+        batchId: String,
+        fileId: String,
+        filename: String,
+        data: Data,
+        mimeType: String
+    ) async throws -> ImportReplaceFileResponse {
+        let fileParts = [(name: "file", filename: filename, mimeType: mimeType, data: data)]
+        return try await uploadMultipart(
+            path: "/imports/batches/\(batchId)/files/\(fileId)/replace",
+            method: .post,
+            files: fileParts
+        )
+    }
+
     func cancelImportBatch(batchId: String) async throws {
         let token = await MainActor.run { authService?.accessToken }
         let (_, response) = try await rawSend(
@@ -120,6 +135,12 @@ struct ImportRetryBatchResponse: Codable, Sendable {
 }
 
 struct ImportRetryFileResponse: Codable, Sendable {
+    let batchId: String
+    let fileId: String
+    let message: String
+}
+
+struct ImportReplaceFileResponse: Codable, Sendable {
     let batchId: String
     let fileId: String
     let message: String

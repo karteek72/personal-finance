@@ -11,6 +11,7 @@ struct ListQuery: Sendable {
     var from: String?
     var to: String?
     var accountId: String?
+    var kind: String?
 
     enum SortDirection: String, Sendable {
         case asc
@@ -27,6 +28,7 @@ struct ListQuery: Sendable {
         if let from { items.append(.init(name: "from", value: from)) }
         if let to { items.append(.init(name: "to", value: to)) }
         if let accountId { items.append(.init(name: "accountId", value: accountId)) }
+        if let kind { items.append(.init(name: "kind", value: kind)) }
         return items
     }
 }

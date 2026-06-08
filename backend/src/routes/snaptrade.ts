@@ -65,25 +65,35 @@ export const snaptradeRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
-  app.post("/snaptrade/complete", async (request) => {
+  app.post("/snaptrade/complete", async (request, reply) => {
     const user = await requireRequestUser(request, app.config.env);
 
     if (!isSnaptradeConfigured(app.config.env)) {
       throw AppError.providerNotConfigured("SnapTrade");
     }
 
-    try {
-      const syncResult = await syncSnaptradeForUser(user.id, app.config.env);
-      return {
-        status: "completed",
-        ...syncResult,
-        message: "Brokerage accounts connected and synced.",
-      };
-    } catch (error) {
-      throw toSnaptradeAppError(
-        error,
-        "Unable to sync SnapTrade accounts after connection",
-      );
-    }
+    request.log.info(
+      { userId: user.id, operation: "snaptrade.complete" },
+      "SnapTrade connection complete — background sync queued",
+    );
+
+    void syncSnaptradeForUser(user.id, app.config.env).catch(
+      (error: unknown) => {
+        request.log.error(
+          { err: error, userId: user.id },
+          "SnapTrade background sync failed after connection",
+        );
+      },
+    );
+
+    return reply.status(202).send({
+      status: "started",
+      connectionsSynced: 0,
+      accountsSynced: 0,
+      holdingsUpdated: 0,
+      activitiesAdded: 0,
+      message:
+        "Brokerage sync started in the background. Holdings will update shortly.",
+    });
   });
 };

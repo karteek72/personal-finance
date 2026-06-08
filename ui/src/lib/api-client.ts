@@ -39,6 +39,7 @@ import type {
   InflationResponse,
   InvestmentsResponse,
   ListQuery,
+  PositionKindFilter,
   MerchantsResponse,
   MerchantsTableResponse,
   MoneyFlowResponse,
@@ -707,7 +708,9 @@ export const api = {
     return fetchJson<NetWorthResponse>("/wealth/net-worth");
   },
 
-  getInvestments(params: ListQuery & { accountId?: string } = {}): Promise<InvestmentsResponse> {
+  getInvestments(
+    params: ListQuery & { accountId?: string; kind?: PositionKindFilter } = {},
+  ): Promise<InvestmentsResponse> {
     if (USE_MOCKS) return mockApi.getInvestments(params);
     return fetchJson<InvestmentsResponse>(
       `/wealth/investments${buildQuery({ ...params })}`,
