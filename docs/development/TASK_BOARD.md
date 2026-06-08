@@ -1,6 +1,6 @@
 # Development Task Board
 
-**Last updated:** 2026-06-07 (115/115 complete — all tasks done)  
+**Last updated:** 2026-06-08 (124/124 complete — all tasks done)  
 **Source of truth:** [`tasks.yaml`](tasks.yaml)  
 **CLI:** `npm run task -- <command>` from repo root
 
@@ -45,10 +45,10 @@
 
 | Status | Count |
 |--------|------:|
-| done | 104 |
+| done | 124 |
 | ready | 0 |
 | in_progress | 0 |
-| backlog | 1 |
+| backlog | 0 |
 
 **Statement import + GDPR export: complete.**
 
@@ -58,7 +58,7 @@ analytics layer shipped fabricated/duplicated/stubbed metrics; see
 for the audit, taxonomy, data model, and scoring frameworks. Tasks are scoped for
 **parallel** work by independent agents.
 
-**Next:** `TASK-PROFILE-004` (annualGrossIncome cross-check); `employmentStatus` consumer TBD.
+**Done:** Investments holdings redesign (`TASK-INV-001`–`009`) — account filter, portfolio analytics, split stocks/options tables, trim-losers what-if.
 
 ---
 
@@ -292,19 +292,15 @@ numbers until the next sync. Design: `analytics-architecture.md` §19.
 
 ---
 
-### Investments / holdings analytics (INV-series)
-
-Backend already accepts an `accountId` filter and computes gain/loss, cost basis, and breakdown —
-the UI just doesn't surface them. Add an account filter, drop the duplicate account list (it lives on
-Net Worth), and enrich the header with winners/losers + charts. Design: `analytics-architecture.md` §20.
+### Investments / holdings analytics (INV-series) — **complete**
 
 | ID | Area | Title | Deps |
 |----|------|-------|------|
-| TASK-INV-001 | ui | Filter holdings by account (backend ready) | — |
+| TASK-INV-001 | ui | Filter holdings by account | — |
 | TASK-INV-002 | ui | Remove duplicate account list from Investments | — |
-| TASK-INV-003 | backend | Winners/losers, win rate, best/worst, concentration, sectors, profit/loss split | — |
+| TASK-INV-003 | backend | Winners/losers, win rate, best/worst, concentration, sector value+P/L, profit/loss split | — |
 | TASK-INV-004 | backend | Portfolio-value time series for trend chart | — |
-| TASK-INV-005 | ui | Enriched KPI header + allocation/winners-losers/trend charts | INV-003 |
+| TASK-INV-005 | ui | Enriched KPI header + allocation/sector-P/L/winners-losers/trend charts | INV-003 |
 | TASK-INV-006 | backend | `kind` (stocks/options) filter on positions | — |
 | TASK-INV-007 | ui | Split Holdings into Stocks/ETFs + Options tables | INV-006 |
 | TASK-INV-008 | backend | Prune-losers what-if + momentum scoring | — |
@@ -346,6 +342,7 @@ feature views in parallel.
 
 | ID | Title |
 |----|-------|
+| TASK-INV-001–009 | Investments holdings redesign — account filter, KPI charts, split tables, trim-losers |
 | TASK-RECON-001 | Reconcile paired transfer legs (R1) |
 | TASK-RECON-002 | Wire data-quality transfer-pair coverage (R2) |
 | TASK-RECON-003 | Self-transfer fallback + unpaired signal (R3) |

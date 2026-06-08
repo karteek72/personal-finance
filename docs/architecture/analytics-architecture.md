@@ -901,6 +901,7 @@ Analysis of what is useful for a personal investor, and whether the data already
 |-------|------|-----|
 | Asset-allocation donut | `portfolioBreakdown` (+ crypto/bond/cash) | diversification at a glance |
 | Sector-allocation donut/bar | roll up `position.sector` | concentration by sector (needs rollup) |
+| Sector profit/loss bar | roll up `position.gainLoss` by sector | which sectors made/lost money (diverging bar, color by sign) |
 | Winners vs losers diverging bar | per-position `gainLoss` (top N each side) | directly answers "positive/negative holdings" |
 | Top contributors to P/L | per-position `gainLoss` ranked | what's driving the total |
 | Portfolio-value trend (line/area) | investment snapshots (`investment-snapshots.ts`) | growth over time (needs a series field/endpoint) |
@@ -912,8 +913,10 @@ contributions-over-time bar (partly in `monthlyActivity`). Mark as later.
 ### 20.5 Recommended split
 - **INV-001 (ui):** account filter (backend ready).
 - **INV-002 (ui):** remove the account list.
-- **INV-003 (backend):** add winners/losers, win rate, best/worst, concentration, and sector
-  allocation to the response, honoring `accountId`; document each formula + confidence/caveats.
+- **INV-003 (backend):** add winners/losers, win rate, best/worst, concentration, and a **sector
+  rollup** to the response, honoring `accountId`; document each formula + confidence/caveats. The
+  sector rollup returns, **per sector**: market value + share%, **and** total unrealized profit/loss
+  ($) + P/L% (Σ `gainLoss` / Σ cost), so the UI can chart both allocation and profit/loss by sector.
 - **INV-004 (backend):** portfolio-value time series from investment snapshots for the trend chart.
 - **INV-005 (ui):** enriched KPI header + the charts above, reusing the shared self-explanatory chart
   components.

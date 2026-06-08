@@ -2133,7 +2133,6 @@ tasks:
     priority: P3
     area: backend
     phase: 3.8
-    assignee: null
     claimed_at: null
     dependencies: []
     source_docs:
@@ -2516,7 +2515,6 @@ tasks:
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-IOS-001
@@ -2546,7 +2544,6 @@ tasks:
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-IOS-001
@@ -2573,7 +2570,6 @@ tasks:
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-IOS-001
@@ -2601,7 +2597,6 @@ tasks:
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-IOS-001
@@ -2624,7 +2619,6 @@ tasks:
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-IOS-001
@@ -2644,7 +2638,6 @@ tasks:
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-IOS-001
@@ -2666,7 +2659,6 @@ tasks:
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-IOS-001
@@ -2688,7 +2680,6 @@ tasks:
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-IOS-001
@@ -2709,7 +2700,6 @@ tasks:
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-IOS-001
@@ -2754,7 +2744,6 @@ tasks:
     priority: P4
     area: ios
     phase: 4
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-IOS-001
@@ -2775,11 +2764,11 @@ tasks:
   # ------------------------------------------------------------------ #
   - id: TASK-INV-001
     title: Filter holdings by account on Wealth → Investments (INV-001)
-    status: ready
+    status: done
+    assignee: cursor-agent
     priority: P2
     area: ui
     phase: 3.8
-    assignee: null
     claimed_at: null
     dependencies: []
     source_docs:
@@ -2799,16 +2788,16 @@ tasks:
       monthlyActivity remain household-wide (acceptable; scoping them is a later option).
     acceptance_criteria:
       - An account dropdown filters the holdings table and portfolio KPIs by account
-      - "All accounts" restores the unfiltered view
+      - '"All accounts" restores the unfiltered view'
       - accountId is passed to /wealth/investments; no client-side recompute of KPIs
       - Selection persists via the list-query URL state like other filters
   - id: TASK-INV-002
     title: Remove the account list from Wealth → Investments (INV-002)
-    status: ready
+    status: done
+    assignee: cursor-agent
     priority: P2
     area: ui
     phase: 3.8
-    assignee: null
     claimed_at: null
     dependencies: []
     source_docs:
@@ -2827,11 +2816,11 @@ tasks:
       - Empty-state (connect a brokerage) still shows when there are no investment accounts
   - id: TASK-INV-003
     title: Portfolio analytics — winners/losers, win rate, best/worst, concentration, sectors (INV-003)
-    status: ready
+    status: done
+    assignee: cursor-agent
     priority: P2
     area: backend
     phase: 3.8
-    assignee: null
     claimed_at: null
     dependencies: []
     source_docs:
@@ -2843,7 +2832,10 @@ tasks:
       /wealth/investments response, computed over scopedPositions so they honor the accountId filter:
       winners vs losers (count + summed value + each as % of portfolio), win rate (winners/total),
       best and worst performer (by gainLossPercent and by $), concentration (largest-position weight,
-      top-5 weight, HHI), and a sector-allocation rollup (sum value by position.sector with share%).
+      top-5 weight, HHI), and a sector rollup. The sector rollup returns, PER SECTOR: market value +
+      share%, AND total unrealized profit/loss ($) + P/L% (sum(gainLoss)/sum(cost)) so the UI can
+      chart both allocation and profit/loss by sector (section 20.4). Group null/unknown sectors into
+      an "Unclassified" bucket.
       Also add the GROSS profit/loss split (Request 5, section 20.7): total unrealized profit =
       sum(gainLoss where >0) and total unrealized loss = sum(gainLoss where <0), each with its
       position count (they net to totalGainLoss). totalGainLoss/totalGainLossPercent/totalCostBasis
@@ -2851,17 +2843,18 @@ tasks:
       cost basis is missing (ties to data-quality costBasisCompleteness).
     acceptance_criteria:
       - Response includes winners/losers (count, value, %), win rate, best/worst, concentration, sectors
+      - Sector rollup includes per-sector value + share% AND profit/loss ($ and %); null sector -> Unclassified
       - Response includes total unrealized profit and total unrealized loss (gross split + counts)
       - All new aggregates honor the accountId filter (scopedPositions)
       - Holdings missing cost basis are excluded/caveated, not silently counted as losers
       - typecheck passes
   - id: TASK-INV-004
     title: Portfolio-value time series for the trend chart (INV-004)
-    status: ready
+    status: done
+    assignee: cursor-agent
     priority: P3
     area: backend
     phase: 3.8
-    assignee: null
     claimed_at: null
     dependencies: []
     source_docs:
@@ -2882,11 +2875,11 @@ tasks:
       - typecheck passes
   - id: TASK-INV-005
     title: Enriched Investments KPI header + charts (INV-005)
-    status: ready
+    status: done
+    assignee: cursor-agent
     priority: P2
     area: ui
     phase: 3.8
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-INV-003
@@ -2899,23 +2892,25 @@ tasks:
       hero with a KPI header showing: portfolio value, total unrealized gain/loss ($ and %, color by
       sign), invested (cost basis), winners/losers + win rate (from INV-003). Add charts, each
       self-explanatory with axes/labels/values (reuse the U1/W1 chart pattern): asset-allocation donut
-      (portfolioBreakdown), sector-allocation donut/bar (INV-003), winners-vs-losers diverging bar,
+      (portfolioBreakdown), sector charts (INV-003): a sector-allocation donut/bar AND a sector
+      profit/loss diverging bar (per-sector P/L, color by sign), winners-vs-losers diverging bar,
       top contributors to P/L, and portfolio-value trend (INV-004 if available). All numbers come from
       the API; no client-side P/L math.
     acceptance_criteria:
       - KPI header shows value, gain/loss $/%, cost basis, winners/losers, win rate
       - KPI header shows total unrealized profit and total unrealized loss (gross split)
-      - Allocation donut, sector chart, and winners/losers chart render with axes/labels/values
+      - Sector allocation chart AND a sector profit/loss chart render with axes/labels/values
+      - Allocation donut and winners/losers chart render with axes/labels/values
       - Portfolio-value trend renders when the series is available
       - No client-side recomputation of portfolio metrics
 
   - id: TASK-INV-006
     title: Add a kind (stocks/options) filter to /wealth/investments positions (INV-006)
-    status: ready
+    status: done
+    assignee: cursor-agent
     priority: P2
     area: backend
     phase: 3.8
-    assignee: null
     claimed_at: null
     dependencies: []
     source_docs:
@@ -2936,11 +2931,11 @@ tasks:
       - Invalid kind falls back to all; typecheck passes
   - id: TASK-INV-007
     title: Split Holdings into separate Stocks/ETFs and Options tables (INV-007)
-    status: ready
+    status: done
+    assignee: cursor-agent
     priority: P2
     area: ui
     phase: 3.8
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-INV-006
@@ -2960,11 +2955,11 @@ tasks:
       - Option-specific columns (strike/expiry/type) show for the options table
   - id: TASK-INV-008
     title: Prune-the-losers what-if + momentum scoring (INV-008)
-    status: ready
+    status: done
+    assignee: cursor-agent
     priority: P3
     area: backend
     phase: 3.9
-    assignee: null
     claimed_at: null
     dependencies: []
     source_docs:
@@ -2989,12 +2984,12 @@ tasks:
       - Honors accountId; degrades gracefully with thin price history; caveats in the envelope
       - typecheck passes
   - id: TASK-INV-009
-    title: "Trim losers" optimizer card on Wealth → Investments (INV-009)
-    status: ready
+    title: '"Trim losers" optimizer card on Wealth → Investments (INV-009)'
+    status: done
+    assignee: cursor-agent
     priority: P3
     area: ui
     phase: 3.9
-    assignee: null
     claimed_at: null
     dependencies:
       - TASK-INV-008
