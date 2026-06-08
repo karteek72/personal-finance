@@ -156,6 +156,12 @@ spendflow_load_env() {
   export NEXT_PUBLIC_GOOGLE_CLIENT_ID="${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-${GOOGLE_CLIENT_ID:-}}"
   export NEXT_PUBLIC_USE_MOCKS="${NEXT_PUBLIC_USE_MOCKS:-false}"
 
+  # Backend invite links + SnapTrade callback (override dev localhost when deploy.env sets public URLs).
+  export UI_APP_URL="${UI_APP_URL:-${NEXT_PUBLIC_APP_URL:-${SPENDFLOW_UI_PUBLIC_URL:-http://localhost:3002}}}"
+  if [[ -z "${SNAPTRADE_REDIRECT_URI:-}" ]]; then
+    export SNAPTRADE_REDIRECT_URI="${UI_APP_URL%/}/accounts/snaptrade/callback"
+  fi
+
   spendflow_validate_host
   spendflow_resolve_runtime_cors
 }
@@ -437,6 +443,7 @@ spendflow_export_compose_runtime_env() {
   export PLAID_CLIENT_ID PLAID_SECRET PLAID_ENV PLAID_PRODUCTS PLAID_COUNTRY_CODES PLAID_REDIRECT_URI
   export GOOGLE_CLIENT_ID GOOGLE_CLIENT_IDS GOOGLE_SECRET_KEY AUTH_ALLOW_DEV_USER
   export TELLER_APPLICATION_ID TELLER_ENV TELLER_CERT_PATH TELLER_KEY_PATH
+  export UI_APP_URL
   export SNAPTRADE_CLIENT_ID SNAPTRADE_CONSUMER_KEY SNAPTRADE_CLIENT_SECRET SNAPTRADE_REDIRECT_URI
 }
 
