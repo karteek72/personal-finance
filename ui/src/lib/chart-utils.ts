@@ -18,6 +18,11 @@ export function sliceLastMonthlyPoints(
   return points.slice(-maxMonths);
 }
 
+/** Overview strips show newest periods first; charts keep API oldest-first order. */
+export function latestPeriodsFirst<T>(points: readonly T[]): T[] {
+  return [...points].reverse();
+}
+
 export function formatMonthLabel(month: string): string {
   const [, monthPart] = month.split("-");
   const monthIndex = Number.parseInt(monthPart ?? "1", 10) - 1;

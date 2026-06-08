@@ -29,10 +29,13 @@ export function resolveInfraUrlsForHostRuntime(): void {
   const databaseUsesContainerHost =
     databaseUrl.includes("@postgres:") ||
     databaseUrl.includes("@postgres/") ||
+    databaseUrl.includes("@spendflow-postgres:") ||
     databaseUrl.includes("host.containers.internal");
 
   const redisUsesContainerHost =
-    redisUrl.includes("redis://redis:") || redisUrl === "redis://redis:6379";
+    redisUrl.includes("redis://redis:") ||
+    redisUrl === "redis://redis:6379" ||
+    redisUrl.includes("redis://spendflow-redis:");
 
   if (!databaseUrl || databaseUsesContainerHost) {
     process.env.DATABASE_URL = `postgresql://${pgUser}:${encodePostgresPassword(pgPassword)}@127.0.0.1:${pgPort}/${pgDb}`;

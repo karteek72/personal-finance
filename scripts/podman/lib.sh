@@ -398,7 +398,9 @@ spendflow_prepare_postgres() {
     return 0
   fi
   export SPENDFLOW_COMPOSE_PROFILE=bundled-db
-  export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@postgres:5432/${POSTGRES_DB:-spendflow}"
+  # Podman DNS resolves compose service names (postgres/redis) to 127.0.0.1 inside
+  # containers; use container_name hostnames from compose.yaml instead.
+  export DATABASE_URL="postgresql://${POSTGRES_USER:-spendflow}:${POSTGRES_PASSWORD:-spendflow}@spendflow-postgres:5432/${POSTGRES_DB:-spendflow}"
 }
 
 # Container API/worker must reach Redis on spendflow-net — not localhost from dev .env.
@@ -411,7 +413,7 @@ spendflow_prepare_redis() {
     return 0
   fi
 
-  export REDIS_URL="redis://redis:6379"
+  export REDIS_URL="redis://spendflow-redis:6379"
   echo "info: container REDIS_URL=${REDIS_URL} (host bind port ${REDIS_HOST_PORT:-6380} is for local dev only)" >&2
 }
 

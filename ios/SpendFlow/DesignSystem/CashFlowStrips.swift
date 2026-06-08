@@ -13,7 +13,7 @@ struct CashFlowOverviewStrips: View {
                 CashFlowStripSection(
                     title: yearlyTitle,
                     subtitle: accountFiltered ? "· filtered by account" : nil,
-                    points: yearly.map { point in
+                    points: yearly.reversed().map { point in
                         CashFlowStripPoint(
                             id: point.year,
                             label: point.year,
@@ -29,7 +29,7 @@ struct CashFlowOverviewStrips: View {
                 CashFlowStripSection(
                     title: periodTitle,
                     subtitle: accountFiltered ? "· filtered by account" : nil,
-                    points: monthly.map { point in
+                    points: monthly.reversed().map { point in
                         CashFlowStripPoint(
                             id: point.month,
                             label: shortMonthLabel(point.month),
@@ -44,7 +44,8 @@ struct CashFlowOverviewStrips: View {
     }
 
     private var yearlyTitle: String {
-        guard let first = yearly.first?.year, let last = yearly.last?.year else {
+        let years = yearly.map(\.year).sorted()
+        guard let first = years.first, let last = years.last else {
             return "By year"
         }
         let range = first == last ? first : "\(first)–\(last)"

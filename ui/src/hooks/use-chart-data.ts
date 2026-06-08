@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api-client";
-import { sliceLastMonthlyPoints, yearToDateRange } from "@/lib/chart-utils";
+import { sliceLastMonthlyPoints, latestPeriodsFirst, yearToDateRange } from "@/lib/chart-utils";
 import type { ChartDataFilters } from "@/types/api";
 
 export function useChartData(filters: ChartDataFilters = {}) {
@@ -26,10 +26,16 @@ export function useChartData(filters: ChartDataFilters = {}) {
         memberId: memberId || undefined,
         scope: scope === "all" ? undefined : scope,
       }),
-    select: (response) => ({
-      ...response,
-      monthly: sliceLastMonthlyPoints(response.monthly),
-      yearly: response.yearly ?? [],
-    }),
+    select: (response) => {
+      const monthly = sliceLastMonthlyPoints(response.monthly);
+      const yearly = response.yearly ?? [];
+      return {
+        ...response,
+        monthly,
+        yearly,
+        monthlyOverview: latestPeriodsFirst(monthly),
+        yearlyOverview: latestPeriodsFirst(yearly),
+      };
+    },
   });
 }

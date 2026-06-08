@@ -98,7 +98,7 @@ services:
       GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
       GOOGLE_SECRET_KEY: ${GOOGLE_SECRET_KEY:-}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_URL: ${REDIS_URL:-redis://spendflow-redis:6379}
     ports:
       - "${SPENDFLOW_HOST:-0.0.0.0}:${SPENDFLOW_API_PORT:-4000}:4000"
     healthcheck:
@@ -136,7 +136,7 @@ services:
       NODE_ENV: production
       SPENDFLOW_RUNTIME: container
       DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_URL: ${REDIS_URL:-redis://spendflow-redis:6379}
       APP_URL: ${SPENDFLOW_API_PUBLIC_URL:-http://localhost:4000}
       CORS_ORIGIN: ${SPENDFLOW_UI_PUBLIC_URL:-http://localhost:3005}
       CORS_ORIGINS: ${CORS_ORIGINS}
