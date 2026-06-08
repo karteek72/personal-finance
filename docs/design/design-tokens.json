@@ -92,6 +92,32 @@
     { "id": "income",                "label": "Income",                  "chartColor": "#437a22" },
     { "id": "transfers",             "label": "Transfers (internal)",    "chartColor": "#01696f" }
   ],
+  "investments": {
+    "chartPalette": [
+      "#3B82F6", "#F97316", "#22C55E", "#EC4899", "#8B5CF6", "#14B8A6",
+      "#EAB308", "#EF4444", "#6366F1", "#84CC16", "#F43F5E", "#0EA5E9"
+    ],
+    "assetAllocation": {
+      "Stocks & ETFs": "#3B82F6",
+      "Options": "#8B5CF6",
+      "Other": "#94A3B8",
+      "Crypto": "#F59E0B",
+      "Bonds": "#64748B"
+    },
+    "gicsSectors": {
+      "Communication Services": "#6366F1",
+      "Consumer Discretionary": "#F97316",
+      "Consumer Staples": "#22C55E",
+      "Energy": "#EAB308",
+      "Financials": "#64748B",
+      "Health Care": "#EC4899",
+      "Industrials": "#6B7280",
+      "Information Technology": "#3B82F6",
+      "Materials": "#A16207",
+      "Real Estate": "#14B8A6",
+      "Utilities": "#0EA5E9"
+    }
+  },
   "navigation": {
     "primaryDestinations": [
       { "id": "home", "label": "Home", "route": "/" },

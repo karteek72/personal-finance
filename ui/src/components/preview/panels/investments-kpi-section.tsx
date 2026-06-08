@@ -154,6 +154,7 @@ export function InvestmentsKpiSection({ data }: Props) {
           slices={allocationSlices}
           selectedCategory=""
           onSelectCategory={() => undefined}
+          colorScheme="asset"
           title="Asset allocation"
           subtitle="By asset class"
         />
@@ -162,6 +163,7 @@ export function InvestmentsKpiSection({ data }: Props) {
             slices={sectorSlices}
             selectedCategory={selectedSector}
             onSelectCategory={setSelectedSector}
+            colorScheme="sector"
             title="Sector allocation"
             subtitle="By GICS sector"
           />
@@ -170,6 +172,9 @@ export function InvestmentsKpiSection({ data }: Props) {
           slices={winnersLosersSlices}
           selectedAccountId=""
           onSelectAccount={() => undefined}
+          colorScheme="semantic"
+          title="Winners vs losers"
+          subtitle="By position value"
           className="min-h-[220px]"
         />
         {trendSlices.length > 0 ? (
@@ -177,6 +182,9 @@ export function InvestmentsKpiSection({ data }: Props) {
             slices={trendSlices}
             selectedAccountId=""
             onSelectAccount={() => undefined}
+            colorScheme="diverse"
+            title="Portfolio value trend"
+            subtitle="Monthly snapshots"
             className="min-h-[220px]"
           />
         ) : (
