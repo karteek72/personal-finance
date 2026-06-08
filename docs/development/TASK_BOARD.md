@@ -292,6 +292,26 @@ numbers until the next sync. Design: `analytics-architecture.md` §19.
 
 ---
 
+### Investments / holdings analytics (INV-series)
+
+Backend already accepts an `accountId` filter and computes gain/loss, cost basis, and breakdown —
+the UI just doesn't surface them. Add an account filter, drop the duplicate account list (it lives on
+Net Worth), and enrich the header with winners/losers + charts. Design: `analytics-architecture.md` §20.
+
+| ID | Area | Title | Deps |
+|----|------|-------|------|
+| TASK-INV-001 | ui | Filter holdings by account (backend ready) | — |
+| TASK-INV-002 | ui | Remove duplicate account list from Investments | — |
+| TASK-INV-003 | backend | Winners/losers, win rate, best/worst, concentration, sectors, profit/loss split | — |
+| TASK-INV-004 | backend | Portfolio-value time series for trend chart | — |
+| TASK-INV-005 | ui | Enriched KPI header + allocation/winners-losers/trend charts | INV-003 |
+| TASK-INV-006 | backend | `kind` (stocks/options) filter on positions | — |
+| TASK-INV-007 | ui | Split Holdings into Stocks/ETFs + Options tables | INV-006 |
+| TASK-INV-008 | backend | Prune-losers what-if + momentum scoring | — |
+| TASK-INV-009 | ui | "Trim losers" optimizer card | INV-008 |
+
+---
+
 ### iOS feature parity (Phase 4, P4)
 
 The SwiftUI app has the core (Auth + AppLock, push, Dashboard, MoneyFlow, Categories, Transactions,

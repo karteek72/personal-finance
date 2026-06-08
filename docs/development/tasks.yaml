@@ -2769,3 +2769,246 @@ tasks:
       - Users can upload and import statements from iOS once the web gate lifts
       - Consent + batch status + review mirror the web flow
       - No on-device parsing; all handled by the backend
+
+  # ------------------------------------------------------------------ #
+  # Investments / holdings analytics (analytics-architecture.md §20)
+  # ------------------------------------------------------------------ #
+  - id: TASK-INV-001
+    title: Filter holdings by account on Wealth → Investments (INV-001)
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/investments-panel.tsx
+      - ui/src/components/preview/panels/holdings-portfolio-section.tsx
+      - ui/src/hooks/use-features.ts
+      - ui/src/lib/api-client.ts
+      - backend/src/routes/wealth.ts
+    description: |
+      Request 1 / INV-001 (analytics-architecture.md section 20.2). The backend /wealth/investments
+      already accepts an accountId query param and scopes positions + portfolio KPIs (value, cost
+      basis, gain/loss, breakdown) to it. Add a UI account selector (dropdown built from the
+      response accounts[] / useAccounts investment accounts, plus an "All accounts" option) and pass
+      accountId through useInvestments -> api-client -> the endpoint. The holdings table AND the KPI
+      header/breakdown must reflect the selection. Note behavioralAlerts/investmentHistory/
+      monthlyActivity remain household-wide (acceptable; scoping them is a later option).
+    acceptance_criteria:
+      - An account dropdown filters the holdings table and portfolio KPIs by account
+      - "All accounts" restores the unfiltered view
+      - accountId is passed to /wealth/investments; no client-side recompute of KPIs
+      - Selection persists via the list-query URL state like other filters
+  - id: TASK-INV-002
+    title: Remove the account list from Wealth → Investments (INV-002)
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/investments-panel.tsx
+      - ui/src/components/preview/panels/net-worth-panel.tsx
+    description: |
+      Request 2 / INV-002 (analytics-architecture.md section 20.3). The investment-accounts list
+      (investments-panel.tsx ~lines 63-91) duplicates what Wealth → Net Worth already shows. Remove
+      that list from the Investments view; keep the portfolio-value hero (enriched by INV-005), the
+      Holdings table, and the Behavioral insights. Preserve the "connect a brokerage" empty-state
+      when no investment accounts exist.
+    acceptance_criteria:
+      - The Accounts list block no longer renders on Wealth → Investments
+      - Holdings + Behavioral insights remain; hero still shows portfolio value
+      - Empty-state (connect a brokerage) still shows when there are no investment accounts
+  - id: TASK-INV-003
+    title: Portfolio analytics — winners/losers, win rate, best/worst, concentration, sectors (INV-003)
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/investments-store.ts
+      - backend/src/services/holdings-mapper.ts
+    description: |
+      Request 3 / INV-003 (analytics-architecture.md section 20.4). Add portfolio analytics to the
+      /wealth/investments response, computed over scopedPositions so they honor the accountId filter:
+      winners vs losers (count + summed value + each as % of portfolio), win rate (winners/total),
+      best and worst performer (by gainLossPercent and by $), concentration (largest-position weight,
+      top-5 weight, HHI), and a sector-allocation rollup (sum value by position.sector with share%).
+      Also add the GROSS profit/loss split (Request 5, section 20.7): total unrealized profit =
+      sum(gainLoss where >0) and total unrealized loss = sum(gainLoss where <0), each with its
+      position count (they net to totalGainLoss). totalGainLoss/totalGainLossPercent/totalCostBasis
+      already exist — keep them. Provide each new metric with a clear definition; add caveats where
+      cost basis is missing (ties to data-quality costBasisCompleteness).
+    acceptance_criteria:
+      - Response includes winners/losers (count, value, %), win rate, best/worst, concentration, sectors
+      - Response includes total unrealized profit and total unrealized loss (gross split + counts)
+      - All new aggregates honor the accountId filter (scopedPositions)
+      - Holdings missing cost basis are excluded/caveated, not silently counted as losers
+      - typecheck passes
+  - id: TASK-INV-004
+    title: Portfolio-value time series for the trend chart (INV-004)
+    status: ready
+    priority: P3
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/investment-snapshots.ts
+      - backend/src/services/balance-snapshots.ts
+      - backend/src/services/investments-store.ts
+    description: |
+      Request 3 / INV-004 (analytics-architecture.md section 20.4). Provide a portfolio-value time
+      series (monthly points) from investment snapshots so the UI can render a portfolio-value trend
+      chart. Reuse investment-snapshots.ts / balance-snapshots.ts. Return points with date + value
+      (and contributions if cheap) in the investments response or a dedicated endpoint; honor the
+      accountId filter where feasible.
+    acceptance_criteria:
+      - A portfolio-value series (date, value) is available for charting
+      - Series derives from stored snapshots (no fabricated history)
+      - Honors account filter where snapshots allow; documents granularity/caveats
+      - typecheck passes
+  - id: TASK-INV-005
+    title: Enriched Investments KPI header + charts (INV-005)
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-INV-003
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/investments-panel.tsx
+      - ui/src/components/preview/panels/holdings-portfolio-section.tsx
+    description: |
+      Request 3 / INV-005 (analytics-architecture.md section 20.4). Replace the single portfolio-value
+      hero with a KPI header showing: portfolio value, total unrealized gain/loss ($ and %, color by
+      sign), invested (cost basis), winners/losers + win rate (from INV-003). Add charts, each
+      self-explanatory with axes/labels/values (reuse the U1/W1 chart pattern): asset-allocation donut
+      (portfolioBreakdown), sector-allocation donut/bar (INV-003), winners-vs-losers diverging bar,
+      top contributors to P/L, and portfolio-value trend (INV-004 if available). All numbers come from
+      the API; no client-side P/L math.
+    acceptance_criteria:
+      - KPI header shows value, gain/loss $/%, cost basis, winners/losers, win rate
+      - KPI header shows total unrealized profit and total unrealized loss (gross split)
+      - Allocation donut, sector chart, and winners/losers chart render with axes/labels/values
+      - Portfolio-value trend renders when the series is available
+      - No client-side recomputation of portfolio metrics
+
+  - id: TASK-INV-006
+    title: Add a kind (stocks/options) filter to /wealth/investments positions (INV-006)
+    status: ready
+    priority: P2
+    area: backend
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/investments-store.ts
+      - backend/src/routes/wealth.ts
+      - backend/src/lib/list-query.ts
+    description: |
+      Request 4 / INV-006 (analytics-architecture.md section 20.6). Add a `kind` filter
+      (stocks | options | all, default all) to the /wealth/investments positions page so each asset
+      class can be paginated/sorted/filtered independently server-side (thin-client). "stocks" = equity
+      + etf + mutual_fund; "options" = isOptionAssetType. Must compose with the existing accountId, q,
+      and sort params (apply to scopedPositions before pagination). Keep stockAggregates /
+      optionPositions / portfolioBreakdown as-is.
+    acceptance_criteria:
+      - /wealth/investments accepts kind=stocks|options|all and filters the positions page accordingly
+      - kind composes with accountId, q, sort, and pagination
+      - Invalid kind falls back to all; typecheck passes
+  - id: TASK-INV-007
+    title: Split Holdings into separate Stocks/ETFs and Options tables (INV-007)
+    status: ready
+    priority: P2
+    area: ui
+    phase: 3.8
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-INV-006
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/holdings-portfolio-section.tsx
+      - ui/src/hooks/use-features.ts
+    description: |
+      Request 4 / INV-007 (analytics-architecture.md section 20.6). Replace the single combined
+      holdings DataTable with two independently paginated/sorted/filtered tables (or sub-tabs):
+      "Stocks & ETFs" and "Options", driven by the kind filter (INV-006). Each keeps its own
+      list-query URL state. Option rows surface strike/expiry/type via the existing expirationLabel /
+      optionType / underlyingTicker fields. Keep the asset-class summary tiles above the tables.
+    acceptance_criteria:
+      - Stocks/ETFs and Options appear in separate tables/sub-tabs, each with its own pagination/sort/search
+      - Each table requests its slice via kind (no client-side splitting of a combined page)
+      - Option-specific columns (strike/expiry/type) show for the options table
+  - id: TASK-INV-008
+    title: Prune-the-losers what-if + momentum scoring (INV-008)
+    status: ready
+    priority: P3
+    area: backend
+    phase: 3.9
+    assignee: null
+    claimed_at: null
+    dependencies: []
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - backend/src/services/investment-performance.ts
+      - backend/src/services/investment-snapshots.ts
+      - backend/src/db/schema.ts
+    description: |
+      Request 6 / INV-008 (analytics-architecture.md section 20.8). Build a momentum + prune-losers
+      what-if. (1) Momentum score per holding from securityPrices trailing returns (1m/3m/6m and a
+      moving-average trend). (2) Classify losing positions into cut-candidates (loss + deteriorating
+      momentum) vs hold/recover (loss + improving momentum). (3) What-if for selected cut candidates:
+      capital freed (sum market value), realized loss / tax-loss-harvest potential (reuse FIFO
+      tax-lots in investment-performance.ts), and a BOUNDED projected uplift if redeployed into
+      top-momentum holdings (return a range, not a point). Honor accountId. Gate gracefully when
+      securityPrices history is too thin to score momentum. Return metrics in the envelope with
+      confidence + caveats (not advice; momentum not predictive; ignores wash-sale/full tax nuance).
+    acceptance_criteria:
+      - Per-holding momentum score from securityPrices trailing returns
+      - Losers classified into cut-candidates vs hold/recover (not every red position)
+      - What-if returns capital freed, realized/harvestable loss, and a bounded projected uplift range
+      - Honors accountId; degrades gracefully with thin price history; caveats in the envelope
+      - typecheck passes
+  - id: TASK-INV-009
+    title: "Trim losers" optimizer card on Wealth → Investments (INV-009)
+    status: ready
+    priority: P3
+    area: ui
+    phase: 3.9
+    assignee: null
+    claimed_at: null
+    dependencies:
+      - TASK-INV-008
+    source_docs:
+      - docs/architecture/analytics-architecture.md
+      - ui/src/components/preview/panels/investments-panel.tsx
+    description: |
+      Request 6 / INV-009 (analytics-architecture.md section 20.8). Present the INV-008 output as a
+      "Trim losers" optimizer card: list cut-candidate holdings with momentum signal, unrealized loss,
+      freed capital, and tax-loss-harvest potential, plus the projected portfolio effect (as a range).
+      All numbers from the API. Display caveats prominently (not investment advice; momentum not
+      predictive; ignores wash-sale rules). Show an empty/gated state when momentum can't be computed.
+    acceptance_criteria:
+      - Card lists cut candidates with momentum, loss, freed capital, harvest potential, projected range
+      - Caveats/disclaimer are clearly shown
+      - Graceful gated state when price history is insufficient
+      - No client-side recomputation
