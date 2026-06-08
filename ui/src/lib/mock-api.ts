@@ -1098,6 +1098,31 @@ export async function getNetWorth(): Promise<NetWorthResponse> {
   };
 }
 
+const EMPTY_PORTFOLIO_ANALYTICS: InvestmentsResponse["portfolioAnalytics"] = {
+  winners: { count: 0, value: "0.00", sharePercent: 0 },
+  losers: { count: 0, value: "0.00", sharePercent: 0 },
+  winRate: 0,
+  bestPerformer: null,
+  worstPerformer: null,
+  bestPerformerByDollar: null,
+  worstPerformerByDollar: null,
+  concentration: { largestPositionWeight: 0, top5Weight: 0, hhi: 0 },
+  sectorAllocation: [],
+  unrealizedProfit: { total: "0.00", positionCount: 0 },
+  unrealizedLoss: { total: "0.00", positionCount: 0 },
+  costBasisCompleteness: { scored: 0, total: 0, percent: 0 },
+  caveats: [],
+};
+
+const EMPTY_PRUNE_LOSERS: InvestmentsResponse["pruneLosers"] = {
+  available: false,
+  confidence: 0,
+  caveats: [],
+  cutCandidates: [],
+  holdRecover: [],
+  whatIf: null,
+};
+
 async function buildMockInvestmentsResponse(
   params: ListQuery = {},
 ): Promise<InvestmentsResponse> {
@@ -1136,6 +1161,13 @@ async function buildMockInvestmentsResponse(
     );
     return {
       ...data,
+      portfolioAnalytics: data.portfolioAnalytics ?? EMPTY_PORTFOLIO_ANALYTICS,
+      portfolioValueTrend: data.portfolioValueTrend ?? {
+        points: [],
+        granularity: "monthly",
+        caveats: [],
+      },
+      pruneLosers: data.pruneLosers ?? EMPTY_PRUNE_LOSERS,
       positions: positionsPage,
       holdings: {
         ...positionsPage,
@@ -1247,6 +1279,13 @@ async function buildMockInvestmentsResponse(
 
   return {
     ...data,
+    portfolioAnalytics: data.portfolioAnalytics ?? EMPTY_PORTFOLIO_ANALYTICS,
+    portfolioValueTrend: data.portfolioValueTrend ?? {
+      points: [],
+      granularity: "monthly",
+      caveats: [],
+    },
+    pruneLosers: data.pruneLosers ?? EMPTY_PRUNE_LOSERS,
     positions: positionsPage,
     holdings: {
       ...positionsPage,

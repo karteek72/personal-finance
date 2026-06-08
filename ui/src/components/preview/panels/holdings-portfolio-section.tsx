@@ -1,18 +1,19 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { FeaturePanelLoading } from "@/components/preview/feature-empty-state";
 import { useInvestments } from "@/hooks/use-features";
 import { useListQueryUrl } from "@/hooks/use-list-query-url";
 import { formatMoneyValue } from "@/lib/format-money";
-import type { InvestmentPosition, PortfolioBreakdown } from "@/types/api";
+import type { InvestmentPosition, PortfolioBreakdown, PositionKindFilter } from "@/types/api";
 
 const PAGE_SIZE = 15;
 
 interface Props {
   portfolioBreakdown: PortfolioBreakdown;
+  accountId?: string;
 }
 
 function plClass(positive: boolean) {
@@ -35,7 +36,17 @@ function fmtPremium(n: number) {
   return formatMoneyValue(n);
 }
 
-function HoldingsTableContent({ portfolioBreakdown }: Props) {
+function HoldingsTable({
+  kind,
+  queryPrefix,
+  accountId,
+  portfolioBreakdown,
+}: {
+  kind: PositionKindFilter;
+  queryPrefix: string;
+  accountId?: string;
+  portfolioBreakdown: PortfolioBreakdown;
+}) {
   const [query, setQuery] = useListQueryUrl({
     defaults: {
       page: 1,
@@ -43,11 +54,16 @@ function HoldingsTableContent({ portfolioBreakdown }: Props) {
       sort: "value",
       dir: "desc",
     },
-    prefix: "holdings",
+    prefix: queryPrefix,
   });
-  const { data, isLoading, isFetching } = useInvestments(query);
+  const { data, isLoading, isFetching } = useInvestments({
+    ...query,
+    accountId,
+    kind,
+  });
   const positions = data?.positions.rows ?? [];
   const positionsPage = data?.positions;
+  const isOptions = kind === "options";
 
   const columns: DataTableColumn<InvestmentPosition>[] = [
     {
@@ -70,6 +86,24 @@ function HoldingsTableContent({ portfolioBreakdown }: Props) {
         </span>
       ),
     },
+    ...(isOptions
+      ? [
+          {
+            id: "optionType",
+            header: "Type",
+            render: (p: InvestmentPosition) => (
+              <span className="text-text-muted">{p.optionType ?? "—"}</span>
+            ),
+          } as DataTableColumn<InvestmentPosition>,
+          {
+            id: "underlying",
+            header: "Underlying",
+            render: (p: InvestmentPosition) => (
+              <span className="text-text-muted">{p.underlyingTicker ?? "—"}</span>
+            ),
+          } as DataTableColumn<InvestmentPosition>,
+        ]
+      : []),
     {
       id: "account",
       header: "Account",
@@ -141,26 +175,30 @@ function HoldingsTableContent({ portfolioBreakdown }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div className="rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2">
-          <p className="text-[10px] uppercase tracking-wide text-text-muted">Stocks & ETFs</p>
-          <p className="text-sm font-bold text-text">
-            {formatMoneyValue(Number.parseFloat(portfolioBreakdown.stocksValue))}
-          </p>
-          <p className="text-[10px] text-text-muted">
-            {portfolioBreakdown.stocksSharePercent}% · {portfolioBreakdown.stockPositionCount} positions
-          </p>
+      {kind === "stocks" ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-text-muted">Stocks & ETFs</p>
+            <p className="text-sm font-bold text-text">
+              {formatMoneyValue(Number.parseFloat(portfolioBreakdown.stocksValue))}
+            </p>
+            <p className="text-[10px] text-text-muted">
+              {portfolioBreakdown.stocksSharePercent}% · {portfolioBreakdown.stockPositionCount}{" "}
+              positions
+            </p>
+          </div>
+          <div className="rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-text-muted">Options</p>
+            <p className="text-sm font-bold text-text">
+              {formatMoneyValue(Number.parseFloat(portfolioBreakdown.optionsValue))}
+            </p>
+            <p className="text-[10px] text-text-muted">
+              {portfolioBreakdown.optionsSharePercent}% · {portfolioBreakdown.optionPositionCount}{" "}
+              positions
+            </p>
+          </div>
         </div>
-        <div className="rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2">
-          <p className="text-[10px] uppercase tracking-wide text-text-muted">Options</p>
-          <p className="text-sm font-bold text-text">
-            {formatMoneyValue(Number.parseFloat(portfolioBreakdown.optionsValue))}
-          </p>
-          <p className="text-[10px] text-text-muted">
-            {portfolioBreakdown.optionsSharePercent}% · {portfolioBreakdown.optionPositionCount} positions
-          </p>
-        </div>
-      </div>
+      ) : null}
 
       <DataTable
         columns={columns}
@@ -184,10 +222,51 @@ function HoldingsTableContent({ portfolioBreakdown }: Props) {
   );
 }
 
-export function HoldingsPortfolioSection({ portfolioBreakdown }: Props) {
+function HoldingsTablesContent({ portfolioBreakdown, accountId }: Props) {
+  const [holdingsTab, setHoldingsTab] = useState<"stocks" | "options">("stocks");
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-1 rounded-[var(--radius-sm)] bg-surface-raised p-1">
+        {(["stocks", "options"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setHoldingsTab(tab)}
+            className={`flex-1 rounded-[var(--radius-sm)] py-1.5 text-sm font-semibold ${
+              holdingsTab === tab
+                ? "bg-surface text-text shadow-sm"
+                : "text-text-muted hover:text-text"
+            }`}
+          >
+            {tab === "stocks" ? "Stocks & ETFs" : "Options"}
+          </button>
+        ))}
+      </div>
+
+      {holdingsTab === "stocks" ? (
+        <HoldingsTable
+          kind="stocks"
+          queryPrefix="holdingsStocks"
+          accountId={accountId}
+          portfolioBreakdown={portfolioBreakdown}
+        />
+      ) : (
+        <HoldingsTable
+          kind="options"
+          queryPrefix="holdingsOptions"
+          accountId={accountId}
+          portfolioBreakdown={portfolioBreakdown}
+        />
+      )}
+    </div>
+  );
+}
+
+export function HoldingsPortfolioSection(props: Props) {
   return (
     <Suspense fallback={<FeaturePanelLoading />}>
-      <HoldingsTableContent portfolioBreakdown={portfolioBreakdown} />
+      <HoldingsTablesContent {...props} />
     </Suspense>
   );
 }

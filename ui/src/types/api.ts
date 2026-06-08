@@ -503,6 +503,82 @@ export interface PortfolioBreakdown {
   totalPositionCount: number;
 }
 
+export interface PortfolioSideSummary {
+  count: number;
+  value: string;
+  sharePercent: number;
+}
+
+export interface PortfolioPerformer {
+  ticker: string;
+  name: string;
+  gainLoss: string;
+  gainLossPercent: number;
+}
+
+export interface PortfolioAnalytics {
+  winners: PortfolioSideSummary;
+  losers: PortfolioSideSummary;
+  winRate: number;
+  bestPerformer: PortfolioPerformer | null;
+  worstPerformer: PortfolioPerformer | null;
+  bestPerformerByDollar: PortfolioPerformer | null;
+  worstPerformerByDollar: PortfolioPerformer | null;
+  concentration: {
+    largestPositionWeight: number;
+    top5Weight: number;
+    hhi: number;
+  };
+  sectorAllocation: Array<{
+    sector: string;
+    value: string;
+    sharePercent: number;
+  }>;
+  unrealizedProfit: { total: string; positionCount: number };
+  unrealizedLoss: { total: string; positionCount: number };
+  costBasisCompleteness: {
+    scored: number;
+    total: number;
+    percent: number;
+  };
+  caveats: string[];
+}
+
+export interface PortfolioValueTrend {
+  points: Array<{ month: string; value: string }>;
+  granularity: "monthly";
+  caveats: string[];
+}
+
+export interface PruneLosersHolding {
+  holdingId: string;
+  ticker: string;
+  name: string;
+  value: string;
+  gainLoss: string;
+  gainLossPercent: number;
+  momentumScore: number;
+  momentumSignal: "improving" | "deteriorating" | "neutral";
+  classification: "cut-candidate" | "hold-recover" | "winner" | "unscored";
+}
+
+export interface PruneLosersResponse {
+  available: boolean;
+  confidence: number;
+  caveats: string[];
+  cutCandidates: PruneLosersHolding[];
+  holdRecover: PruneLosersHolding[];
+  whatIf: {
+    capitalFreed: string;
+    realizedLoss: string;
+    harvestableLoss: string;
+    projectedUpliftLow: string;
+    projectedUpliftHigh: string;
+  } | null;
+}
+
+export type PositionKindFilter = "all" | "stocks" | "options";
+
 export interface InvestmentHolding {
   ticker: string;
   name: string;
@@ -524,6 +600,9 @@ export interface InvestmentsResponse {
   totalCostBasis: string;
   totalGainLoss: string;
   totalGainLossPercent: number;
+  portfolioAnalytics: PortfolioAnalytics;
+  portfolioValueTrend: PortfolioValueTrend;
+  pruneLosers: PruneLosersResponse;
   accounts: {
     accountId: string;
     name: string;

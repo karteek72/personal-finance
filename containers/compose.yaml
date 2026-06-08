@@ -78,6 +78,7 @@ services:
       - "host.containers.internal:host-gateway"
     environment:
       NODE_ENV: production
+      SPENDFLOW_RUNTIME: container
       PORT: "4000"
       DATABASE_URL: ${DATABASE_URL}
       APP_URL: ${SPENDFLOW_API_PUBLIC_URL:-http://localhost:4000}
@@ -133,6 +134,7 @@ services:
       - "host.containers.internal:host-gateway"
     environment:
       NODE_ENV: production
+      SPENDFLOW_RUNTIME: container
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       APP_URL: ${SPENDFLOW_API_PUBLIC_URL:-http://localhost:4000}

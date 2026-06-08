@@ -23,6 +23,7 @@ import {
   parseOccOptionTicker,
   resolveOptionPremiumPerShare,
 } from "../holdings-mapper.js";
+import { lookupGicsSectorForTicker } from "../security-sector.js";
 import { mapSnaptradeActivityType } from "../investment-txn-classify.js";
 import { getSnaptradeClient, resolveSnaptradeRedirectUri } from "./client.js";
 import { getSnaptradeCredentials } from "./user-store.js";
@@ -168,10 +169,11 @@ function buildSecurityMetadata(
   assetType = effectiveAssetType(assetType, ticker, null);
 
   if (assetType !== "option") {
+    const sector = lookupGicsSectorForTicker(ticker, assetType);
     return {
       name: instrument.description?.trim() || instrument.symbol?.trim() || "Unknown",
       assetType,
-      sector: null,
+      sector,
     };
   }
 
@@ -326,7 +328,7 @@ async function upsertSecurity(
       .set({
         name: input.name.slice(0, 200) || normalized,
         assetType: input.assetType,
-        sector: input.sector ?? null,
+        ...(input.sector != null ? { sector: input.sector } : {}),
         ...(price ? { currentPrice: price, asOf: new Date() } : {}),
       })
       .where(eq(securities.id, existing.id));
