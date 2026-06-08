@@ -3,7 +3,7 @@ import {
   isOptionAssetType,
   type InvestmentPosition,
 } from "./holdings-mapper.js";
-import { resolveGicsSector } from "./security-sector.js";
+import { resolveGicsSector, buildPortfolioSectorHints } from "./security-sector.js";
 
 export interface PortfolioSideSummary {
   count: number;
@@ -72,6 +72,7 @@ export function computePortfolioAnalytics(
   positions: InvestmentPosition[],
   portfolioValue: number,
   dbSectors: ReadonlyMap<string, string> = new Map(),
+  portfolioHints?: ReadonlyMap<string, string>,
 ): PortfolioAnalytics {
   const caveats: string[] = [];
   const scored = positions.filter(hasScorableCostBasis);
@@ -121,9 +122,17 @@ export function computePortfolioAnalytics(
 
   const sectorMap = new Map<string, number>();
   let unknownSectorCount = 0;
+  const portfolioSectorHints =
+    portfolioHints ??
+    buildPortfolioSectorHints(positions, dbSectors);
+
   for (const position of positions) {
-    const sector = resolveGicsSector(position, dbSectors);
-    if (sector === "Unknown" || sector === "Options (unknown sector)") {
+    const sector = resolveGicsSector(position, dbSectors, portfolioSectorHints);
+    if (
+      sector === "Unknown" ||
+      sector === "Options (unknown sector)" ||
+      sector === "Unclassified security"
+    ) {
       unknownSectorCount += 1;
     }
     sectorMap.set(sector, (sectorMap.get(sector) ?? 0) + positionValue(position));

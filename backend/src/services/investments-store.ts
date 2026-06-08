@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import {
   accounts,
@@ -37,7 +37,9 @@ import {
 } from "./portfolio-analytics.js";
 import {
   buildDbSectorMap,
+  buildPortfolioSectorHints,
   collectSectorLookupTickers,
+  collectTickersNeedingSectorBackfill,
 } from "./security-sector.js";
 import {
   getPortfolioValueTrend,
@@ -157,6 +159,19 @@ function holdingSortKey(
       return (r) => Number.parseFloat(r.costBasis);
     default:
       return (r) => Number.parseFloat(r.value);
+  }
+}
+
+async function backfillMissingSecuritySectors(
+  db: ReturnType<typeof getDb>,
+  rows: ReadonlyArray<{ ticker: string; sector: string | null; assetType: string }>,
+): Promise<void> {
+  const updates = collectTickersNeedingSectorBackfill(rows);
+  for (const row of updates) {
+    await db
+      .update(securities)
+      .set({ sector: row.sector })
+      .where(and(eq(securities.ticker, row.ticker), isNull(securities.sector)));
   }
 }
 
@@ -280,16 +295,23 @@ export async function getInvestments(
           .select({
             ticker: securities.ticker,
             sector: securities.sector,
+            assetType: securities.assetType,
           })
           .from(securities)
           .where(inArray(securities.ticker, sectorTickers))
       : [];
   const dbSectors = buildDbSectorMap(sectorRows);
+  void backfillMissingSecuritySectors(db, sectorRows).catch(() => undefined);
+  const portfolioSectorHints = buildPortfolioSectorHints(
+    scopedPositions,
+    dbSectors,
+  );
 
   const portfolioAnalytics = computePortfolioAnalytics(
     scopedPositions,
     displayPortfolioValue,
     dbSectors,
+    portfolioSectorHints,
   );
   const portfolioValueTrend = await getPortfolioValueTrend(
     ctx.userIds,

@@ -41,6 +41,9 @@ export const gicsSectorColors: Record<string, string> = {
   "Funds (uncategorized)": "#94A3B8",
   Unknown: "#9CA3AF",
   "Options (unknown sector)": "#C084FC",
+  "Cash & Money Market": "#94A3B8",
+  "Unclassified security": "#D1D5DB",
+  "Other ETF": "#8B5CF6",
 };
 
 export const assetAllocationColors: Record<string, string> = {
