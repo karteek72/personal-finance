@@ -13,12 +13,10 @@ final class DashboardViewModel {
         errorMessage = nil
         defer { isLoading = false }
 
-        let year = Calendar.current.component(.year, from: Date())
-        let from = "\(year)-01-01"
-        let to = "\(year)-12-31"
+        let range = AnalyticsDateRange.rolling()
 
         do {
-            async let summaryTask = api.getSummary(from: from, to: to)
+            async let summaryTask = api.getSummary(from: range.from, to: range.to)
             async let alertsTask = api.getAlerts()
             summary = try await summaryTask
             alerts = try await alertsTask.alerts
@@ -62,7 +60,7 @@ struct DashboardView: View {
     private func heroCard(summary: TransactionSummary) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Net savings · \(Calendar.current.component(.year, from: Date()))")
+                Text("Net savings · \(AnalyticsDateRange.periodLabel)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.85))
                 Spacer()

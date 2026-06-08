@@ -13,7 +13,8 @@ final class CategoriesViewModel {
         defer { isLoading = false }
 
         do {
-            let response = try await api.getCategories()
+            let range = AnalyticsDateRange.rolling()
+            let response = try await api.getCategories(from: range.from, to: range.to)
             categories = response.categories.sorted { lhs, rhs in
                 (Decimal(string: lhs.amount) ?? 0) > (Decimal(string: rhs.amount) ?? 0)
             }

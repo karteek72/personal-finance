@@ -25,9 +25,28 @@ enum APIError: LocalizedError, Sendable {
         case let .httpStatus(code, message):
             return message.isEmpty ? "Request failed (\(code))" : message
         case let .decoding(error):
-            return "Unexpected response format: \(error.localizedDescription)"
+            return "Unexpected response format: \(Self.describeDecodingError(error))"
         case let .transport(error):
             return error.localizedDescription
+        }
+    }
+
+    private static func describeDecodingError(_ error: Error) -> String {
+        guard let decodingError = error as? DecodingError else {
+            return error.localizedDescription
+        }
+
+        switch decodingError {
+        case let .keyNotFound(key, context):
+            return "Missing field '\(key.stringValue)' at \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+        case let .typeMismatch(type, context):
+            return "Wrong type for '\(context.codingPath.map(\.stringValue).joined(separator: "."))' (expected \(type))"
+        case let .valueNotFound(type, context):
+            return "Missing value for '\(context.codingPath.map(\.stringValue).joined(separator: "."))' (expected \(type))"
+        case let .dataCorrupted(context):
+            return context.debugDescription
+        @unknown default:
+            return decodingError.localizedDescription
         }
     }
 }

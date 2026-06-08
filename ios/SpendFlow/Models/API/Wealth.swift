@@ -124,8 +124,9 @@ struct InvestmentsResponse: Codable, Sendable {
     struct InvestmentHistory: Codable, Sendable {
         let lookbackYears: Int
         let totalContributed: String
-        let estimatedValueToday: String
         let currentPortfolioValue: String
+        let totalCostBasis: String
+        let unrealizedGain: String
         let monthlyAverageInvest: String
         let transactionCount: Int
         let buyTransactionCount: Int
@@ -218,12 +219,24 @@ struct CreditDebtSummary: Codable, Sendable {
     let cards: [CreditCardDebtRow]
 }
 
-struct AccountCreditLiability: Codable, Sendable {
-    struct Apr: Codable, Sendable {
+struct AccountCreditLiability: Codable, Sendable, Equatable {
+    struct Apr: Codable, Sendable, Equatable {
         let aprType: String
         let aprPercentage: String
         let balanceSubjectToApr: String?
         let interestChargeAmount: String?
+
+        enum CodingKeys: String, CodingKey {
+            case aprType, aprPercentage, balanceSubjectToApr, interestChargeAmount
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            aprType = try container.decode(String.self, forKey: .aprType)
+            aprPercentage = try APIDecoding.decodeMoney(from: container, forKey: .aprPercentage)
+            balanceSubjectToApr = try APIDecoding.decodeOptionalMoney(from: container, forKey: .balanceSubjectToApr)
+            interestChargeAmount = try APIDecoding.decodeOptionalMoney(from: container, forKey: .interestChargeAmount)
+        }
     }
 
     let lastStatementBalance: String?
@@ -239,4 +252,28 @@ struct AccountCreditLiability: Codable, Sendable {
     let statementVsCurrentDelta: String?
     let daysUntilDue: Int?
     let syncedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case lastStatementBalance, lastStatementIssueDate, minimumPaymentAmount
+        case nextPaymentDueDate, lastPaymentAmount, lastPaymentDate, isOverdue, aprs
+        case purchaseApr, estimatedMonthlyInterest, statementVsCurrentDelta
+        case daysUntilDue, syncedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        lastStatementBalance = try APIDecoding.decodeOptionalMoney(from: container, forKey: .lastStatementBalance)
+        lastStatementIssueDate = try container.decodeIfPresent(String.self, forKey: .lastStatementIssueDate)
+        minimumPaymentAmount = try APIDecoding.decodeOptionalMoney(from: container, forKey: .minimumPaymentAmount)
+        nextPaymentDueDate = try container.decodeIfPresent(String.self, forKey: .nextPaymentDueDate)
+        lastPaymentAmount = try APIDecoding.decodeOptionalMoney(from: container, forKey: .lastPaymentAmount)
+        lastPaymentDate = try container.decodeIfPresent(String.self, forKey: .lastPaymentDate)
+        isOverdue = try container.decodeIfPresent(Bool.self, forKey: .isOverdue)
+        aprs = try container.decode([Apr].self, forKey: .aprs)
+        purchaseApr = try APIDecoding.decodeOptionalMoney(from: container, forKey: .purchaseApr)
+        estimatedMonthlyInterest = try APIDecoding.decodeOptionalMoney(from: container, forKey: .estimatedMonthlyInterest)
+        statementVsCurrentDelta = try APIDecoding.decodeOptionalMoney(from: container, forKey: .statementVsCurrentDelta)
+        daysUntilDue = try container.decodeIfPresent(Int.self, forKey: .daysUntilDue)
+        syncedAt = try container.decodeIfPresent(String.self, forKey: .syncedAt)
+    }
 }

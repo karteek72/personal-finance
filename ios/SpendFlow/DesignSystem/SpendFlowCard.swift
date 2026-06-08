@@ -53,7 +53,7 @@ struct SpendFlowScreen<Content: View>: View {
                     content()
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 100)
+                .padding(.bottom, 24)
             }
         }
     }
@@ -219,6 +219,7 @@ enum AppTab: String, CaseIterable, Identifiable {
 
 struct FloatingTabBar: View {
     @Binding var selection: AppTab
+    @Binding var moreNavigationPath: NavigationPath
 
     var body: some View {
         HStack(spacing: 0) {
@@ -226,7 +227,13 @@ struct FloatingTabBar: View {
                 let isActive = selection == tab
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-                        selection = tab
+                        if selection == tab {
+                            if tab == .more, !moreNavigationPath.isEmpty {
+                                moreNavigationPath = NavigationPath()
+                            }
+                        } else {
+                            selection = tab
+                        }
                     }
                 } label: {
                     VStack(spacing: 3) {
@@ -243,23 +250,20 @@ struct FloatingTabBar: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 4)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+        .frame(maxWidth: .infinity)
         .background {
-            RoundedRectangle(cornerRadius: SpendFlowTheme.radiusLG, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .background(
-                    RoundedRectangle(cornerRadius: SpendFlowTheme.radiusLG, style: .continuous)
-                        .fill(SpendFlowTheme.surface.opacity(0.92))
-                )
+            SpendFlowTheme.surface.opacity(0.98)
+                .background(.ultraThinMaterial)
+                .ignoresSafeArea(edges: .bottom)
         }
-        .overlay(
-            RoundedRectangle(cornerRadius: SpendFlowTheme.radiusLG, style: .continuous)
-                .stroke(SpendFlowTheme.border.opacity(0.6), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.08), radius: 20, x: 0, y: 8)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(SpendFlowTheme.border.opacity(0.55))
+                .frame(height: 1)
+        }
     }
 }
 

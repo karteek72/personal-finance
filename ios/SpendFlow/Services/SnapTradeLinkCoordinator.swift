@@ -13,7 +13,6 @@ final class SnapTradeLinkCoordinator: NSObject {
 
     private let api: APIClient
     private var onLinked: (() async -> Void)?
-    private var authSession: ASWebAuthenticationSession?
 
     init(api: APIClient) {
         self.api = api

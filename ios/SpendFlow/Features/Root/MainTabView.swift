@@ -4,28 +4,28 @@ struct MainTabView: View {
     @Environment(AppState.self) private var appState
     @State private var tab: AppTab = .home
     @State private var showSettings = false
+    @State private var moreNavigationPath = NavigationPath()
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Group {
-                switch tab {
-                case .home:
-                    DashboardView()
-                case .flow:
-                    MoneyFlowView()
-                case .spend:
-                    CategoriesView()
-                case .activity:
-                    TransactionsView()
-                case .wallet:
-                    AccountsView()
-                case .more:
-                    MoreHubView()
-                }
+        Group {
+            switch tab {
+            case .home:
+                DashboardView()
+            case .flow:
+                MoneyFlowView()
+            case .spend:
+                CategoriesView()
+            case .activity:
+                TransactionsView()
+            case .wallet:
+                AccountsView()
+            case .more:
+                MoreHubView(navigationPath: $moreNavigationPath)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            FloatingTabBar(selection: $tab)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            FloatingTabBar(selection: $tab, moreNavigationPath: $moreNavigationPath)
         }
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 12) {

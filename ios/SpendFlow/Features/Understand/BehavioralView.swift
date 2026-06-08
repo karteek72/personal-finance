@@ -148,10 +148,8 @@ struct BehavioralView: View {
     }
 
     private func lifestyleCreep(_ data: BehavioralResponse) -> some View {
-        let income = data.creep.income.map { AnalyticsUI.parseAmount($0) }
         let spending = data.creep.spending.map { AnalyticsUI.parseAmount($0) }
         let hasCreep = !data.creep.months.isEmpty
-        let maxVal = max(income.max() ?? 0, spending.max() ?? 0, 1)
 
         return SpendFlowCard {
             VStack(alignment: .leading, spacing: 10) {

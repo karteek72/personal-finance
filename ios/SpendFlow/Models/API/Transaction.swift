@@ -10,6 +10,7 @@ struct Transaction: Codable, Identifiable, Equatable, Sendable {
     let amount: String
     let currencyCode: String
     let category: String
+    let subCategory: String?
     let transactionType: TransactionType
     let isTransfer: Bool
     let pending: Bool

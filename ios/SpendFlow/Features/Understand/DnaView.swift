@@ -236,9 +236,10 @@ private struct DnaRadarChart: View {
 
     private func axisPoint(index: Int, count: Int, factor: Double, center: CGPoint, scale: CGFloat) -> CGPoint {
         let angle = (Double(index) / Double(count)) * 2 * .pi - .pi / 2
+        let r = Double(radius) * factor * Double(scale)
         return CGPoint(
-            x: center.x + CGFloat(cos(angle) * radius * factor) * scale,
-            y: center.y + CGFloat(sin(angle) * radius * factor) * scale
+            x: center.x + CGFloat(Darwin.cos(angle) * r),
+            y: center.y + CGFloat(Darwin.sin(angle) * r)
         )
     }
 
