@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { getDb } from "../db/client.js";
 import { formatCsvRow } from "../lib/csv.js";
 import { countMonthsInclusive, deltaPercentVsPrior, priorComparablePeriod } from "../lib/date-range.js";
@@ -249,11 +249,17 @@ async function activeTransactionSqlFilters(userIds: string[]) {
   };
 }
 
+export type CategorizationStatus =
+  | "uncategorized"
+  | "missing_subcategory"
+  | "needs_review";
+
 export type TransactionListFilters = {
   userIds: string[];
   month?: string;
   category?: string;
   subCategory?: string;
+  categorizationStatus?: CategorizationStatus;
   accountId?: string;
   scopedAccountIds?: string[] | null;
   q?: string;
@@ -289,6 +295,27 @@ function buildTransactionFilterConditions(filters: TransactionListFilters) {
       conditions.push(isNull(transactions.subCategory));
     } else {
       conditions.push(eq(transactions.subCategory, filters.subCategory));
+    }
+  }
+  if (filters.categorizationStatus) {
+    conditions.push(eq(transactions.transactionType, "expense"));
+    conditions.push(eq(transactions.isTransfer, false));
+    switch (filters.categorizationStatus) {
+      case "uncategorized":
+        conditions.push(eq(transactions.category, "Uncategorized"));
+        break;
+      case "missing_subcategory":
+        conditions.push(isNull(transactions.subCategory));
+        conditions.push(ne(transactions.category, "Uncategorized"));
+        break;
+      case "needs_review":
+        conditions.push(
+          or(
+            eq(transactions.category, "Uncategorized"),
+            isNull(transactions.subCategory),
+          )!,
+        );
+        break;
     }
   }
   if (filters.accountId) {
@@ -394,6 +421,7 @@ export async function listTransactions(filters: {
   month?: string;
   category?: string;
   subCategory?: string;
+  categorizationStatus?: CategorizationStatus;
   accountId?: string;
   scopedAccountIds?: string[] | null;
   q?: string;

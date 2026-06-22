@@ -82,6 +82,11 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
         month: query.month,
         category: query.category,
         subCategory: query.subCategory,
+        categorizationStatus: query.categorizationStatus as
+          | "uncategorized"
+          | "missing_subcategory"
+          | "needs_review"
+          | undefined,
         accountId: query.accountId,
         scopedAccountIds: scope.scopedAccountIds,
         q: query.q,
@@ -110,6 +115,11 @@ export const transactionRoutes: FastifyPluginAsync = async (app) => {
       month: query.month,
       category: query.category,
       subCategory: query.subCategory,
+      categorizationStatus: query.categorizationStatus as
+        | "uncategorized"
+        | "missing_subcategory"
+        | "needs_review"
+        | undefined,
       accountId: query.accountId,
       scopedAccountIds: scope.scopedAccountIds,
       q: query.q,

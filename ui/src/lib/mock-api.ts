@@ -338,6 +338,8 @@ export async function getTransactions(
   const {
     month,
     category,
+    subCategory,
+    categorizationStatus,
     accountId,
     q,
     type,
@@ -363,6 +365,34 @@ export async function getTransactions(
     }
     if (category && tx.category !== category) {
       return false;
+    }
+    if (subCategory) {
+      if (subCategory === "General") {
+        if (tx.subCategory != null && tx.subCategory.trim() !== "") {
+          return false;
+        }
+      } else if (tx.subCategory !== subCategory) {
+        return false;
+      }
+    }
+    if (categorizationStatus) {
+      if (tx.transactionType !== "expense" || tx.isTransfer) {
+        return false;
+      }
+      if (categorizationStatus === "uncategorized") {
+        if (tx.category !== "Uncategorized") return false;
+      } else if (categorizationStatus === "missing_subcategory") {
+        if (tx.category === "Uncategorized") return false;
+        if (tx.subCategory != null && tx.subCategory.trim() !== "") {
+          return false;
+        }
+      } else if (categorizationStatus === "needs_review") {
+        const needsReview =
+          tx.category === "Uncategorized" ||
+          tx.subCategory == null ||
+          tx.subCategory.trim() === "";
+        if (!needsReview) return false;
+      }
     }
     if (accountId && tx.accountId !== accountId) {
       return false;

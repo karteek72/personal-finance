@@ -160,7 +160,7 @@ Requires `PLAID_PRODUCTS=transactions,liabilities`. Existing items must be re-li
 
 | Method | Path | Query | Response |
 |--------|------|-------|----------|
-| GET | `/transactions` | `month`, `category`, `subCategory`, `accountId`, `memberId`, `scope` (`all`\|`household`\|`personal`), `q`, `type`, `sort` (`date_desc`\|`date_asc`\|`amount_desc`\|`amount_asc`), `limit`, `cursor` | `{ items: Transaction[], nextCursor }` |
+| GET | `/transactions` | `month`, `category`, `subCategory`, `categorizationStatus` (`uncategorized`\|`missing_subcategory`\|`needs_review`), `accountId`, `memberId`, `scope` (`all`\|`household`\|`personal`), `q`, `type`, `sort` (`date_desc`\|`date_asc`\|`amount_desc`\|`amount_asc`), `limit`, `cursor` | `{ items: Transaction[], nextCursor }` |
 | GET | `/transactions/summary` | `from`, `to` | `TransactionSummary` |
 | GET | `/transactions/by-category` | `from`, `to` | `{ categories: CategoryTotal[] }` |
 | GET | `/transactions/chart-data` | `from`, `to`, `category`, `accountId` | `ChartDataResponse` — `monthly` (filtered by `from`/`to`), `yearly` (full history when data spans 2+ calendar years), category breakdown |

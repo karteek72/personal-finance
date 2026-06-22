@@ -14,6 +14,11 @@ import { useCategories } from "@/hooks/use-categories";
 import type { InfiniteTransactionFilters } from "@/hooks/use-infinite-transactions";
 import { useHousehold } from "@/hooks/use-household";
 import { api } from "@/lib/api-client";
+import {
+  CATEGORIZATION_STATUS_OPTIONS,
+  isCategorizationStatusFilter,
+  type CategorizationStatusFilter,
+} from "@/lib/transaction-filters";
 import type { TransactionFilters } from "@/types/api";
 import { useViewModeStore } from "@/stores/view-mode-store";
 
@@ -52,6 +57,15 @@ function readSortFromUrl(value: string | null): NonNullable<TransactionFilters["
   return "date_desc";
 }
 
+function readCategorizationFromUrl(
+  value: string | null,
+): CategorizationStatusFilter | "" {
+  if (value && isCategorizationStatusFilter(value)) {
+    return value;
+  }
+  return "";
+}
+
 function TransactionsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -68,6 +82,9 @@ function TransactionsContent() {
   const [subCategory, setSubCategory] = useState(
     () => searchParams.get("subCategory") ?? "",
   );
+  const [categorizationStatus, setCategorizationStatus] = useState<
+    CategorizationStatusFilter | ""
+  >(() => readCategorizationFromUrl(searchParams.get("review")));
   const [sort, setSort] = useState<NonNullable<TransactionFilters["sort"]>>(() =>
     readSortFromUrl(searchParams.get("sort")),
   );
@@ -82,12 +99,18 @@ function TransactionsContent() {
   const [exporting, setExporting] = useState(false);
 
   const transactionFilters: InfiniteTransactionFilters = {
-    type: filter === "all" ? undefined : filter,
+    type:
+      categorizationStatus !== ""
+        ? "expense"
+        : filter === "all"
+          ? undefined
+          : filter,
     q: search || undefined,
     month: monthQueryValue(selectedMonth),
     accountId: accountId || undefined,
-    category: category || undefined,
-    subCategory: subCategory || undefined,
+    category: categorizationStatus ? undefined : category || undefined,
+    subCategory: categorizationStatus ? undefined : subCategory || undefined,
+    categorizationStatus: categorizationStatus || undefined,
     memberId: selectedMemberId || undefined,
     scope: selectedMemberId ? undefined : scope,
     sort,
@@ -120,12 +143,14 @@ function TransactionsContent() {
   function updateUrlFilters(patch: {
     accountId?: string;
     category?: string;
+    review?: string;
     sort?: string;
     q?: string;
   }) {
     const params = new URLSearchParams(searchParams.toString());
     const nextAccountId = patch.accountId ?? accountId;
     const nextCategory = patch.category ?? category;
+    const nextReview = patch.review ?? categorizationStatus;
     const nextSort = patch.sort ?? sort;
     const nextQ = patch.q ?? search;
 
@@ -138,6 +163,11 @@ function TransactionsContent() {
       params.set("category", nextCategory);
     } else {
       params.delete("category");
+    }
+    if (nextReview) {
+      params.set("review", nextReview);
+    } else {
+      params.delete("review");
     }
     if (nextSort && nextSort !== "date_desc") {
       params.set("sort", nextSort);
@@ -246,7 +276,13 @@ function TransactionsContent() {
             type="button"
             role="tab"
             aria-selected={filter === option.id}
-            onClick={() => setFilter(option.id)}
+            onClick={() => {
+              setFilter(option.id);
+              if (option.id !== "expense") {
+                setCategorizationStatus("");
+                updateUrlFilters({ review: "" });
+              }
+            }}
             className={`flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-2 text-sm font-semibold transition-all sm:px-4 ${
               filter === option.id
                 ? "bg-primary text-text-inverse shadow-sm"
@@ -270,10 +306,25 @@ function TransactionsContent() {
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <MonthFilterSelect
           selectedMonth={selectedMonth}
           onChange={setSelectedMonth}
+        />
+        <FilterSelect
+          id="transaction-review-filter"
+          label="Categorization"
+          value={categorizationStatus}
+          onChange={(value) => {
+            const next = isCategorizationStatusFilter(value) ? value : "";
+            setCategorizationStatus(next);
+            if (next) {
+              setCategory("");
+              setSubCategory("");
+            }
+            updateUrlFilters({ review: next, category: "" });
+          }}
+          options={CATEGORIZATION_STATUS_OPTIONS}
         />
         <FilterSelect
           id="transaction-account-filter"
@@ -291,9 +342,13 @@ function TransactionsContent() {
           value={category}
           onChange={(value) => {
             setCategory(value);
-            updateUrlFilters({ category: value });
+            if (value) {
+              setCategorizationStatus("");
+            }
+            updateUrlFilters({ category: value, review: "" });
           }}
           options={categoryOptions}
+          className={categorizationStatus ? "opacity-60" : undefined}
         />
         <FilterSelect
           id="transaction-sort"
@@ -311,6 +366,13 @@ function TransactionsContent() {
         />
       </div>
 
+      {categorizationStatus ? (
+        <p className="rounded-[var(--radius-sm)] bg-warning/10 px-3 py-2 text-xs text-text-muted">
+          Showing expenses that need a category or subcategory. Use the dropdowns
+          on each row to classify them.
+        </p>
+      ) : null}
+
       {categoryFeedback ? (
         <p className="rounded-[var(--radius-sm)] bg-primary-soft/60 px-3 py-2 text-sm text-primary">
           {categoryFeedback}
@@ -321,7 +383,11 @@ function TransactionsContent() {
         <TransactionList
           filters={transactionFilters}
           pageSize={50}
-          emptyMessage="Nothing here — try changing your filters"
+          emptyMessage={
+            categorizationStatus
+              ? "Nothing left to review — you're all caught up"
+              : "Nothing here — try changing your filters"
+          }
           loadingMessage="Loading activity…"
           onCategoryUpdated={setCategoryFeedback}
         />

@@ -1183,6 +1183,10 @@ export interface TransactionFilters {
   month?: string;
   category?: string;
   subCategory?: string;
+  categorizationStatus?:
+    | "uncategorized"
+    | "missing_subcategory"
+    | "needs_review";
   accountId?: string;
   memberId?: string;
   scope?: "all" | "household" | "personal";

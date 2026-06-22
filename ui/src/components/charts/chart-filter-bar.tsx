@@ -1,7 +1,8 @@
 "use client";
 
-import clsx from "clsx";
+import { useMemo } from "react";
 
+import { FilterSelect } from "@/components/ui/filter-select";
 import type { Account, HouseholdMember } from "@/types/api";
 import type { ViewScope } from "@/stores/view-mode-store";
 
@@ -18,13 +19,23 @@ interface ChartFilterBarProps {
   onCategoryChange: (category: string) => void;
   onMemberChange?: (memberId: string) => void;
   onClear: () => void;
+  showAccountFilter?: boolean;
+  showCategoryFilter?: boolean;
+  showMemberFilter?: boolean;
 }
 
-const SCOPE_OPTIONS: { id: ViewScope; label: string }[] = [
-  { id: "household", label: "Family" },
-  { id: "personal", label: "Mine" },
-  { id: "all", label: "Everything" },
+const SCOPE_OPTIONS: { value: ViewScope; label: string }[] = [
+  { value: "all", label: "Everything" },
+  { value: "household", label: "Family" },
+  { value: "personal", label: "Mine" },
 ];
+
+function accountLabel(account: Account): string {
+  if (account.mask) {
+    return `${account.name} ••${account.mask}`;
+  }
+  return account.name;
+}
 
 export function ChartFilterBar({
   accounts,
@@ -39,154 +50,99 @@ export function ChartFilterBar({
   onCategoryChange,
   onMemberChange,
   onClear,
+  showAccountFilter = true,
+  showCategoryFilter = true,
+  showMemberFilter = true,
 }: ChartFilterBarProps) {
   const hasFilters = Boolean(
     selectedAccountId || selectedCategory || selectedMemberId,
   );
 
+  const scopeOptions = useMemo(
+    () =>
+      SCOPE_OPTIONS.map((option) => ({
+        value: option.value,
+        label: option.label,
+      })),
+    [],
+  );
+
+  const memberOptions = useMemo(
+    () => [
+      { value: "", label: "All people" },
+      ...members.map((member) => ({
+        value: member.id,
+        label: member.displayName,
+      })),
+    ],
+    [members],
+  );
+
+  const accountOptions = useMemo(
+    () => [
+      { value: "", label: "All accounts" },
+      ...accounts.map((account) => ({
+        value: account.id,
+        label: accountLabel(account),
+      })),
+    ],
+    [accounts],
+  );
+
+  const categoryOptions = useMemo(
+    () => [
+      { value: "", label: "All categories" },
+      ...categories.map((category) => ({
+        value: category,
+        label: category,
+      })),
+    ],
+    [categories],
+  );
+
   return (
     <div className="flex flex-col gap-3">
-      {onScopeChange ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-            View
-          </span>
-          {SCOPE_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => onScopeChange(option.id)}
-              className={clsx(
-                "rounded-[var(--radius-pill)] px-3 py-1.5 text-xs font-semibold transition-all",
-                scope === option.id
-                  ? "bg-primary text-text-inverse"
-                  : "bg-surface text-text-muted card-shadow hover:text-text",
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {onScopeChange ? (
+          <FilterSelect
+            id="chart-scope-filter"
+            label="View"
+            value={scope}
+            onChange={(value) => onScopeChange(value as ViewScope)}
+            options={scopeOptions}
+          />
+        ) : null}
 
-      {members.length > 0 && onMemberChange ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-            Member
-          </span>
-          <button
-            type="button"
-            onClick={() => onMemberChange("")}
-            className={clsx(
-              "rounded-[var(--radius-pill)] px-3 py-1.5 text-xs font-semibold transition-all",
-              !selectedMemberId
-                ? "bg-primary text-text-inverse"
-                : "bg-surface text-text-muted card-shadow hover:text-text",
-            )}
-          >
-            All
-          </button>
-          {members.map((member) => (
-            <button
-              key={member.id}
-              type="button"
-              onClick={() =>
-                onMemberChange(
-                  selectedMemberId === member.id ? "" : member.id,
-                )
-              }
-              className={clsx(
-                "inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-1.5 text-xs font-semibold transition-all",
-                selectedMemberId === member.id
-                  ? "bg-primary text-text-inverse"
-                  : "bg-surface text-text-muted card-shadow hover:text-text",
-              )}
-            >
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: member.avatarColor }}
-              />
-              {member.displayName}
-            </button>
-          ))}
-        </div>
-      ) : null}
+        {showMemberFilter && members.length > 0 && onMemberChange ? (
+          <FilterSelect
+            id="chart-member-filter"
+            label="Person"
+            value={selectedMemberId}
+            onChange={onMemberChange}
+            options={memberOptions}
+          />
+        ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-          Account
-        </span>
-        <button
-          type="button"
-          onClick={() => onAccountChange("")}
-          className={clsx(
-            "rounded-[var(--radius-pill)] px-3 py-1.5 text-xs font-semibold transition-all",
-            !selectedAccountId
-              ? "bg-primary text-text-inverse"
-              : "bg-surface text-text-muted card-shadow hover:text-text",
-          )}
-        >
-          All
-        </button>
-        {accounts.map((account) => (
-          <button
-            key={account.id}
-            type="button"
-            onClick={() =>
-              onAccountChange(
-                selectedAccountId === account.id ? "" : account.id,
-              )
-            }
-            className={clsx(
-              "rounded-[var(--radius-pill)] px-3 py-1.5 text-xs font-semibold transition-all",
-              selectedAccountId === account.id
-                ? "bg-primary text-text-inverse"
-                : "bg-surface text-text-muted card-shadow hover:text-text",
-            )}
-          >
-            {account.mask ? `••${account.mask}` : account.name}
-          </button>
-        ))}
+        {showAccountFilter ? (
+          <FilterSelect
+            id="chart-account-filter"
+            label="Account"
+            value={selectedAccountId}
+            onChange={onAccountChange}
+            options={accountOptions}
+          />
+        ) : null}
+
+        {showCategoryFilter && categories.length > 0 ? (
+          <FilterSelect
+            id="chart-category-filter"
+            label="Category"
+            value={selectedCategory}
+            onChange={onCategoryChange}
+            options={categoryOptions}
+          />
+        ) : null}
       </div>
-
-      {categories.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-            Category
-          </span>
-          <button
-            type="button"
-            onClick={() => onCategoryChange("")}
-            className={clsx(
-              "rounded-[var(--radius-pill)] px-3 py-1.5 text-xs font-semibold transition-all",
-              !selectedCategory
-                ? "bg-primary text-text-inverse"
-                : "bg-surface text-text-muted card-shadow hover:text-text",
-            )}
-          >
-            All
-          </button>
-          {categories.slice(0, 8).map((category) => (
-            <button
-              key={category}
-              type="button"
-              onClick={() =>
-                onCategoryChange(
-                  selectedCategory === category ? "" : category,
-                )
-              }
-              className={clsx(
-                "rounded-[var(--radius-pill)] px-3 py-1.5 text-xs font-semibold transition-all",
-                selectedCategory === category
-                  ? "bg-primary text-text-inverse"
-                  : "bg-surface text-text-muted card-shadow hover:text-text",
-              )}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-      ) : null}
 
       {hasFilters ? (
         <button

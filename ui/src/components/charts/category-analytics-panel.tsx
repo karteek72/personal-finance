@@ -11,20 +11,31 @@ import { InteractiveMultiLineChart } from "@/components/charts/interactive-multi
 import { useAccounts } from "@/hooks/use-accounts";
 import { useCategories } from "@/hooks/use-categories";
 import { useChartData } from "@/hooks/use-chart-data";
+import { useHousehold } from "@/hooks/use-household";
 import type { CategoryTotal } from "@/types/api";
 
 interface CategoryAnalyticsPanelProps {
   initialCategories?: CategoryTotal[];
   selectedAccountId?: string;
   onAccountChange?: (id: string) => void;
+  /** When the parent renders the account filter, hide it here to avoid duplication. */
+  hideAccountFilter?: boolean;
+  selectedMemberId?: string;
+  onMemberChange?: (id: string) => void;
+  hideMemberFilter?: boolean;
 }
 
 export function CategoryAnalyticsPanel({
   initialCategories = [],
   selectedAccountId: selectedAccountIdProp = "",
   onAccountChange,
+  hideAccountFilter = false,
+  selectedMemberId: selectedMemberIdProp = "",
+  onMemberChange,
+  hideMemberFilter = false,
 }: CategoryAnalyticsPanelProps) {
   const [internalAccountId, setInternalAccountId] = useState("");
+  const [internalMemberId, setInternalMemberId] = useState("");
 
   // Use prop when provided (controlled), fall back to internal state
   const selectedAccountId = onAccountChange !== undefined ? selectedAccountIdProp : internalAccountId;
@@ -35,16 +46,29 @@ export function CategoryAnalyticsPanel({
       setInternalAccountId(id);
     }
   }
+
+  const selectedMemberId =
+    onMemberChange !== undefined ? selectedMemberIdProp : internalMemberId;
+  function setSelectedMemberId(id: string) {
+    if (onMemberChange) {
+      onMemberChange(id);
+    } else {
+      setInternalMemberId(id);
+    }
+  }
+
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(
     null,
   );
 
   const { data: accountsData } = useAccounts();
+  const { data: householdData } = useHousehold();
   const { data: categoriesData } = useCategories();
   const { data, isLoading, isFetching } = useChartData({
     accountId: selectedAccountId || undefined,
     category: selectedCategory ?? undefined,
+    memberId: selectedMemberId || undefined,
   });
 
   const categoryBreakdown = categoriesData?.categories ?? initialCategories;
@@ -120,16 +144,22 @@ export function CategoryAnalyticsPanel({
       <ChartFilterBar
         accounts={accountsData?.accounts ?? []}
         categories={filterCategories}
+        members={householdData?.members ?? []}
         selectedAccountId={selectedAccountId}
         selectedCategory={selectedCategory ?? ""}
+        selectedMemberId={selectedMemberId}
         onAccountChange={setSelectedAccountId}
         onCategoryChange={(category) =>
           handleSelectCategory(category || null)
         }
+        onMemberChange={setSelectedMemberId}
         onClear={() => {
           setSelectedAccountId("");
+          setSelectedMemberId("");
           handleSelectCategory(null);
         }}
+        showAccountFilter={!hideAccountFilter}
+        showMemberFilter={!hideMemberFilter}
       />
 
       {isFetching && !isLoading ? (
