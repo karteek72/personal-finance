@@ -8,7 +8,9 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { TopBar } from "@/components/layout/top-bar";
 import { InsightNotificationsSync } from "@/components/notifications/insight-notifications-sync";
+import { WrappedNotificationsSync } from "@/components/notifications/wrapped-notifications-sync";
 import { CoachAssistant } from "@/components/preview/coach-assistant";
+import { WrappedOverlay } from "@/components/preview/wrapped-overlay";
 import { AuthGate } from "@/providers/auth-provider";
 
 const PAGE_TITLES: Record<string, string> = {
@@ -37,6 +39,7 @@ export default function DashboardLayout({
   return (
     <AuthGate>
       <InsightNotificationsSync />
+      <WrappedNotificationsSync />
       <div className="flex min-h-screen overflow-x-hidden bg-bg">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden pb-20 md:pb-0">
@@ -51,6 +54,7 @@ export default function DashboardLayout({
         </div>
         <MobileNav />
         <CoachAssistant />
+        <WrappedOverlay />
       </div>
     </AuthGate>
   );

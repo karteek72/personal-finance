@@ -151,8 +151,13 @@ extension APIClient {
         try await send(APIRequest(path: "/household"))
     }
 
-    func getHouseholdInsights() async throws -> HouseholdInsightsResponse {
-        try await send(APIRequest(path: "/household/insights"))
+    func getHouseholdInsights(from: String? = nil, to: String? = nil) async throws -> HouseholdInsightsResponse {
+        var queryItems: [URLQueryItem] = []
+        if let from { queryItems.append(.init(name: "from", value: from)) }
+        if let to { queryItems.append(.init(name: "to", value: to)) }
+        return try await send(
+            APIRequest(path: "/household/insights", queryItems: queryItems)
+        )
     }
 
     // MARK: - Profile

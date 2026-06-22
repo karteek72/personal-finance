@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { SpendAnalyticsPanel } from "@/components/charts/spend-analytics-panel";
+import { DashboardPeriodControls } from "@/components/dashboard/dashboard-period-controls";
+import { FamilyMemberMetrics } from "@/components/dashboard/family-member-metrics";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { MetricGrid } from "@/components/ui/metric-grid";
 import { AsyncPanel } from "@/components/ui/async-panel";
@@ -11,7 +13,6 @@ import {
   type DrilldownConfig,
 } from "@/components/ui/drilldown-drawer";
 import { AccountBalanceSummary } from "@/components/accounts/account-balance-summary";
-import { WrappedBanner } from "@/components/preview/wrapped-banner";
 import { ProfileSetupBanner } from "@/components/profile/profile-setup-banner";
 import { useSummary } from "@/hooks/use-summary";
 import {
@@ -19,13 +20,23 @@ import {
   normalizeSavingsRate,
 } from "@/lib/savings-rate";
 import {
-  analyticsDateRange,
-  analyticsPeriodLabel,
+  currentMonthKey,
+  dashboardPeriodLabel,
+  resolveDashboardDateRange,
+  type DashboardPeriodMode,
 } from "@/lib/date-ranges";
 import { formatMoney } from "@/lib/format-money";
 
 export default function DashboardPage() {
-  const { from, to } = analyticsDateRange();
+  const [periodMode, setPeriodMode] = useState<DashboardPeriodMode>("rolling");
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+
+  const { from, to } = useMemo(
+    () => resolveDashboardDateRange(periodMode, selectedMonth),
+    [periodMode, selectedMonth],
+  );
+  const periodLabel = dashboardPeriodLabel(periodMode, selectedMonth);
+
   const {
     data: summary,
     isLoading,
@@ -42,7 +53,16 @@ export default function DashboardPage() {
       errorMessage="Failed to load dashboard data"
     >
       {summary ? (
-        <DashboardContent summary={summary} />
+        <DashboardContent
+          summary={summary}
+          from={from}
+          to={to}
+          periodMode={periodMode}
+          selectedMonth={selectedMonth}
+          periodLabel={periodLabel}
+          onPeriodModeChange={setPeriodMode}
+          onSelectedMonthChange={setSelectedMonth}
+        />
       ) : null}
     </AsyncPanel>
   );
@@ -50,8 +70,22 @@ export default function DashboardPage() {
 
 function DashboardContent({
   summary,
+  from,
+  to,
+  periodMode,
+  selectedMonth,
+  periodLabel,
+  onPeriodModeChange,
+  onSelectedMonthChange,
 }: {
   summary: NonNullable<ReturnType<typeof useSummary>["data"]>;
+  from: string;
+  to: string;
+  periodMode: DashboardPeriodMode;
+  selectedMonth: string;
+  periodLabel: string;
+  onPeriodModeChange: (mode: DashboardPeriodMode) => void;
+  onSelectedMonthChange: (month: string) => void;
 }) {
   const [drilldown, setDrilldown] = useState<DrilldownConfig | null>(null);
   const closeDrilldown = useCallback(() => setDrilldown(null), []);
@@ -60,6 +94,7 @@ function DashboardContent({
   const isPositive = netSavings >= 0;
   const savingsRate = normalizeSavingsRate(summary.savingsRate);
   const savingsRatePct = formatSavingsRatePercent(savingsRate, 1).replace("%", "");
+  const isMonthlyView = periodMode === "month";
 
   const savingsRateTone =
     savingsRate >= 0.2
@@ -72,15 +107,25 @@ function DashboardContent({
     setDrilldown(config);
   }
 
+  const drilldownMonth = isMonthlyView ? selectedMonth : undefined;
+
   return (
     <>
       <div className="flex flex-col gap-4">
 
-        {/* ── Period context (greeting lives in TopBar) ─────────── */}
+        {/* ── Period controls ───────────────────────────────────── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs font-medium text-text-muted sm:text-sm">
-            {analyticsPeriodLabel()}
-          </p>
+          <div className="flex flex-col gap-2">
+            <DashboardPeriodControls
+              mode={periodMode}
+              selectedMonth={selectedMonth}
+              onModeChange={onPeriodModeChange}
+              onMonthChange={onSelectedMonthChange}
+            />
+            <p className="text-xs font-medium text-text-muted sm:text-sm">
+              {periodLabel}
+            </p>
+          </div>
           <Link
             href="/transactions"
             className="shrink-0 self-start rounded-[var(--radius-pill)] border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:border-primary/40 hover:text-primary sm:self-auto"
@@ -88,9 +133,6 @@ function DashboardContent({
             All transactions →
           </Link>
         </div>
-
-        {/* ── Wrapped (seasonal) ────────────────────────────────── */}
-        <WrappedBanner />
 
         <ProfileSetupBanner />
 
@@ -154,8 +196,8 @@ function DashboardContent({
             onClick={() =>
               openDrilldown({
                 title: "Expenses",
-                subtitle: `All expense transactions · ${analyticsPeriodLabel()}`,
-                filters: { type: "expense" },
+                subtitle: `All expense transactions · ${periodLabel}`,
+                filters: { type: "expense", month: drilldownMonth },
                 viewAllHref: "/transactions?type=expense",
               })
             }
@@ -172,7 +214,9 @@ function DashboardContent({
               {formatMoney(summary.totalSpent)}
             </p>
             <p className="truncate text-[11px] text-text-muted">
-              {formatMoney(summary.avgMonthlySpend)}/mo avg
+              {isMonthlyView
+                ? `${summary.transactionCount} transactions`
+                : `${formatMoney(summary.avgMonthlySpend)}/mo avg`}
             </p>
           </button>
 
@@ -181,8 +225,8 @@ function DashboardContent({
             onClick={() =>
               openDrilldown({
                 title: "Income",
-                subtitle: `All income transactions · ${analyticsPeriodLabel()}`,
-                filters: { type: "income" },
+                subtitle: `All income transactions · ${periodLabel}`,
+                filters: { type: "income", month: drilldownMonth },
                 viewAllHref: "/transactions?type=income",
               })
             }
@@ -199,7 +243,9 @@ function DashboardContent({
               {formatMoney(summary.income)}
             </p>
             <p className="truncate text-[11px] text-text-muted">
-              {summary.transactionCount} transactions
+              {isMonthlyView
+                ? "This month"
+                : `${summary.transactionCount} transactions`}
             </p>
           </button>
         </div>
@@ -222,10 +268,11 @@ function DashboardContent({
             onClick={() =>
               openDrilldown({
                 title: summary.topCategory.name,
-                subtitle: `Top spending category · ${analyticsPeriodLabel()}`,
+                subtitle: `Top spending category · ${periodLabel}`,
                 filters: {
                   category: summary.topCategory.name,
                   type: "expense",
+                  month: drilldownMonth,
                 },
                 viewAllHref: `/transactions?category=${encodeURIComponent(summary.topCategory.name)}&type=expense`,
               })
@@ -240,7 +287,7 @@ function DashboardContent({
               openDrilldown({
                 title: "Credit Card Payments",
                 subtitle: "Inter-account transfers excluded from spending",
-                filters: { type: "transfer" },
+                filters: { type: "transfer", month: drilldownMonth },
                 viewAllHref: "/transactions?type=transfer",
               })
             }
@@ -256,13 +303,16 @@ function DashboardContent({
                 openDrilldown({
                   title: "Pending Transactions",
                   subtitle: "Not yet settled — amounts may change",
-                  filters: {},
+                  filters: { month: drilldownMonth },
                   viewAllHref: "/transactions",
                 })
               }
             />
           ) : null}
         </MetricGrid>
+
+        {/* ── Family member income vs spend ─────────────────────── */}
+        <FamilyMemberMetrics from={from} to={to} periodLabel={periodLabel} />
 
         {/* ── Account balance summary ───────────────────────────── */}
         <AccountBalanceSummary />

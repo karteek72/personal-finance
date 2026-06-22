@@ -11,6 +11,8 @@ interface MonthFilterSelectProps {
   onChange: (month: string | null) => void;
   monthsBack?: number;
   className?: string;
+  /** When false, hide the "All months" option (e.g. dashboard month view). */
+  allowAll?: boolean;
 }
 
 export function MonthFilterSelect({
@@ -18,10 +20,11 @@ export function MonthFilterSelect({
   onChange,
   monthsBack = 12,
   className,
+  allowAll = true,
 }: MonthFilterSelectProps) {
   const options = useMemo(
-    () => buildRecentMonthFilterOptions(monthsBack),
-    [monthsBack],
+    () => buildRecentMonthFilterOptions(monthsBack, allowAll),
+    [monthsBack, allowAll],
   );
 
   return (

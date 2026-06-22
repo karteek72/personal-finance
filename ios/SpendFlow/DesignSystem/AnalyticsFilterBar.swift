@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Scope / account / category / member pickers — mirrors web `ChartFilterBar`.
+/// Scope / account / category / member dropdown filters — mirrors web `ChartFilterBar`.
 struct AnalyticsFilterBar: View {
     let accounts: [Account]
     let categories: [String]
@@ -23,39 +23,21 @@ struct AnalyticsFilterBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if showScope {
-                filterRow(label: "View") {
-                    scopePill("Family", scope: .household)
-                    scopePill("Mine", scope: .personal)
-                    scopePill("Everything", scope: .all)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                if showScope {
+                    scopeMenu
                 }
-            }
 
-            if showMembers, !members.isEmpty {
-                filterRow(label: "Member") {
-                    memberPill(id: "", label: "All")
-                    ForEach(members) { member in
-                        memberPill(id: member.id, label: member.displayName, color: Color(hex: member.avatarColor))
-                    }
+                if showMembers, !members.isEmpty {
+                    memberMenu
                 }
-            }
 
-            if showAccounts {
-                filterRow(label: "Account") {
-                    accountPill(id: "", label: "All")
-                    ForEach(accounts) { account in
-                        let label = account.mask.map { "••\($0)" } ?? account.name
-                        accountPill(id: account.id, label: label)
-                    }
+                if showAccounts {
+                    accountMenu
                 }
-            }
 
-            if showCategories, !categories.isEmpty {
-                filterRow(label: "Category") {
-                    categoryPill(name: "")
-                    ForEach(categories.prefix(8), id: \.self) { category in
-                        categoryPill(name: category)
-                    }
+                if showCategories, !categories.isEmpty {
+                    categoryMenu
                 }
             }
 
@@ -73,74 +55,81 @@ struct AnalyticsFilterBar: View {
         )
     }
 
-    private func filterRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label.uppercased())
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(SpendFlowTheme.textMuted)
-                .tracking(0.6)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    content()
-                }
+    private var scopeMenu: some View {
+        FilterMenuField(
+            title: "View",
+            selection: scopeLabel(scope),
+            options: [
+                FilterMenuOption(id: ViewScope.all.rawValue, label: "Everything"),
+                FilterMenuOption(id: ViewScope.household.rawValue, label: "Family"),
+                FilterMenuOption(id: ViewScope.personal.rawValue, label: "Mine"),
+            ]
+        ) { option in
+            scope = ViewScope(rawValue: option.id) ?? .all
+        }
+    }
+
+    private var memberMenu: some View {
+        FilterMenuField(
+            title: "Person",
+            selection: selectedMemberLabel,
+            options: memberOptions
+        ) { option in
+            selectedMemberId = option.id
+        }
+    }
+
+    private var accountMenu: some View {
+        FilterMenuField(
+            title: "Account",
+            selection: selectedAccountLabel,
+            options: accountOptions
+        ) { option in
+            selectedAccountId = option.id
+        }
+    }
+
+    private var categoryMenu: some View {
+        FilterMenuField(
+            title: "Category",
+            selection: selectedCategory.isEmpty ? "All categories" : selectedCategory,
+            options: categoryOptions
+        ) { option in
+            selectedCategory = option.id
+        }
+    }
+
+    private var memberOptions: [FilterMenuOption] {
+        [FilterMenuOption(id: "", label: "All people")]
+            + members.map { FilterMenuOption(id: $0.id, label: $0.displayName) }
+    }
+
+    private var accountOptions: [FilterMenuOption] {
+        [FilterMenuOption(id: "", label: "All accounts")]
+            + accounts.map { account in
+                let label = account.mask.map { "\(account.name) ••\($0)" } ?? account.name
+                return FilterMenuOption(id: account.id, label: label)
             }
-        }
     }
 
-    private func scopePill(_ label: String, scope value: ViewScope) -> some View {
-        filterPill(label: label, isSelected: scope == value) {
-            scope = value
-        }
+    private var categoryOptions: [FilterMenuOption] {
+        [FilterMenuOption(id: "", label: "All categories")]
+            + categories.map { FilterMenuOption(id: $0, label: $0) }
     }
 
-    private func accountPill(id: String, label: String) -> some View {
-        filterPill(label: label, isSelected: selectedAccountId == id) {
-            selectedAccountId = selectedAccountId == id && !id.isEmpty ? "" : id
-        }
+    private var selectedMemberLabel: String {
+        memberOptions.first(where: { $0.id == selectedMemberId })?.label ?? "All people"
     }
 
-    private func categoryPill(name: String) -> some View {
-        let label = name.isEmpty ? "All" : name
-        return filterPill(label: label, isSelected: selectedCategory == name) {
-            selectedCategory = selectedCategory == name && !name.isEmpty ? "" : name
-        }
+    private var selectedAccountLabel: String {
+        accountOptions.first(where: { $0.id == selectedAccountId })?.label ?? "All accounts"
     }
 
-    private func memberPill(id: String, label: String, color: Color? = nil) -> some View {
-        filterPill(label: label, isSelected: selectedMemberId == id, dotColor: color) {
-            selectedMemberId = selectedMemberId == id && !id.isEmpty ? "" : id
+    private func scopeLabel(_ scope: ViewScope) -> String {
+        switch scope {
+        case .all: "Everything"
+        case .household: "Family"
+        case .personal: "Mine"
         }
-    }
-
-    private func filterPill(
-        label: String,
-        isSelected: Bool,
-        dotColor: Color? = nil,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                if let dotColor {
-                    Circle()
-                        .fill(dotColor)
-                        .frame(width: 8, height: 8)
-                }
-                Text(label)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background {
-                Capsule()
-                    .fill(isSelected ? SpendFlowTheme.primary : SpendFlowTheme.surface)
-            }
-            .overlay {
-                Capsule()
-                    .stroke(isSelected ? Color.clear : SpendFlowTheme.border, lineWidth: 1)
-            }
-            .foregroundStyle(isSelected ? .white : SpendFlowTheme.textMuted)
-        }
-        .buttonStyle(.plain)
     }
 }

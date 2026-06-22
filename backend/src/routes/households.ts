@@ -64,7 +64,12 @@ export const householdRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/household/insights", async (request) => {
     const user = await requireRequestUser(request, app.config.env);
-    return getHouseholdInsights(user.id);
+    const query = request.query as { from?: string; to?: string };
+    const range =
+      query.from && query.to
+        ? { from: query.from, to: query.to }
+        : undefined;
+    return getHouseholdInsights(user.id, range);
   });
 
   app.post("/household/members", async (request) => {

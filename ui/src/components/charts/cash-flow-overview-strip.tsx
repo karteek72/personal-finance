@@ -151,12 +151,17 @@ function CashFlowStrip({
 
 interface OverviewStripsProps {
   accountId?: string;
+  memberId?: string;
 }
 
 export function MonthlyCashFlowOverviewStrip({
   accountId,
+  memberId,
 }: OverviewStripsProps) {
-  const { data, isLoading } = useChartData({ accountId: accountId || undefined });
+  const { data, isLoading } = useChartData({
+    accountId: accountId || undefined,
+    memberId: memberId || undefined,
+  });
 
   if (isLoading) {
     return <SectionLoader message="Loading monthly cash flow" />;
@@ -186,8 +191,12 @@ export function MonthlyCashFlowOverviewStrip({
 
 export function YearlyCashFlowOverviewStrip({
   accountId,
+  memberId,
 }: OverviewStripsProps) {
-  const { data, isLoading } = useChartData({ accountId: accountId || undefined });
+  const { data, isLoading } = useChartData({
+    accountId: accountId || undefined,
+    memberId: memberId || undefined,
+  });
   const yearly = data?.yearlyOverview ?? [];
 
   if (isLoading) {
@@ -220,11 +229,14 @@ export function YearlyCashFlowOverviewStrip({
   );
 }
 
-export function CashFlowOverviewStrips({ accountId }: OverviewStripsProps) {
+export function CashFlowOverviewStrips({
+  accountId,
+  memberId,
+}: OverviewStripsProps) {
   return (
     <div className="flex flex-col gap-5">
-      <YearlyCashFlowOverviewStrip accountId={accountId} />
-      <MonthlyCashFlowOverviewStrip accountId={accountId} />
+      <YearlyCashFlowOverviewStrip accountId={accountId} memberId={memberId} />
+      <MonthlyCashFlowOverviewStrip accountId={accountId} memberId={memberId} />
     </div>
   );
 }

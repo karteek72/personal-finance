@@ -14,6 +14,24 @@ import {
 import { formatMoney } from "@/lib/format-money";
 import type { HouseholdMemberRole } from "@/types/api";
 
+function formatInsightsPeriodLabel(from: string, to: string): string {
+  const fromMonth = from.slice(0, 7);
+  const toMonth = to.slice(0, 7);
+  if (fromMonth === toMonth) {
+    const [, monthPart] = fromMonth.split("-");
+    const monthIndex = Number.parseInt(monthPart ?? "1", 10) - 1;
+    const year = Number.parseInt(fromMonth.split("-")[0] ?? "1970", 10);
+    return new Date(year, monthIndex, 1).toLocaleString("en-US", {
+      month: "long",
+      year: "numeric",
+    });
+  }
+  if (from.endsWith("-01-01") && to.endsWith("-12-31") && from.slice(0, 4) === to.slice(0, 4)) {
+    return `${from.slice(0, 4)} YTD`;
+  }
+  return `${from} – ${to}`;
+}
+
 const ROLE_LABELS: Record<HouseholdMemberRole, string> = {
   owner: "Owner",
   partner: "Partner",
@@ -245,7 +263,12 @@ export function FamilyView() {
               {stats ? (
                 <dl className="mt-4 grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <dt className="text-text-muted">Spent (YTD)</dt>
+                    <dt className="text-text-muted">
+                      Spent
+                      {insights
+                        ? ` (${formatInsightsPeriodLabel(insights.period.from, insights.period.to)})`
+                        : ""}
+                    </dt>
                     <dd className="mt-0.5 font-bold tabular-nums" data-money>
                       {formatMoney(stats.totalSpent)}
                     </dd>

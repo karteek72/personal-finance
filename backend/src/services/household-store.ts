@@ -468,8 +468,11 @@ export async function resolveScopedAccountIdsForContext(
   return [...activeSet];
 }
 
-export async function getHouseholdInsights(userId: string) {
-  const { from, to } = yearToDateRange();
+export async function getHouseholdInsights(
+  userId: string,
+  range?: { from: string; to: string },
+) {
+  const { from, to } = range ?? yearToDateRange();
   const details = await getHouseholdDetails(userId);
   const db = getDb();
 

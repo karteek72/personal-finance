@@ -1,5 +1,19 @@
 import SwiftUI
 
+struct NotificationEntry: Identifiable, Hashable {
+    enum Kind: Hashable {
+        case insight
+        case wrapped
+    }
+
+    let id: String
+    let kind: Kind
+    let title: String
+    let message: String
+    let dismissible: Bool
+    let wrappedYear: Int?
+}
+
 @MainActor
 @Observable
 final class NotificationCenterStore {
@@ -33,15 +47,19 @@ final class NotificationCenterStore {
         !readIds.contains(id) && !dismissedIds.contains(id)
     }
 
-    func unreadCount(for alerts: [Alert]) -> Int {
-        alerts.filter { !dismissedIds.contains($0.id) && !readIds.contains($0.id) }.count
+    func unreadCount(for entries: [NotificationEntry]) -> Int {
+        entries.filter { !dismissedIds.contains($0.id) && !readIds.contains($0.id) }.count
+    }
+
+    static func wrappedNotificationId(year: Int) -> String {
+        "wrapped:\(year)"
     }
 }
 
 @MainActor
 @Observable
 final class NotificationCenterViewModel {
-    var alerts: [Alert] = []
+    var entries: [NotificationEntry] = []
     var isLoading = false
     var errorMessage: String?
     let store = NotificationCenterStore()
@@ -52,38 +70,78 @@ final class NotificationCenterViewModel {
         defer { isLoading = false }
 
         do {
-            let response = try await api.getAlerts()
-            alerts = response.alerts.filter { !store.dismissedIds.contains($0.id) }
+            async let alertsTask = api.getAlerts()
+            async let wrappedTask: WrappedResponse? = {
+                do {
+                    return try await api.getWrapped()
+                } catch {
+                    return nil
+                }
+            }()
+
+            let alertsResponse = try await alertsTask
+            var nextEntries = alertsResponse.alerts
+                .filter { !store.dismissedIds.contains($0.id) }
+                .map {
+                    NotificationEntry(
+                        id: $0.id,
+                        kind: .insight,
+                        title: $0.title,
+                        message: $0.message,
+                        dismissible: $0.dismissible,
+                        wrappedYear: nil
+                    )
+                }
+
+            if let wrapped = await wrappedTask, wrapped.transactionCount > 0 {
+                let wrappedId = NotificationCenterStore.wrappedNotificationId(year: wrapped.year)
+                if !store.dismissedIds.contains(wrappedId) {
+                    nextEntries.insert(
+                        NotificationEntry(
+                            id: wrappedId,
+                            kind: .wrapped,
+                            title: "Your \(wrapped.year) Wrapped is ready",
+                            message: "Your year in money, as a story. Tap to play.",
+                            dismissible: true,
+                            wrappedYear: wrapped.year
+                        ),
+                        at: 0
+                    )
+                }
+            }
+
+            entries = nextEntries
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     var unreadCount: Int {
-        store.unreadCount(for: alerts)
+        store.unreadCount(for: entries)
     }
 }
 
 struct NotificationCenterView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel = NotificationCenterViewModel()
+    @State private var showWrapped = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.isLoading, viewModel.alerts.isEmpty {
-                    LoadingStateView(message: "Loading alerts…")
-                } else if let error = viewModel.errorMessage, viewModel.alerts.isEmpty {
+                if viewModel.isLoading, viewModel.entries.isEmpty {
+                    LoadingStateView(message: "Loading notifications…")
+                } else if let error = viewModel.errorMessage, viewModel.entries.isEmpty {
                     ErrorStateView(message: error) {
                         Task { await viewModel.load(api: appState.apiClient) }
                     }
-                } else if viewModel.alerts.isEmpty {
-                    FeatureEmptyCard(title: "All caught up", message: "No alerts right now.")
+                } else if viewModel.entries.isEmpty {
+                    FeatureEmptyCard(title: "All caught up", message: "No notifications right now.")
                 } else {
                     List {
-                        ForEach(viewModel.alerts) { alert in
-                            alertRow(alert)
+                        ForEach(viewModel.entries) { entry in
+                            notificationRow(entry)
                         }
                     }
                     .listStyle(.plain)
@@ -101,46 +159,71 @@ struct NotificationCenterView: View {
             .task {
                 await viewModel.load(api: appState.apiClient)
             }
+            .sheet(isPresented: $showWrapped) {
+                NavigationStack {
+                    WrappedView()
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") { showWrapped = false }
+                            }
+                        }
+                }
+            }
         }
     }
 
-    private func alertRow(_ alert: Alert) -> some View {
-        let unread = viewModel.store.isUnread(alert.id)
+    private func notificationRow(_ entry: NotificationEntry) -> some View {
+        let unread = viewModel.store.isUnread(entry.id)
+
         return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(alert.title)
-                    .font(.subheadline.weight(unread ? .bold : .semibold))
-                Spacer()
-                if unread {
-                    Circle().fill(SpendFlowTheme.primary).frame(width: 8, height: 8)
+            Button {
+                viewModel.store.markRead(entry.id)
+                if entry.kind == .wrapped {
+                    showWrapped = true
+                    dismiss()
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(entry.title)
+                            .font(.subheadline.weight(unread ? .bold : .semibold))
+                            .foregroundStyle(SpendFlowTheme.text)
+                        Spacer()
+                        if unread {
+                            Circle().fill(SpendFlowTheme.primary).frame(width: 8, height: 8)
+                        }
+                    }
+                    Text(entry.message)
+                        .font(.caption)
+                        .foregroundStyle(SpendFlowTheme.textMuted)
+                        .multilineTextAlignment(.leading)
+                    if entry.kind == .wrapped {
+                        Text("Tap to open →")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(SpendFlowTheme.primary)
+                    }
                 }
             }
-            Text(alert.message)
-                .font(.caption)
-                .foregroundStyle(SpendFlowTheme.textMuted)
-            HStack {
-                if alert.dismissible {
+            .buttonStyle(.plain)
+
+            if entry.dismissible {
+                HStack {
                     Button("Dismiss") {
-                        viewModel.store.dismiss(alert.id)
-                        viewModel.alerts.removeAll { $0.id == alert.id }
+                        viewModel.store.dismiss(entry.id)
+                        viewModel.entries.removeAll { $0.id == entry.id }
                     }
                     .font(.caption.weight(.semibold))
-                }
-                Spacer()
-                if unread {
-                    Button("Mark read") {
-                        viewModel.store.markRead(alert.id)
+                    Spacer()
+                    if unread {
+                        Button("Mark read") {
+                            viewModel.store.markRead(entry.id)
+                        }
+                        .font(.caption.weight(.semibold))
                     }
-                    .font(.caption.weight(.semibold))
                 }
             }
         }
         .padding(.vertical, 4)
-        .onAppear {
-            if unread {
-                viewModel.store.markRead(alert.id)
-            }
-        }
     }
 }
 

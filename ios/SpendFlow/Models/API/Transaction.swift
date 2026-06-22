@@ -33,6 +33,8 @@ struct PaginatedTransactions: Codable, Sendable {
 struct TransactionFilters: Sendable {
     var month: String?
     var category: String?
+    var subCategory: String?
+    var categorizationStatus: CategorizationStatus?
     var accountId: String?
     var memberId: String?
     var scope: ViewScope?
@@ -46,6 +48,10 @@ struct TransactionFilters: Sendable {
         var items: [URLQueryItem] = []
         if let month { items.append(.init(name: "month", value: month)) }
         if let category { items.append(.init(name: "category", value: category)) }
+        if let subCategory { items.append(.init(name: "subCategory", value: subCategory)) }
+        if let categorizationStatus {
+            items.append(.init(name: "categorizationStatus", value: categorizationStatus.rawValue))
+        }
         if let accountId { items.append(.init(name: "accountId", value: accountId)) }
         if let memberId { items.append(.init(name: "memberId", value: memberId)) }
         if let scope { items.append(.init(name: "scope", value: scope.rawValue)) }
@@ -55,6 +61,20 @@ struct TransactionFilters: Sendable {
         if let limit { items.append(.init(name: "limit", value: String(limit))) }
         if let cursor { items.append(.init(name: "cursor", value: cursor)) }
         return items
+    }
+}
+
+enum CategorizationStatus: String, Sendable, CaseIterable {
+    case uncategorized
+    case missingSubcategory = "missing_subcategory"
+    case needsReview = "needs_review"
+
+    var label: String {
+        switch self {
+        case .uncategorized: "Uncategorized"
+        case .missingSubcategory: "Missing subcategory"
+        case .needsReview: "Needs review"
+        }
     }
 }
 

@@ -338,6 +338,8 @@ export async function getTransactions(
   const {
     month,
     category,
+    subCategory,
+    categorizationStatus,
     accountId,
     q,
     type,
@@ -363,6 +365,34 @@ export async function getTransactions(
     }
     if (category && tx.category !== category) {
       return false;
+    }
+    if (subCategory) {
+      if (subCategory === "General") {
+        if (tx.subCategory != null && tx.subCategory.trim() !== "") {
+          return false;
+        }
+      } else if (tx.subCategory !== subCategory) {
+        return false;
+      }
+    }
+    if (categorizationStatus) {
+      if (tx.transactionType !== "expense" || tx.isTransfer) {
+        return false;
+      }
+      if (categorizationStatus === "uncategorized") {
+        if (tx.category !== "Uncategorized") return false;
+      } else if (categorizationStatus === "missing_subcategory") {
+        if (tx.category === "Uncategorized") return false;
+        if (tx.subCategory != null && tx.subCategory.trim() !== "") {
+          return false;
+        }
+      } else if (categorizationStatus === "needs_review") {
+        const needsReview =
+          tx.category === "Uncategorized" ||
+          tx.subCategory == null ||
+          tx.subCategory.trim() === "";
+        if (!needsReview) return false;
+      }
     }
     if (accountId && tx.accountId !== accountId) {
       return false;
@@ -802,9 +832,16 @@ export async function updateHouseholdName(name: string) {
   return { id: mockHouseholdState.household.id, name };
 }
 
-export async function getHouseholdInsights(): Promise<HouseholdInsightsResponse> {
+export async function getHouseholdInsights(
+  from?: string,
+  to?: string,
+): Promise<HouseholdInsightsResponse> {
   await delay();
   const year = new Date().getFullYear();
+  const period =
+    from && to
+      ? { from, to }
+      : { from: `${year}-01-01`, to: `${year}-12-31` };
   return {
     members: mockHouseholdState.members.map((member) => ({
       memberId: member.id,
@@ -826,7 +863,7 @@ export async function getHouseholdInsights(): Promise<HouseholdInsightsResponse>
       income: "10400.00",
       net: "5500.00",
     },
-    period: { from: `${year}-01-01`, to: `${year}-12-31` },
+    period,
   };
 }
 

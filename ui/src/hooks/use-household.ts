@@ -12,10 +12,10 @@ export function useHousehold() {
   });
 }
 
-export function useHouseholdInsights() {
+export function useHouseholdInsights(from?: string, to?: string) {
   return useQuery({
-    queryKey: ["household-insights"],
-    queryFn: () => api.getHouseholdInsights(),
+    queryKey: ["household-insights", from, to],
+    queryFn: () => api.getHouseholdInsights(from, to),
   });
 }
 

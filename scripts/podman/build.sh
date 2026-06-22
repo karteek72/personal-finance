@@ -26,7 +26,7 @@ spendflow_print_deploy_urls
 if ((${#SPENDFLOW_REMAINING_ARGS[@]})); then
   spendflow_compose build "${SPENDFLOW_REMAINING_ARGS[@]}"
 else
-  spendflow_compose build
+  spendflow_podman_build_images
 fi
 
 echo "==> Done. Images:"

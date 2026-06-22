@@ -166,10 +166,53 @@ spendflow_load_env() {
   spendflow_resolve_runtime_cors
 }
 
+spendflow_compose_provider_ok() {
+  local provider="$1"
+  [[ -n "${provider}" && -x "${provider}" ]] || return 1
+  "${provider}" --version >/dev/null 2>&1
+}
+
+# Podman delegates `podman compose` to podman-compose; distro /usr/bin copies can SIGILL on some hosts.
+spendflow_resolve_compose_provider() {
+  if spendflow_compose_provider_ok "${PODMAN_COMPOSE_PROVIDER:-}"; then
+    export PODMAN_COMPOSE_PROVIDER
+    return 0
+  fi
+
+  local -a candidates=()
+  local candidate seen="|"
+  while IFS= read -r candidate; do
+    [[ -n "${candidate}" ]] && candidates+=("${candidate}")
+  done < <(command -v -a podman-compose 2>/dev/null || true)
+  candidates+=(
+    "${HOME}/.local/bin/podman-compose"
+    "${HOME}/.local/share/pipx/venvs/podman-compose/bin/podman-compose"
+    /usr/local/bin/podman-compose
+    /usr/bin/podman-compose
+  )
+
+  for candidate in "${candidates[@]}"; do
+    [[ -z "${candidate}" ]] && continue
+    [[ "${seen}" == *"|${candidate}|"* ]] && continue
+    seen="${seen}${candidate}|"
+    if spendflow_compose_provider_ok "${candidate}"; then
+      export PODMAN_COMPOSE_PROVIDER="${candidate}"
+      return 0
+    fi
+  done
+
+  echo "error: no working podman-compose binary found." >&2
+  echo "  If /usr/bin/podman-compose crashes (illegal instruction), install a working copy:" >&2
+  echo "    pipx install podman-compose" >&2
+  echo "  Then export PODMAN_COMPOSE_PROVIDER=\$(command -v podman-compose) in containers/deploy.env" >&2
+  exit 1
+}
+
 spendflow_compose() {
   local containers
   containers="${SPENDFLOW_CONTAINERS_DIR}"
   spendflow_ensure_podman
+  spendflow_resolve_compose_provider
   cd "${containers}"
   # podman-compose ignores COMPOSE_PROFILES; pass --profile explicitly when bundled DB is used.
   if [[ -n "${SPENDFLOW_COMPOSE_PROFILE:-}" ]]; then
@@ -177,6 +220,27 @@ spendflow_compose() {
   else
     podman compose -f compose.yaml "$@"
   fi
+}
+
+# Build images with native podman build (no podman-compose) — avoids broken distro wrappers.
+spendflow_podman_build_images() {
+  local root tag
+  root="$(spendflow_repo_root)"
+  tag="${SPENDFLOW_IMAGE_TAG:-latest}"
+
+  podman build \
+    -f "${root}/containers/Containerfile.backend" \
+    -t "localhost/spendflow-api:${tag}" \
+    "${root}/backend"
+
+  podman build \
+    -f "${root}/containers/Containerfile.ui" \
+    --build-arg "NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}" \
+    --build-arg "NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}" \
+    --build-arg "NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}" \
+    --build-arg "NEXT_PUBLIC_USE_MOCKS=${NEXT_PUBLIC_USE_MOCKS:-false}" \
+    -t "localhost/spendflow-ui:${tag}" \
+    "${root}/ui"
 }
 
 spendflow_require_cmd() {
