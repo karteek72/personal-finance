@@ -590,7 +590,7 @@ Multi-user households: owner invites partners by email; partner signs in with Go
 |--------|------|------|-------|
 | GET | `/household` | Bearer | Returns `accessRole` (`owner` \| `member`), members, accounts |
 | PATCH | `/household` | Owner | Body `{ name }` → updated household |
-| GET | `/household/insights` | Bearer | Household-level spend/income rollups |
+| GET | `/household/insights` | Bearer | Household-level spend/income rollups; optional `from`/`to` query params (defaults to calendar YTD) |
 | POST | `/household/members` | Owner | Body `{ name, relationship?, … }` → `HouseholdMember` |
 | PATCH | `/household/members/:memberId` | Owner | Update member fields → `HouseholdMember` |
 | DELETE | `/household/members/:memberId` | Owner | `204` |

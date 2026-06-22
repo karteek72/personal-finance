@@ -802,9 +802,16 @@ export async function updateHouseholdName(name: string) {
   return { id: mockHouseholdState.household.id, name };
 }
 
-export async function getHouseholdInsights(): Promise<HouseholdInsightsResponse> {
+export async function getHouseholdInsights(
+  from?: string,
+  to?: string,
+): Promise<HouseholdInsightsResponse> {
   await delay();
   const year = new Date().getFullYear();
+  const period =
+    from && to
+      ? { from, to }
+      : { from: `${year}-01-01`, to: `${year}-12-31` };
   return {
     members: mockHouseholdState.members.map((member) => ({
       memberId: member.id,
@@ -826,7 +833,7 @@ export async function getHouseholdInsights(): Promise<HouseholdInsightsResponse>
       income: "10400.00",
       net: "5500.00",
     },
-    period: { from: `${year}-01-01`, to: `${year}-12-31` },
+    period,
   };
 }
 

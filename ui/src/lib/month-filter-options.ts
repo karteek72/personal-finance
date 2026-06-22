@@ -1,11 +1,14 @@
 /** Last N calendar months (newest first) for activity filters. */
-export function buildRecentMonthFilterOptions(monthsBack = 12): {
+export function buildRecentMonthFilterOptions(
+  monthsBack = 12,
+  allowAll = true,
+): {
   value: string;
   label: string;
 }[] {
-  const options: { value: string; label: string }[] = [
-    { value: "", label: "All months" },
-  ];
+  const options: { value: string; label: string }[] = allowAll
+    ? [{ value: "", label: "All months" }]
+    : [];
   const now = new Date();
 
   for (let offset = 0; offset < monthsBack; offset += 1) {

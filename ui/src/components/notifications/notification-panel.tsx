@@ -9,6 +9,7 @@ import {
   type AppNotification,
   type NotificationKind,
 } from "@/stores/notification-store";
+import { useWrappedStore } from "@/stores/wrapped-store";
 
 function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -41,12 +42,15 @@ function NotificationItem({
   notification,
   onDismiss,
   onMarkRead,
+  onActivate,
 }: {
   notification: AppNotification;
   onDismiss: (id: string) => void;
   onMarkRead: (id: string) => void;
+  onActivate: (notification: AppNotification) => void;
 }) {
   const styles = kindStyles(notification.kind);
+  const isActionable = Boolean(notification.action);
 
   return (
     <li
@@ -59,20 +63,44 @@ function NotificationItem({
         className={clsx("mt-1.5 h-2 w-2 shrink-0 rounded-full", styles.dot)}
         aria-hidden
       />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-semibold text-text">{notification.title}</p>
-          <time
-            className="shrink-0 text-[10px] text-text-muted"
-            dateTime={notification.createdAt}
-          >
-            {formatRelativeTime(notification.createdAt)}
-          </time>
+      {isActionable ? (
+        <button
+          type="button"
+          onClick={() => onActivate(notification)}
+          className="min-w-0 flex-1 text-left"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-semibold text-text">{notification.title}</p>
+            <time
+              className="shrink-0 text-[10px] text-text-muted"
+              dateTime={notification.createdAt}
+            >
+              {formatRelativeTime(notification.createdAt)}
+            </time>
+          </div>
+          <p className="mt-0.5 text-xs leading-relaxed text-text-muted">
+            {notification.message}
+          </p>
+          <p className="mt-1 text-[10px] font-semibold text-primary">
+            Tap to open →
+          </p>
+        </button>
+      ) : (
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-semibold text-text">{notification.title}</p>
+            <time
+              className="shrink-0 text-[10px] text-text-muted"
+              dateTime={notification.createdAt}
+            >
+              {formatRelativeTime(notification.createdAt)}
+            </time>
+          </div>
+          <p className="mt-0.5 text-xs leading-relaxed text-text-muted">
+            {notification.message}
+          </p>
         </div>
-        <p className="mt-0.5 text-xs leading-relaxed text-text-muted">
-          {notification.message}
-        </p>
-      </div>
+      )}
       <div className="flex shrink-0 flex-col gap-1">
         {!notification.read ? (
           <button
@@ -112,8 +140,17 @@ export function NotificationPanel({
   const markRead = useNotificationStore((s) => s.markRead);
   const markAllRead = useNotificationStore((s) => s.markAllRead);
   const dismiss = useNotificationStore((s) => s.dismiss);
+  const openWrapped = useWrappedStore((s) => s.openWrapped);
 
   const visible = selectVisibleNotifications(notifications);
+
+  function handleActivate(notification: AppNotification) {
+    markRead(notification.id);
+    if (notification.action?.type === "open-wrapped") {
+      openWrapped();
+      onClose();
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -174,6 +211,7 @@ export function NotificationPanel({
               notification={notification}
               onDismiss={dismiss}
               onMarkRead={markRead}
+              onActivate={handleActivate}
             />
           ))}
         </ul>

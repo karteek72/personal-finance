@@ -12,7 +12,13 @@ export type NotificationSource =
   | "import"
   | "household"
   | "insight"
+  | "wrapped"
   | "system";
+
+export type NotificationAction = { type: "open-wrapped" };
+
+const INSIGHT_ID_PREFIX = "insight:";
+const WRAPPED_ID_PREFIX = "wrapped:";
 
 export interface InsightAlertInput {
   id: string;
@@ -21,7 +27,9 @@ export interface InsightAlertInput {
   message: string;
 }
 
-const INSIGHT_ID_PREFIX = "insight:";
+export interface WrappedNotificationInput {
+  year: number;
+}
 
 export interface AppNotification {
   id: string;
@@ -34,6 +42,7 @@ export interface AppNotification {
   dismissed: boolean;
   /** Group progress → completion updates for one async job */
   taskId?: string;
+  action?: NotificationAction;
 }
 
 const MAX_NOTIFICATIONS = 50;
@@ -45,6 +54,7 @@ export interface AddNotificationInput {
   source?: NotificationSource;
   taskId?: string;
   read?: boolean;
+  action?: NotificationAction;
 }
 
 interface NotificationState {
@@ -69,6 +79,8 @@ interface NotificationState {
   clearDismissed: () => void;
   /** Replaces active insight alerts; preserves read/dismissed per alert id */
   syncInsightNotifications: (alerts: InsightAlertInput[]) => void;
+  /** Surfaces year-in-review when wrapped data is available */
+  syncWrappedNotification: (input: WrappedNotificationInput | null) => void;
   setPanelOpen: (open: boolean) => void;
   togglePanel: () => void;
 }
@@ -82,6 +94,10 @@ function insightSeverityToKind(
 ): NotificationKind {
   if (severity === "danger") return "error";
   return "info";
+}
+
+function wrappedNotificationId(year: number): string {
+  return `${WRAPPED_ID_PREFIX}${year}`;
 }
 
 function createId(): string {
@@ -114,6 +130,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       read: input.read ?? false,
       dismissed: false,
       taskId: input.taskId,
+      action: input.action,
     };
 
     set((state) => ({
@@ -221,6 +238,46 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         notifications: trimNotifications([
           ...activeInsights,
           ...nonInsight,
+        ]),
+      };
+    });
+  },
+
+  syncWrappedNotification: (input) => {
+    set((state) => {
+      const withoutWrapped = state.notifications.filter(
+        (notification) => notification.source !== "wrapped",
+      );
+
+      if (!input) {
+        return { notifications: withoutWrapped };
+      }
+
+      const id = wrappedNotificationId(input.year);
+      const existing = state.notifications.find(
+        (notification) => notification.id === id,
+      );
+
+      if (existing?.dismissed) {
+        return { notifications: state.notifications };
+      }
+
+      const wrappedNotification: AppNotification = {
+        id,
+        kind: "info",
+        title: `Your ${input.year} Wrapped is ready`,
+        message: "Your year in money, as a story. Tap to play.",
+        source: "wrapped",
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+        read: existing?.read ?? false,
+        dismissed: false,
+        action: { type: "open-wrapped" },
+      };
+
+      return {
+        notifications: trimNotifications([
+          wrappedNotification,
+          ...withoutWrapped,
         ]),
       };
     });

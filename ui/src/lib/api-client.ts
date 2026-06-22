@@ -458,11 +458,13 @@ export const api = {
     });
   },
 
-  getHouseholdInsights(): Promise<HouseholdInsightsResponse> {
+  getHouseholdInsights(from?: string, to?: string): Promise<HouseholdInsightsResponse> {
     if (USE_MOCKS) {
-      return mockApi.getHouseholdInsights();
+      return mockApi.getHouseholdInsights(from, to);
     }
-    return fetchJson<HouseholdInsightsResponse>("/household/insights");
+    return fetchJson<HouseholdInsightsResponse>(
+      `/household/insights${buildQuery({ from, to })}`,
+    );
   },
 
   createHouseholdMember(input: {
