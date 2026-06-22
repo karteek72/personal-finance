@@ -91,6 +91,12 @@ function InvestmentsPanelContent() {
     otherValue: "0",
   };
   const hasHoldings = portfolioBreakdown.totalPositionCount > 0;
+  const linkedAccountBalance = investmentAccounts.reduce(
+    (sum, account) => sum + Number.parseFloat(account.value),
+    0,
+  );
+  const needsHoldingsResync =
+    investmentAccounts.length > 0 && !hasHoldings && linkedAccountBalance > 0;
   const behavioralAlerts = investments?.behavioralAlerts ?? [];
   const monthlyActivity = investments?.monthlyActivity ?? null;
 
@@ -186,11 +192,29 @@ function InvestmentsPanelContent() {
               accountId={accountId || undefined}
             />
           ) : (
-            <p className="py-6 text-center text-sm text-text-muted">
-              {investmentAccounts.length > 0
-                ? "No positions stored yet. Sync your brokerage from Accounts."
-                : "Connect a brokerage and run sync to see holdings."}
-            </p>
+            <div className="rounded-[var(--radius-lg)] border border-dashed border-border bg-surface px-4 py-6 text-center">
+              <p className="text-sm font-semibold text-text">
+                {needsHoldingsResync
+                  ? "Account balances synced, but position details are missing"
+                  : "No positions stored yet"}
+              </p>
+              <p className="mt-1 text-xs text-text-muted">
+                {needsHoldingsResync
+                  ? "This usually happens after removing another account. Re-sync your brokerages from Accounts to reload stocks, ETFs, and options."
+                  : investmentAccounts.length > 0
+                    ? "Sync your brokerage from Accounts to load holdings."
+                    : "Connect a brokerage and run sync to see holdings."}
+              </p>
+              {investmentAccounts.length > 0 ? (
+                <Link
+                  href="/accounts"
+                  className="mt-3 inline-block rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold text-white"
+                  style={{ background: "var(--gradient-hero)" }}
+                >
+                  Sync brokerages
+                </Link>
+              ) : null}
+            </div>
           ))}
 
         {activeTab === "options" &&
