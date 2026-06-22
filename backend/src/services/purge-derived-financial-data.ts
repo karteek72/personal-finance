@@ -6,11 +6,9 @@ import {
   coachInsights,
   fireProfiles,
   habitStreaks,
-  holdings,
   importBatches,
   inflationCategories,
   inflationProfiles,
-  investmentTransactions,
   lifestyleHabits,
   merchantCategoryRules,
   netWorthSnapshots,
@@ -31,8 +29,9 @@ const log = createLogger("purge-derived-data");
 
 /**
  * Removes seeded / snapshot feature data for a user. Does not delete accounts,
- * transactions, Plaid items, or the user row — call after account deletes or
- * before a fresh import.
+ * transactions, Plaid items, holdings, investment transactions, or the user row.
+ * Holdings are scoped to accounts and cascade on account delete — do not wipe them
+ * here or unrelated brokerage positions disappear when a bank account is removed.
  */
 export async function purgeDerivedFinancialData(userId: string): Promise<void> {
   const db = getDb();
@@ -45,14 +44,6 @@ export async function purgeDerivedFinancialData(userId: string): Promise<void> {
         db
           .delete(merchantCategoryRules)
           .where(eq(merchantCategoryRules.userId, userId)),
-    ],
-    ["holdings", () => db.delete(holdings).where(eq(holdings.userId, userId))],
-    [
-      "investment_transactions",
-      () =>
-        db
-          .delete(investmentTransactions)
-          .where(eq(investmentTransactions.userId, userId)),
     ],
     ["budgets", () => db.delete(budgets).where(eq(budgets.userId, userId))],
     ["savings_goals", () => db.delete(savingsGoals).where(eq(savingsGoals.userId, userId))],
