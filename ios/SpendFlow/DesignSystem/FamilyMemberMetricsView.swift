@@ -22,7 +22,10 @@ struct FamilyMemberMetricsView: View {
                         .foregroundStyle(SpendFlowTheme.textMuted)
                 }
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 280), spacing: 12)],
+                    spacing: 12
+                ) {
                     ForEach(membersWithAccounts) { member in
                         memberCard(member)
                     }
@@ -38,7 +41,7 @@ struct FamilyMemberMetricsView: View {
         let maxValue = max(spent, income, 1)
 
         return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
                 Circle()
                     .fill(Color(hex: member.avatarColor))
                     .frame(width: 36, height: 36)
@@ -56,38 +59,17 @@ struct FamilyMemberMetricsView: View {
                     Text("\(member.accountCount) account\(member.accountCount == 1 ? "" : "s")")
                         .font(.caption2)
                         .foregroundStyle(SpendFlowTheme.textMuted)
+                        .lineLimit(1)
                 }
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
-                Spacer(minLength: 0)
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("NET")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(SpendFlowTheme.textMuted)
-                    MoneyText(
-                        amount: String(format: "%.2f", net),
-                        font: .subheadline.weight(.bold)
-                    )
-                    .foregroundStyle(net >= 0 ? SpendFlowTheme.success : SpendFlowTheme.danger)
-                }
+                netColumn(net: net)
             }
 
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("INCOME")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(SpendFlowTheme.textMuted)
-                    MoneyText(amount: member.totalIncome, font: .caption.weight(.bold))
-                        .foregroundStyle(SpendFlowTheme.success)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("SPENT")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(SpendFlowTheme.textMuted)
-                    MoneyText(amount: member.totalSpent, font: .caption.weight(.bold))
-                        .foregroundStyle(SpendFlowTheme.danger)
-                }
+            HStack(alignment: .top, spacing: 12) {
+                metricColumn(title: "INCOME", amount: member.totalIncome, color: SpendFlowTheme.success)
+                Spacer(minLength: 8)
+                metricColumn(title: "SPENT", amount: member.totalSpent, color: SpendFlowTheme.danger, alignment: .trailing)
             }
 
             barRow(label: "In", value: income / maxValue, color: SpendFlowTheme.success)
@@ -105,6 +87,41 @@ struct FamilyMemberMetricsView: View {
                 .frame(height: 3)
                 .clipShape(RoundedRectangle(cornerRadius: SpendFlowTheme.radiusCard))
         }
+    }
+
+    private func netColumn(net: Double) -> some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text("NET")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(SpendFlowTheme.textMuted)
+            MoneyText(
+                amount: String(format: "%.2f", net),
+                font: .subheadline.weight(.bold).monospacedDigit()
+            )
+            .foregroundStyle(net >= 0 ? SpendFlowTheme.success : SpendFlowTheme.danger)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+        }
+        .frame(minWidth: 88, alignment: .trailing)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func metricColumn(
+        title: String,
+        amount: String,
+        color: Color,
+        alignment: HorizontalAlignment = .leading
+    ) -> some View {
+        VStack(alignment: alignment, spacing: 2) {
+            Text(title)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(SpendFlowTheme.textMuted)
+            MoneyText(amount: amount, font: .caption.weight(.bold).monospacedDigit())
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .frame(maxWidth: .infinity, alignment: alignment == .leading ? .leading : .trailing)
     }
 
     private func barRow(label: String, value: Double, color: Color) -> some View {
