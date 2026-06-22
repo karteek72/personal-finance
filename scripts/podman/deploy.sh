@@ -58,11 +58,15 @@ for img in "localhost/spendflow-api:${SPENDFLOW_IMAGE_TAG}" "localhost/spendflow
   fi
 done
 
-echo "==> Starting stack on ${SPENDFLOW_HOST}:${SPENDFLOW_UI_PORT} (UI) and :${SPENDFLOW_API_PORT} (API)"
+echo "==> Starting SpendFlow stack on ${SPENDFLOW_HOST}:${SPENDFLOW_UI_PORT} (UI) and :${SPENDFLOW_API_PORT} (API)"
 echo "    Image tag: ${SPENDFLOW_IMAGE_TAG}"
+echo "    Cloudflare tunnel is external (systemd/pod) — not started or stopped by deploy.sh"
 spendflow_print_deploy_urls
 
-UP_ARGS=(up -d --remove-orphans --no-build)
+spendflow_remove_stale_app_containers
+
+mapfile -t COMPOSE_SERVICES < <(spendflow_compose_service_names)
+UP_ARGS=(up -d --remove-orphans --no-build "${COMPOSE_SERVICES[@]}")
 if ((${#EXTRA_ARGS[@]})); then
   spendflow_compose "${UP_ARGS[@]}" "${EXTRA_ARGS[@]}"
 else
