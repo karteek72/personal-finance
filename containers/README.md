@@ -99,6 +99,15 @@ Log files: `logs/dev/api.log`, `logs/dev/ui.log`.
 
 ### Switching between npm dev and Podman deploy
 
+**Before `./scripts/podman/deploy.sh`**, stop local dev if it is using port 4000:
+
+```bash
+./scripts/podman/dev-down.sh --keep-db   # keeps Postgres/Redis running
+./scripts/podman/deploy.sh
+```
+
+`deploy.sh` tries to stop dev servers and free ports automatically (`SPENDFLOW_STOP_DEV=true`). If deploy still fails with `bind: address already in use` on port 4000, run `dev-down.sh --keep-db` manually.
+
 Both modes share the **same Postgres/Redis volumes** on `127.0.0.1:5433` / `6380`. Set `POSTGRES_PASSWORD` once in repo-root `.env` — it is the single source of truth.
 
 | Mode | Command | DATABASE_URL at runtime |

@@ -520,24 +520,102 @@ spendflow_wait_container_healthy() {
   return 1
 }
 
+spendflow_port_listener_pids() {
+  local port="$1"
+  lsof -ti "tcp:${port}" -sTCP:LISTEN 2>/dev/null || true
+}
+
+spendflow_describe_port_listeners() {
+  local port="$1"
+  local pids
+  pids="$(spendflow_port_listener_pids "${port}")"
+  [[ -z "${pids}" ]] && return 0
+  # shellcheck disable=SC2086
+  ps -o pid=,comm=,args= -p ${pids} 2>/dev/null | sed 's/^/    /' || true
+}
+
 spendflow_stop_port() {
   local port="$1"
   local pids
 
-  if pids="$(lsof -ti "tcp:${port}" -sTCP:LISTEN 2>/dev/null)"; then
-    # shellcheck disable=SC2086
-    kill ${pids} 2>/dev/null || true
+  pids="$(spendflow_port_listener_pids "${port}")"
+  [[ -z "${pids}" ]] && return 0
+
+  # shellcheck disable=SC2086
+  kill ${pids} 2>/dev/null || true
+  sleep 1
+
+  pids="$(spendflow_port_listener_pids "${port}")"
+  [[ -z "${pids}" ]] && return 0
+
+  # shellcheck disable=SC2086
+  kill -9 ${pids} 2>/dev/null || true
+  sleep 1
+}
+
+spendflow_assert_port_free() {
+  local port="$1"
+  local label="$2"
+  local pids
+  pids="$(spendflow_port_listener_pids "${port}")"
+  if [[ -n "${pids}" ]]; then
+    echo "error: port ${port} (${label}) is already in use:" >&2
+    spendflow_describe_port_listeners "${port}" >&2
+    echo "  Stop local dev:  ./scripts/podman/dev-down.sh --keep-db" >&2
+    echo "  Or change ports: SPENDFLOW_API_PORT / SPENDFLOW_UI_PORT in containers/deploy.env" >&2
+    return 1
   fi
+}
+
+spendflow_stop_dev_pid_servers() {
+  local repo logs_dir api_port ui_port
+  repo="$(spendflow_repo_root)"
+  logs_dir="${repo}/logs/dev"
+  api_port="${SPENDFLOW_DEV_API_PORT:-4000}"
+  ui_port="${SPENDFLOW_DEV_UI_PORT:-3002}"
+
+  if [[ ! -f "${logs_dir}/api.pid" && ! -f "${logs_dir}/ui.pid" ]]; then
+    return 0
+  fi
+
+  echo "==> Stopping local dev servers started by dev.sh"
+  SPENDFLOW_REPO_ROOT="${repo}"
+  spendflow_dev_stop_process api "${api_port}"
+  spendflow_dev_stop_process ui "${ui_port}"
+}
+
+spendflow_remove_stale_app_containers() {
+  local name state
+  for name in spendflow-api spendflow-ui spendflow-worker; do
+    if ! podman container exists "${name}" 2>/dev/null; then
+      continue
+    fi
+    state="$(podman inspect --format '{{.State.Status}}' "${name}" 2>/dev/null || echo missing)"
+    if [[ "${state}" != "running" ]]; then
+      podman rm -f "${name}" 2>/dev/null || true
+    fi
+  done
+}
+
+spendflow_compose_service_names() {
+  local -a services=()
+  if [[ "${SPENDFLOW_EXTERNAL_POSTGRES:-false}" != "true" ]]; then
+    services+=(postgres)
+  fi
+  services+=(redis api worker ui)
+  printf '%s\n' "${services[@]}"
 }
 
 spendflow_stop_dev_servers() {
   if [[ "${SPENDFLOW_STOP_DEV:-true}" != "true" ]]; then
     return 0
   fi
-  echo "==> Freeing ports ${SPENDFLOW_API_PORT} and ${SPENDFLOW_UI_PORT} (stop npm dev if running)"
+  spendflow_stop_dev_pid_servers
+  echo "==> Freeing ports ${SPENDFLOW_API_PORT} and ${SPENDFLOW_UI_PORT} for container deploy"
   spendflow_stop_port "${SPENDFLOW_API_PORT}"
   spendflow_stop_port "${SPENDFLOW_UI_PORT}"
-  sleep 1
+  spendflow_assert_port_free "${SPENDFLOW_API_PORT}" "API" || return 1
+  spendflow_assert_port_free "${SPENDFLOW_UI_PORT}" "UI" || return 1
 }
 
 # --- Local development (Postgres in Podman, API + UI on host) ---
