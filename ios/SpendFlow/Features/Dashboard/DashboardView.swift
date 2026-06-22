@@ -7,8 +7,11 @@ final class DashboardViewModel {
     var chartData: ChartDataResponse?
     var accounts: [Account] = []
     var members: [HouseholdMember] = []
+    var householdInsights: HouseholdInsightsResponse?
     var profile: UserProfileResponse?
-    var alerts: [Alert] = []
+
+    var periodMode: DashboardPeriodMode = .rolling
+    var selectedMonth: String = DashboardDateRange.currentMonthKey()
 
     var selectedAccountId = ""
     var selectedCategory = ""
@@ -19,39 +22,50 @@ final class DashboardViewModel {
     var isChartLoading = false
     var errorMessage: String?
 
-    func load(api: APIClient, period: AnalyticsPeriodStore) async {
+    var periodLabel: String {
+        DashboardDateRange.periodLabel(mode: periodMode, monthKey: selectedMonth)
+    }
+
+    private var dateRange: (from: String, to: String) {
+        DashboardDateRange.resolve(mode: periodMode, monthKey: selectedMonth)
+    }
+
+    func load(api: APIClient) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
-        let range = period.dateRange
+        let range = dateRange
 
         do {
             async let summaryTask = api.getSummary(from: range.from, to: range.to)
-            async let alertsTask = api.getAlerts()
             async let accountsTask = api.getAccounts()
             async let profileTask = api.getUserProfile()
 
             summary = try await summaryTask
-            alerts = try await alertsTask.alerts
             accounts = try await accountsTask.accounts
             profile = try await profileTask
 
             if let household = try? await api.getHousehold() {
                 members = household.members
+                if members.count > 1 {
+                    householdInsights = try? await api.getHouseholdInsights(from: range.from, to: range.to)
+                } else {
+                    householdInsights = nil
+                }
             }
         } catch {
             errorMessage = error.localizedDescription
         }
 
-        await loadChartData(api: api, period: period)
+        await loadChartData(api: api)
     }
 
-    func loadChartData(api: APIClient, period: AnalyticsPeriodStore) async {
+    func loadChartData(api: APIClient) async {
         isChartLoading = true
         defer { isChartLoading = false }
 
-        let range = period.dateRange
+        let range = dateRange
         var filters = ChartDataFilters(from: range.from, to: range.to)
         if !selectedAccountId.isEmpty { filters.accountId = selectedAccountId }
         if !selectedCategory.isEmpty { filters.category = selectedCategory }
@@ -87,6 +101,9 @@ final class DashboardViewModel {
     ) -> TransactionsDrilldownConfig {
         var filters = TransactionFilters()
         filters.type = type
+        if periodMode == .month {
+            filters.month = selectedMonth
+        }
         if !selectedCategory.isEmpty { filters.category = selectedCategory }
         if !selectedAccountId.isEmpty { filters.accountId = selectedAccountId }
         if !selectedMemberId.isEmpty {
@@ -109,25 +126,28 @@ struct DashboardView: View {
             content
         }
         .refreshable {
-            await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod)
+            await viewModel.load(api: appState.apiClient)
         }
         .task(id: appState.refreshCenter.refreshToken) {
-            await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod)
+            await viewModel.load(api: appState.apiClient)
         }
-        .onChange(of: appState.analyticsPeriod.period) { _, _ in
-            Task { await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod) }
+        .onChange(of: viewModel.periodMode) { _, _ in
+            Task { await viewModel.load(api: appState.apiClient) }
+        }
+        .onChange(of: viewModel.selectedMonth) { _, _ in
+            Task { await viewModel.load(api: appState.apiClient) }
         }
         .onChange(of: viewModel.selectedAccountId) { _, _ in
-            Task { await viewModel.loadChartData(api: appState.apiClient, period: appState.analyticsPeriod) }
+            Task { await viewModel.loadChartData(api: appState.apiClient) }
         }
         .onChange(of: viewModel.selectedCategory) { _, _ in
-            Task { await viewModel.loadChartData(api: appState.apiClient, period: appState.analyticsPeriod) }
+            Task { await viewModel.loadChartData(api: appState.apiClient) }
         }
         .onChange(of: viewModel.selectedMemberId) { _, _ in
-            Task { await viewModel.loadChartData(api: appState.apiClient, period: appState.analyticsPeriod) }
+            Task { await viewModel.loadChartData(api: appState.apiClient) }
         }
         .onChange(of: viewModel.scope) { _, _ in
-            Task { await viewModel.loadChartData(api: appState.apiClient, period: appState.analyticsPeriod) }
+            Task { await viewModel.loadChartData(api: appState.apiClient) }
         }
         .sheet(item: $drilldownConfig) { config in
             NavigationStack {
@@ -157,13 +177,21 @@ struct DashboardView: View {
             LoadingStateView(message: "Loading your vibe check…")
         } else if let error = viewModel.errorMessage, viewModel.summary == nil {
             ErrorStateView(message: error) {
-                Task { await viewModel.load(api: appState.apiClient, period: appState.analyticsPeriod) }
+                Task { await viewModel.load(api: appState.apiClient) }
             }
         } else if let summary = viewModel.summary {
-            AnalyticsPeriodPicker(store: appState.analyticsPeriod)
+            DashboardPeriodControls(
+                mode: $viewModel.periodMode,
+                selectedMonth: $viewModel.selectedMonth
+            )
             profileNudge
             heroCard(summary: summary)
-            alertsSection
+            if let insights = viewModel.householdInsights {
+                FamilyMemberMetricsView(
+                    members: insights.members,
+                    periodLabel: viewModel.periodLabel
+                )
+            }
             analyticsSection
             quickStats(summary: summary)
         }
@@ -273,7 +301,7 @@ struct DashboardView: View {
         .onTapGesture {
             drilldownConfig = viewModel.drilldownConfig(
                 title: "Monthly spending",
-                subtitle: appState.analyticsPeriod.periodLabel
+                subtitle: viewModel.periodLabel
             )
         }
     }
@@ -343,7 +371,7 @@ struct DashboardView: View {
     private func heroCard(summary: TransactionSummary) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Net savings · \(appState.analyticsPeriod.periodLabel)")
+                Text("Net savings · \(viewModel.periodLabel)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.85))
                 Spacer()
@@ -353,7 +381,7 @@ struct DashboardView: View {
             Button {
                 drilldownConfig = viewModel.drilldownConfig(
                     title: "Net savings",
-                    subtitle: "Income minus expenses · \(appState.analyticsPeriod.periodLabel)",
+                    subtitle: "Income minus expenses · \(viewModel.periodLabel)",
                     type: nil
                 )
             } label: {
@@ -397,7 +425,7 @@ struct DashboardView: View {
         Button {
             drilldownConfig = viewModel.drilldownConfig(
                 title: label,
-                subtitle: appState.analyticsPeriod.periodLabel,
+                subtitle: viewModel.periodLabel,
                 type: type
             )
         } label: {
@@ -414,20 +442,6 @@ struct DashboardView: View {
             .clipShape(RoundedRectangle(cornerRadius: SpendFlowTheme.radiusSM, style: .continuous))
         }
         .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private var alertsSection: some View {
-        if !viewModel.alerts.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Heads up")
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(SpendFlowTheme.text)
-                ForEach(viewModel.alerts) { alert in
-                    AlertBanner(alert: alert)
-                }
-            }
-        }
     }
 
     private func quickStats(summary: TransactionSummary) -> some View {

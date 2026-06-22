@@ -6,11 +6,17 @@ final class CategoriesViewModel {
     var categories: [CategoryTotal] = []
     var chartData: ChartDataResponse?
     var accounts: [Account] = []
+    var members: [HouseholdMember] = []
     var selectedAccountId = ""
+    var selectedMemberId = ""
     var selectedCategory = ""
     var isLoading = false
     var isChartLoading = false
     var errorMessage: String?
+
+    var hasMultipleAccounts: Bool { accounts.count > 1 }
+    var hasMultipleMembers: Bool { members.count > 1 }
+    var showTopFilters: Bool { hasMultipleAccounts || hasMultipleMembers }
 
     func load(api: APIClient, period: AnalyticsPeriodStore) async {
         isLoading = true
@@ -22,8 +28,15 @@ final class CategoriesViewModel {
         do {
             async let categoriesTask = api.getCategories(from: range.from, to: range.to)
             async let accountsTask = api.getAccounts()
+            async let householdTask: HouseholdResponse? = {
+                do { return try await api.getHousehold() } catch { return nil }
+            }()
+
             let response = try await categoriesTask
             accounts = try await accountsTask.accounts
+            if let household = await householdTask {
+                members = household.members
+            }
             categories = response.categories.sorted { lhs, rhs in
                 (Decimal(string: lhs.amount) ?? 0) > (Decimal(string: rhs.amount) ?? 0)
             }
@@ -42,6 +55,7 @@ final class CategoriesViewModel {
         var filters = ChartDataFilters(from: range.from, to: range.to)
         if !selectedAccountId.isEmpty { filters.accountId = selectedAccountId }
         if !selectedCategory.isEmpty { filters.category = selectedCategory }
+        if !selectedMemberId.isEmpty { filters.memberId = selectedMemberId }
 
         do {
             chartData = try await api.getChartData(filters: filters)
@@ -73,6 +87,7 @@ final class CategoriesViewModel {
 
     func clearFilters() {
         selectedAccountId = ""
+        selectedMemberId = ""
         selectedCategory = ""
     }
 }
@@ -91,7 +106,7 @@ struct CategoriesView: View {
                 }
             } else {
                 AnalyticsPeriodPicker(store: appState.analyticsPeriod)
-                accountFilter
+                topFilters
 
                 if viewModel.isChartLoading, viewModel.chartData == nil {
                     LoadingStateView(message: "Loading charts…")
@@ -100,9 +115,10 @@ struct CategoriesView: View {
                         monthly: chartData.monthly,
                         yearly: chartData.yearly,
                         periodTitle: appState.analyticsPeriod.periodLabel,
-                        accountFiltered: !viewModel.selectedAccountId.isEmpty
+                        accountFiltered: !viewModel.selectedAccountId.isEmpty || !viewModel.selectedMemberId.isEmpty
                     )
 
+                    chartFilterBar
                     categoryCharts(chartData)
                 }
 
@@ -121,22 +137,76 @@ struct CategoriesView: View {
         .onChange(of: viewModel.selectedAccountId) { _, _ in
             Task { await viewModel.loadChartData(api: appState.apiClient, period: appState.analyticsPeriod) }
         }
+        .onChange(of: viewModel.selectedMemberId) { _, _ in
+            Task { await viewModel.loadChartData(api: appState.apiClient, period: appState.analyticsPeriod) }
+        }
         .onChange(of: viewModel.selectedCategory) { _, _ in
             Task { await viewModel.loadChartData(api: appState.apiClient, period: appState.analyticsPeriod) }
         }
     }
 
-    private var accountFilter: some View {
+    @ViewBuilder
+    private var topFilters: some View {
+        if viewModel.showTopFilters {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                if viewModel.hasMultipleMembers {
+                    FilterMenuField(
+                        title: "Person",
+                        selection: memberLabel,
+                        options: memberOptions
+                    ) { option in
+                        viewModel.selectedMemberId = option.id
+                        Task { await viewModel.loadChartData(api: appState.apiClient, period: appState.analyticsPeriod) }
+                    }
+                }
+                if viewModel.hasMultipleAccounts {
+                    FilterMenuField(
+                        title: "Account",
+                        selection: accountLabel,
+                        options: accountOptions
+                    ) { option in
+                        viewModel.selectedAccountId = option.id
+                        Task { await viewModel.loadChartData(api: appState.apiClient, period: appState.analyticsPeriod) }
+                    }
+                }
+            }
+        }
+    }
+
+    private var memberOptions: [FilterMenuOption] {
+        [FilterMenuOption(id: "", label: "All people")]
+            + viewModel.members.map { FilterMenuOption(id: $0.id, label: $0.displayName) }
+    }
+
+    private var accountOptions: [FilterMenuOption] {
+        [FilterMenuOption(id: "", label: "All accounts")]
+            + viewModel.accounts.map { account in
+                let label = account.mask.map { "\(account.name) ••\($0)" } ?? account.name
+                return FilterMenuOption(id: account.id, label: label)
+            }
+    }
+
+    private var memberLabel: String {
+        memberOptions.first(where: { $0.id == viewModel.selectedMemberId })?.label ?? "All people"
+    }
+
+    private var accountLabel: String {
+        accountOptions.first(where: { $0.id == viewModel.selectedAccountId })?.label ?? "All accounts"
+    }
+
+    private var chartFilterBar: some View {
         AnalyticsFilterBar(
             accounts: viewModel.accounts,
-            categories: [],
+            categories: viewModel.chartData?.byCategory.map(\.name) ?? [],
+            members: viewModel.members,
             selectedAccountId: $viewModel.selectedAccountId,
             selectedCategory: $viewModel.selectedCategory,
-            selectedMemberId: .constant(""),
+            selectedMemberId: $viewModel.selectedMemberId,
             scope: .constant(.all),
             showScope: false,
-            showMembers: false,
-            showCategories: false,
+            showMembers: !viewModel.hasMultipleMembers,
+            showAccounts: !viewModel.hasMultipleAccounts,
+            showCategories: true,
             onClear: { viewModel.clearFilters() }
         )
     }

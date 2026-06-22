@@ -24,7 +24,10 @@ struct TransactionsView: View {
                     }
                 }
             )
-            .onChange(of: bindableModel.filter) { _, _ in
+            .onChange(of: bindableModel.filter) { _, newValue in
+                if newValue != .expense {
+                    bindableModel.categorizationStatus = nil
+                }
                 Task { await viewModel.reload(api: appState.apiClient) }
             }
 
@@ -33,6 +36,15 @@ struct TransactionsView: View {
             searchBar
 
             filterMenus
+
+            if viewModel.categorizationStatus != nil {
+                Text("Showing expenses that need a category or subcategory. Tap a row to classify it.")
+                    .font(.caption)
+                    .foregroundStyle(SpendFlowTheme.textMuted)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(SpendFlowTheme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: SpendFlowTheme.radiusSM))
+            }
 
             if let feedback = viewModel.feedbackMessage {
                 Text(feedback)
@@ -192,6 +204,21 @@ struct TransactionsView: View {
             }
 
             filterMenu(
+                title: "Categorization",
+                selection: viewModel.selectedCategorizationLabel,
+                options: viewModel.categorizationOptions
+            ) { option in
+                if let status = CategorizationStatus(rawValue: option.id) {
+                    viewModel.categorizationStatus = status
+                    viewModel.filter = .expense
+                    viewModel.selectedCategory = nil
+                } else {
+                    viewModel.categorizationStatus = nil
+                }
+                Task { await viewModel.reload(api: appState.apiClient) }
+            }
+
+            filterMenu(
                 title: "Account",
                 selection: viewModel.selectedAccountLabel,
                 options: viewModel.accountOptions
@@ -206,6 +233,7 @@ struct TransactionsView: View {
                 options: viewModel.categoryOptions
             ) { option in
                 viewModel.selectedCategory = option.id.nilIfEmpty
+                viewModel.categorizationStatus = nil
                 Task { await viewModel.reload(api: appState.apiClient) }
             }
 
@@ -275,8 +303,16 @@ struct TransactionsView: View {
                 Task { await viewModel.reload(api: appState.apiClient) }
             }
         } else if viewModel.transactions.isEmpty {
-            ContentUnavailableView("No transactions", systemImage: "tray", description: Text("Try changing your filters"))
-                .frame(minHeight: 220)
+            ContentUnavailableView(
+                viewModel.categorizationStatus == nil ? "No transactions" : "All caught up",
+                systemImage: "tray",
+                description: Text(
+                    viewModel.categorizationStatus == nil
+                        ? "Try changing your filters"
+                        : "Nothing left to review — you're all caught up"
+                )
+            )
+            .frame(minHeight: 220)
         } else {
             LazyVStack(spacing: 10) {
                 ForEach(viewModel.transactions) { transaction in
@@ -402,6 +438,7 @@ final class TransactionsViewModel {
     var selectedMonth: String?
     var selectedAccountId: String?
     var selectedCategory: String?
+    var categorizationStatus: CategorizationStatus?
     var selectedMemberId: String?
     var scope: ViewScope = .all
     var sort: TransactionSort = .dateDesc
@@ -503,6 +540,16 @@ final class TransactionsViewModel {
 
     var selectedCategoryLabel: String {
         categoryOptions.first(where: { $0.id == (selectedCategory ?? "") })?.label ?? "All categories"
+    }
+
+    var categorizationOptions: [FilterOption] {
+        [FilterOption(id: "", label: "All transactions")]
+            + CategorizationStatus.allCases.map { FilterOption(id: $0.rawValue, label: $0.label) }
+    }
+
+    var selectedCategorizationLabel: String {
+        categorizationOptions.first(where: { $0.id == (categorizationStatus?.rawValue ?? "") })?.label
+            ?? "All transactions"
     }
 
     func loadMetadata(api: APIClient) async {
@@ -630,11 +677,16 @@ final class TransactionsViewModel {
 
     private func buildFilters(cursor: String? = nil) -> TransactionFilters {
         var filters = TransactionFilters()
-        filters.type = filter.transactionType
+        if let categorizationStatus {
+            filters.type = .expense
+            filters.categorizationStatus = categorizationStatus
+        } else {
+            filters.type = filter.transactionType
+            filters.category = selectedCategory
+        }
         filters.query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         filters.month = selectedMonth
         filters.accountId = selectedAccountId
-        filters.category = selectedCategory
         filters.memberId = selectedMemberId
         if selectedMemberId == nil {
             filters.scope = scope
